@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<!--
+  The overlay drawn on top of the video. Used twice:
+    * by the renderer (headless Chromium -> transparent PNGs), and
+    * by the editor, inside an <iframe> over the video, for a live preview.
+  Layout is defined on a 1080 x 1920 canvas and scaled to the output size.
+-->
+<style>
+  @font-face { font-family: "Amiri Quran"; src: url("/fonts/AmiriQuran-Regular.ttf"); }
+  @font-face { font-family: "Comic Neue"; font-weight: 400; src: url("/fonts/ComicNeue-Regular.ttf"); }
+  @font-face { font-family: "Comic Neue"; font-weight: 700; src: url("/fonts/ComicNeue-Bold.ttf"); }
+
+  :root {
+    --latin: "Comic Neue", "Comic Sans MS", system-ui, sans-serif;
+    --arabic: "Amiri Quran", "Amiri", serif;
+    --outline: #0b0b0d;
+    --title-grad: linear-gradient(90deg, #f07ad6 0%, #c79ee0 38%, #a9bfe0 62%, #86dde6 100%);
+    --reciter-grad: linear-gradient(90deg, #86dccb 0%, #b4b0aa 55%, #e6a1a5 100%);
+    --white: #f6f6f8;
+    --phonetic: #f3df8f;
+    --hl-grad: linear-gradient(90deg, #ef86d6 0%, #b9a8de 50%, #82dcdb 100%);
+    --hl-arabic-grad: linear-gradient(90deg, #7fded0 0%, #a9c6c4 50%, #e3a6a6 100%);
+    --hl-phonetic: #f09aa4;
+    --block-top: 1188px;
+  }
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body { width: 1080px; height: 1920px; overflow: hidden; position: relative; transform-origin: 0 0; }
+
+  /* Outlined text: every text is two stacked copies. The lower one (.o)
+     carries the outline and shadow; the upper one (.f) the fill, flat or
+     gradient, so the fill stays crisp on top of the outline. */
+  .ol { position: relative; display: inline-block; }
+  .ol > .o, .ol > .f { display: block; }
+  .ol > .o {
+    position: absolute; inset: 0; color: var(--outline);
+    -webkit-text-stroke: var(--sw, 6px) var(--outline);
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .55));
+  }
+  .ol > .f { position: relative; }
+  .grad > .f { background: var(--g); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  #header { position: absolute; top: 140px; left: 0; right: 0; text-align: center; }
+  #title { font: 700 64px/1.1 var(--latin); letter-spacing: .5px; --g: var(--title-grad); --sw: 7px; white-space: nowrap; }
+  #reciter { font: 700 34px/1.2 var(--latin); --g: var(--reciter-grad); --sw: 5px; }
+  #reciter-line { margin-top: 30px; }
+  #mic { font-size: 30px; margin-right: 10px; vertical-align: 4px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+
+  #block { position: absolute; top: var(--block-top); left: 70px; right: 70px; text-align: center; }
+  #block[hidden] { display: none; }
+  #num { font: 400 34px/1 var(--latin); color: var(--white); --sw: 5px; }
+  #fr-box { min-height: 86px; display: flex; align-items: center; justify-content: center; margin-top: 10px; }
+  #fr { font: 400 35px/1.18 var(--latin); color: var(--white); --sw: 5px; max-width: 900px; text-wrap: balance; white-space: pre-line; }
+  #ar-box { margin-top: 30px; min-height: 80px; display: flex; align-items: center; justify-content: center; }
+  #ar { font: 400 42px/1.75 var(--arabic); direction: rtl; color: var(--white); --sw: 5px; max-width: 920px; text-wrap: balance; }
+  #tr { margin-top: 60px; font: 400 29px/1.2 var(--latin); color: var(--phonetic); --sw: 4px; max-width: 940px; text-wrap: balance; }
+
+  #block.hl #num { color: #ef8fb8; }
+  #block.hl #fr { --g: var(--hl-grad); }
+  #block.hl #ar { --g: var(--hl-arabic-grad); }
+  #block.hl #tr { color: var(--hl-phonetic); }
+</style>
+</head>
+<body>
+  <div id="header">
+    <div><span id="title" class="ol grad"></span></div>
+    <div id="reciter-line"><span id="mic">🎙️</span><span id="reciter" class="ol grad"></span></div>
+  </div>
+  <div id="block" hidden>
+    <div><span id="num" class="ol"></span></div>
+    <div id="fr-box"><span id="fr" class="ol"></span></div>
+    <div id="ar-box"><span id="ar" class="ol" lang="ar"></span></div>
+    <div><span id="tr" class="ol"></span></div>
+  </div>
+<script>
+  function setText(el, text) {
+    el.replaceChildren();
+    for (const cls of ["o", "f"]) {
+      const layer = document.createElement("span");
+      layer.className = cls;
+      layer.textContent = text || "";
+      el.append(layer);
+    }
+    el.style.display = text ? "" : "none";
+  }
+  // When French text needs two lines, break it after a sentence end close to
+  // the middle (if both halves fit) rather than wherever the width runs out.
+  const measure = document.createElement("span");
+  measure.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:400 35px/1.18 var(--latin)";
+  document.body.append(measure);
+  function lineWidth(t) { measure.textContent = t; return measure.getBoundingClientRect().width; }
+  function sentenceBreak(text) {
+    const max = parseFloat(getComputedStyle(document.getElementById("fr")).maxWidth) || 900;
+    if (text.includes("\n") || lineWidth(text) <= max) return text;
+    let best = null;
+    for (const m of text.matchAll(/[.!?;»:](?=\s)/g)) {
+      const a = text.slice(0, m.index + 1).trim(), b = text.slice(m.index + 1).trim();
+      const wa = lineWidth(a), wb = lineWidth(b);
+      if (wa > max || wb > max) continue;
+      const balance = Math.abs(wa - wb) / (wa + wb);
+      if (balance < 0.45 && (!best || balance < best.balance)) best = { a, b, balance };
+    }
+    return best ? best.a + "\n" + best.b : text;
+  }
+  // header: {title, reciter, visible}
+  window.setHeader = function (h) {
+    document.getElementById("header").style.display = h && h.visible !== false ? "" : "none";
+    if (!h) return;
+    setText(document.getElementById("title"), h.title);
+    setText(document.getElementById("reciter"), h.reciter);
+    document.getElementById("reciter-line").style.display = h.reciter ? "" : "none";
+  };
+  // block: {num, fr, ar, tr, highlight} or null
+  window.setBlock = function (b) {
+    const el = document.getElementById("block");
+    el.hidden = !b;
+    if (!b) return;
+    el.classList.toggle("hl", !!b.highlight);
+    setText(document.getElementById("num"), b.num);
+    setText(document.getElementById("fr"), sentenceBreak(b.fr || ""));
+    setText(document.getElementById("ar"), b.ar);
+    setText(document.getElementById("tr"), b.tr);
+    for (const id of ["fr", "ar"]) document.getElementById(id).classList.toggle("grad", !!b.highlight);
+  };
+  // style overrides: {"--block-top": "1150px", ...}
+  window.setStyle = function (vars) {
+    for (const [k, v] of Object.entries(vars || {})) document.documentElement.style.setProperty(k, v);
+  };
+  window.ready = document.fonts.ready;
+</script>
+</body>
+</html>

@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tilawa Studio</title>
+<style>
+  @font-face { font-family: "Amiri Quran"; src: url("/fonts/AmiriQuran-Regular.ttf"); }
+  :root {
+    --bg: #0f1214; --panel: #171b1f; --panel2: #1e2328; --line: #2a3036; --text: #e8eaed; --muted: #9aa3ab;
+    --accent: #5fd3c6; --accent2: #f3df8f; --pink: #ef86d6; --danger: #ff7a7a; --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #062421; border-color: var(--accent); font-weight: 600; }
+  button.primary:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: transparent; }
+  button.small { padding: 3px 8px; font-size: 13px; }
+  input, select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 5px; }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .3px; cursor: pointer; }
+  header h1 span { color: var(--accent); }
+  header .grow { flex: 1; }
+  main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+  .field { margin-bottom: 14px; }
+  .muted { color: var(--muted); }
+  .hidden { display: none !important; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* home */
+  #home { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .drop { border: 2px dashed var(--line); border-radius: var(--radius); padding: 22px; text-align: center; cursor: pointer; transition: .15s; }
+  .drop.over, .drop:hover { border-color: var(--accent); background: rgba(95, 211, 198, .05); }
+  .drop strong { color: var(--accent); }
+  .or { text-align: center; color: var(--muted); margin: 10px 0; font-size: 13px; }
+  .projects { display: grid; gap: 10px; }
+  .proj { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: var(--panel2); border-radius: 10px; cursor: pointer; border: 1px solid transparent; }
+  .proj:hover { border-color: var(--accent); }
+  .proj small { color: var(--muted); }
+  .progress { height: 8px; background: var(--panel2); border-radius: 6px; overflow: hidden; margin-top: 10px; }
+  .progress > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0; transition: width .3s; }
+  .error { color: var(--danger); white-space: pre-wrap; font-size: 13px; margin-top: 8px; }
+
+  /* editor */
+  #editor { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 20px; align-items: start; }
+  .stage-col { position: sticky; top: 70px; }
+  .stage { position: relative; width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: var(--radius); overflow: hidden; }
+  .stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .stage iframe { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .transport { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .transport .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; min-width: 110px; }
+  .timeline { position: relative; height: 34px; background: var(--panel2); border-radius: 8px; margin-top: 10px; cursor: pointer; overflow: hidden; }
+  .timeline .seg { position: absolute; top: 5px; bottom: 5px; border-radius: 4px; background: #2f5d58; border: 1px solid #3f7b74; font-size: 10px; color: #cfe; overflow: hidden; padding: 1px 3px; white-space: nowrap; }
+  .timeline .seg.hl { background: #5a3a57; border-color: #8a5a86; }
+  .timeline .seg.active { background: var(--accent); color: #062421; }
+  .timeline .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent2); }
+  .settings { margin-top: 14px; }
+  .settings summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
+  .blocks { display: grid; gap: 10px; }
+  .block { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+  .block.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .block .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .block .num { font-weight: 700; color: var(--accent2); min-width: 44px; cursor: pointer; }
+  .block .times { display: flex; gap: 4px; align-items: center; font-variant-numeric: tabular-nums; font-size: 13px; }
+  .block .times input { width: 74px; padding: 3px 6px; text-align: center; }
+  .block .ar { font: 30px/1.9 "Amiri Quran", serif; direction: rtl; text-align: right; margin: 6px 0 2px; }
+  .block .words { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+  .block .words span { font-size: 13px; padding: 1px 6px; border-radius: 6px; background: var(--panel2); color: var(--accent2); cursor: pointer; border: 1px solid transparent; }
+  .block .words span:hover { border-color: var(--pink); }
+  .block .words span.cut::before { content: "✂ "; color: var(--pink); }
+  .block textarea { min-height: 54px; resize: vertical; }
+  .block .tools { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+  .block .tools .grow { flex: 1; }
+  .toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); cursor: pointer; }
+  .toggle input { width: auto; }
+  .help { font-size: 13px; color: var(--muted); background: var(--panel2); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .done-box { background: rgba(95, 211, 198, .08); border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-top: 12px; }
+  @media (max-width: 960px) {
+    #home, #editor { grid-template-columns: 1fr; }
+    .stage-col { position: static; max-width: 420px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 onclick="go('')">🎙️ Tilawa <span>Studio</span></h1>
+  <div class="grow"></div>
+  <span id="saved" class="muted" style="font-size:13px"></span>
+  <button onclick="go('')">Accueil</button>
+</header>
+
+<main>
+  <!-- HOME -->
+  <section id="home">
+    <div class="card">
+      <h2 style="margin-top:0">Nouvelle vidéo</h2>
+      <div class="field">
+        <div id="drop" class="drop">
+          <div>Dépose la vidéo de la récitation ici<br><span class="muted">ou</span> <strong>clique pour choisir un fichier</strong></div>
+          <div id="file-name" class="muted" style="margin-top:6px"></div>
+          <input id="file" type="file" accept="video/*,.mkv,.mov,.webm" class="hidden">
+        </div>
+        <div class="or">— ou —</div>
+        <input id="url" placeholder="Colle un lien (YouTube, Instagram, TikTok…)">
+      </div>
+      <div class="grid3">
+        <div class="field">
+          <label>Sourate</label>
+          <select id="surah"></select>
+        </div>
+        <div class="field">
+          <label>1er verset (environ)</label>
+          <input id="first" type="number" min="1" value="1">
+        </div>
+        <div class="field">
+          <label>Dernier (optionnel)</label>
+          <input id="last" type="number" min="1" placeholder="auto">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Récitateur</label>
+          <input id="reciter" list="reciters" placeholder="ex. Muhammad Dibirov">
+          <datalist id="reciters"></datalist>
+        </div>
+        <div class="field">
+          <label>Titre en haut</label>
+          <input id="title">
+        </div>
+      </div>
+      <button id="go" class="primary" onclick="createProject()">Analyser la récitation</button>
+      <div id="job-box" class="hidden">
+        <div id="job-stage" class="muted" style="margin-top:12px"></div>
+        <div class="progress"><div id="job-bar"></div></div>
+        <div id="job-error" class="error"></div>
+      </div>
+      <p class="muted" style="font-size:13px;margin-bottom:0">Le logiciel écoute la récitation, retrouve chaque mot du Coran
+        et place automatiquement l'arabe, la traduction (Hamidullah) et la phonétique au bon moment. Tu pourras tout vérifier avant de créer la vidéo.</p>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Mes projets</h2>
+      <div id="projects" class="projects"><span class="muted">Aucun projet pour l'instant.</span></div>
+    </div>
+  </section>
+
+  <!-- EDITOR -->
+  <section id="editor" class="hidden">
+    <div class="stage-col">
+      <div class="stage" id="stage">
+        <video id="video" playsinline preload="auto"></video>
+        <iframe id="overlay" src="/overlay.html" title="aperçu"></iframe>
+      </div>
+      <div class="transport">
+        <button id="play" onclick="togglePlay()">▶︎ Lecture</button>
+        <span class="time" id="time">0:00.0</span>
+        <button class="ghost small" onclick="step(-1)" title="bloc précédent">⏮</button>
+        <button class="ghost small" onclick="step(1)" title="bloc suivant">⏭</button>
+      </div>
+      <div class="timeline" id="timeline"><div class="head" id="head"></div></div>
+
+      <div class="card settings">
+        <div class="grid2">
+          <div class="field"><label>Titre</label><input id="e-title" oninput="setMeta()"></div>
+          <div class="field"><label>Récitateur</label><input id="e-reciter" oninput="setMeta()"></div>
+        </div>
+        <details>
+          <summary>Réglages de la vidéo</summary>
+          <div class="grid2">
+            <div class="field"><label>Résolution</label>
+              <select id="r-size" onchange="setRender()">
+                <option value="auto">Native (aucune perte)</option>
+                <option value="1080x1920">1080 × 1920</option>
+                <option value="1440x2560">1440 × 2560 (2K)</option>
+                <option value="2160x3840">2160 × 3840 (4K, meilleur rendu YouTube)</option>
+              </select></div>
+            <div class="field"><label>Qualité</label>
+              <select id="r-quality" onchange="setRender()">
+                <option value="max">Maximale (H.264, compatible partout)</option>
+                <option value="hevc">Maximale 10-bit (H.265)</option>
+                <option value="high">Haute (fichier plus léger)</option>
+                <option value="prores">Master ProRes (pour retravailler au montage)</option>
+              </select></div>
+            <div class="field"><label>Vidéo horizontale</label>
+              <select id="r-fit" onchange="setRender()">
+                <option value="auto">Automatique</option>
+                <option value="blur">Fond flouté</option>
+                <option value="crop">Recadrer au centre</option>
+                <option value="pad">Bandes noires</option>
+              </select></div>
+            <div class="field"><label>Fondu (secondes)</label>
+              <input id="r-fade" type="number" step="0.05" min="0" max="1" onchange="setRender()"></div>
+            <div class="field"><label>Couper le début à (s)</label>
+              <input id="r-trim-start" type="number" step="0.1" min="0" onchange="setRender()"></div>
+            <div class="field"><label>Couper la fin à (s)</label>
+              <input id="r-trim-end" type="number" step="0.1" min="0" placeholder="fin" onchange="setRender()"></div>
+          </div>
+          <label class="toggle"><input id="r-header" type="checkbox" onchange="setRender()"> Afficher le titre et le récitateur</label>
+          <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+          <div class="row">
+            <div style="width:90px"><label>Du verset</label><input id="a-first" type="number" min="1"></div>
+            <div style="width:90px"><label>Au verset</label><input id="a-last" type="number" min="1" placeholder="auto"></div>
+            <button style="align-self:end" onclick="reanalyze()">Réanalyser</button>
+            <button style="align-self:end" class="ghost" onclick="retimeAll()" title="annule les modifications d'horaires">Horaires auto</button>
+          </div>
+        </details>
+        <div style="margin-top:14px">
+          <button id="render" class="primary" style="width:100%;padding:11px" onclick="renderVideo()">Créer la vidéo</button>
+          <div id="r-box" class="hidden">
+            <div id="r-stage" class="muted" style="margin-top:10px"></div>
+            <div class="progress"><div id="r-bar"></div></div>
+            <div id="r-error" class="error"></div>
+          </div>
+          <div id="r-done" class="done-box hidden"></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="help">Chaque carte = un sous-titre. Vérifie la traduction et le moment d'apparition (▶ pour écouter).
+        Clique sur un mot phonétique pour <b>couper</b> le sous-titre avant ce mot. Les horaires sont en secondes.</div>
+      <div id="notice" class="help hidden" style="border:1px solid var(--accent2)"></div>
+      <div id="blocks" class="blocks"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const STAGES = { queued: "En attente…", download: "Téléchargement de la vidéo…", preview: "Préparation de l'aperçu…",
+  audio: "Lecture de l'audio…", model: "Chargement du modèle de récitation…", listening: "Écoute de la récitation…",
+  aligning: "Recherche de chaque mot…", done: "Terminé", overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…" };
+let surahs = [], P = null, saveTimer = null, overlayReady = false;
+
+async function api(path, opts = {}) {
+  let r;
+  try { r = await fetch(path, opts); }
+  catch { throw new Error("Tilawa Studio est fermé. Relance « Tilawa Studio » (et laisse sa fenêtre ouverte), puis réessaie."); }
+  if (!r.ok) {
+    let msg = r.statusText;
+    try { msg = (await r.json()).detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+// ---------------------------------------------------------------- routing
+function go(hash) { location.hash = hash; }
+window.addEventListener("hashchange", route);
+async function route() {
+  const m = location.hash.match(/^#p\/(.+)$/);
+  $("home").classList.toggle("hidden", !!m);
+  $("editor").classList.toggle("hidden", !m);
+  if (m) await openProject(decodeURIComponent(m[1]));
+  else { $("video").pause(); loadProjects(); }
+}
+
+// The preview overlay is the same page the renderer uses. It may finish
+// loading before or after this script runs, so check both ways.
+async function overlayLoaded() {
+  const w = $("overlay").contentWindow;
+  if (overlayReady || !w || !w.setHeader || !w.ready) return;
+  await w.ready;
+  overlayReady = true; lastShown = -2; fitOverlay(); draw();
+}
+$("overlay").addEventListener("load", overlayLoaded);
+overlayLoaded();
+
+// ---------------------------------------------------------------- home
+async function init() {
+  surahs = await api("/api/surahs");
+  $("surah").innerHTML = surahs.map(s => `<option value="${s.n}">${s.n}. ${s.name} — ${s.fr}</option>`).join("");
+  $("surah").onchange = () => { $("first").max = surahs[$("surah").value - 1].verses; $("title").value = titleFor($("surah").value); };
+  $("surah").onchange();
+  const rec = JSON.parse(localStorage.getItem("reciters") || "[]");
+  $("reciters").innerHTML = rec.map(r => `<option value="${r}">`).join("");
+  const drop = $("drop");
+  drop.onclick = () => $("file").click();
+  $("file").onchange = () => { $("file-name").textContent = $("file").files[0]?.name || ""; if ($("file").files[0]) $("url").value = ""; };
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); $("file").files = e.dataTransfer.files; $("file").onchange(); };
+  new ResizeObserver(fitOverlay).observe($("stage"));
+  route();
+}
+function titleFor(n) { return "SOURATE " + surahs[n - 1].name.toUpperCase().replace(/-/g, " "); }
+
+async function loadProjects() {
+  const list = await api("/api/projects");
+  $("projects").innerHTML = list.length ? list.map(p => `
+    <div class="proj" onclick="go('p/${encodeURIComponent(p.id)}')">
+      <div><b>${esc(p.title)}</b> <small>· v. ${p.first_verse}${p.reciter ? " · " + esc(p.reciter) : ""}</small><br>
+      <small>${new Date(p.modified * 1000).toLocaleString("fr-FR")} · ${p.blocks} sous-titres</small></div>
+      <button class="ghost small" onclick="event.stopPropagation(); delProject('${p.id}')" title="supprimer">🗑</button>
+    </div>`).join("") : `<span class="muted">Aucun projet pour l'instant.</span>`;
+}
+async function delProject(id) {
+  if (!confirm("Supprimer ce projet ? (les vidéos déjà créées sont conservées)")) return;
+  await api(`/api/projects/${id}`, { method: "DELETE" }); loadProjects();
+}
+
+async function createProject() {
+  const file = $("file").files[0], url = $("url").value.trim();
+  if (!file && !url) return alert("Choisis une vidéo ou colle un lien.");
+  const fd = new FormData();
+  fd.append("surah", $("surah").value); fd.append("first_verse", $("first").value);
+  if ($("last").value) fd.append("last_verse", $("last").value);
+  fd.append("reciter", $("reciter").value); fd.append("title", $("title").value);
+  if (file) fd.append("file", file); else fd.append("url", url);
+  const r = $("reciter").value.trim();
+  if (r) {
+    const rec = JSON.parse(localStorage.getItem("reciters") || "[]").filter(x => x !== r);
+    localStorage.setItem("reciters", JSON.stringify([r, ...rec].slice(0, 30)));
+  }
+  $("go").disabled = true; $("job-box").classList.remove("hidden"); $("job-error").textContent = "";
+  $("job-stage").textContent = file ? "Envoi de la vidéo…" : STAGES.queued;
+  try {
+    const { id, job } = await api("/api/projects", { method: "POST", body: fd });
+    await follow(job, $("job-stage"), $("job-bar"));
+    go("p/" + encodeURIComponent(id));
+  } catch (e) { $("job-error").textContent = e.message; }
+  finally { $("go").disabled = false; }
+}
+
+async function follow(job, stageEl, barEl) {
+  while (true) {
+    const j = await api(`/api/jobs/${job}`);
+    stageEl.textContent = STAGES[j.stage] || j.stage;
+    barEl.style.width = (j.progress * 100) + "%";
+    if (j.status === "done") return j.result;
+    if (j.status === "error") throw new Error(j.error);
+    await new Promise(r => setTimeout(r, 400));
+  }
+}
+
+// ---------------------------------------------------------------- editor
+async function openProject(id) {
+  if (!P || P.id !== id) {
+    P = await api(`/api/projects/${encodeURIComponent(id)}`);
+    $("video").src = `/api/projects/${encodeURIComponent(id)}/preview`;
+    $("r-done").classList.add("hidden"); $("r-box").classList.add("hidden");
+  }
+  $("e-title").value = P.title; $("e-reciter").value = P.reciter;
+  const r = P.render;
+  $("r-size").value = r.size; $("r-quality").value = r.quality; $("r-fit").value = r.fit;
+  $("r-fade").value = r.fade_in; $("r-trim-start").value = r.trim_start || ""; $("r-trim-end").value = r.trim_end || "";
+  $("r-header").checked = r.show_header;
+  $("a-first").value = P.first_verse; $("a-last").value = P.last_verse || "";
+  renderBlocks(); renderTimeline(); draw();
+  if (P.output) showDone(P.output);
+  const ayahs = P.blocks.filter(b => b.kind === "verse").map(b => b.ayah);
+  const notice = $("notice");
+  if (!ayahs.length) {
+    notice.textContent = "Aucun verset trouvé. Vérifie la sourate et le verset de départ, puis « Réanalyser ».";
+  } else if (Math.min(...ayahs) !== P.first_verse) {
+    notice.textContent = `La récitation commence en fait au verset ${Math.min(...ayahs)} (tu avais indiqué ${P.first_verse}). ` +
+      `Versets trouvés : ${Math.min(...ayahs)} à ${Math.max(...ayahs)}.`;
+  } else {
+    notice.textContent = `Versets trouvés : ${Math.min(...ayahs)} à ${Math.max(...ayahs)}.`;
+  }
+  notice.classList.remove("hidden");
+}
+
+function fitOverlay() {
+  const w = $("stage").clientWidth;
+  $("overlay").style.transform = `scale(${w / 1080})`;
+}
+
+function payload(b) { return { num: b.kind === "verse" ? b.ayah + "." : "", fr: b.fr, ar: b.ar, tr: b.tr, highlight: b.highlight }; }
+function currentIndex(t) { return P.blocks.findIndex(b => t >= b.start && t < b.end); }
+let lastShown = -2;
+function draw() {
+  if (!P || !overlayReady) return;
+  const t = $("video").currentTime, w = $("overlay").contentWindow;
+  w.setHeader({ title: P.title, reciter: P.reciter, visible: P.render.show_header });
+  const i = currentIndex(t);
+  if (i !== lastShown) {
+    w.setBlock(i >= 0 ? payload(P.blocks[i]) : null);
+    document.querySelectorAll(".block").forEach((el, k) => el.classList.toggle("active", k === i));
+    document.querySelectorAll(".timeline .seg").forEach((el, k) => el.classList.toggle("active", k === i));
+    if (i >= 0 && !$("video").paused) $("b" + i)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    lastShown = i;
+  }
+  // same fades as the final video
+  if (i >= 0) {
+    const b = P.blocks[i], fi = P.render.fade_in, fo = P.render.fade_out;
+    const a = Math.min(1, fi > 0 && i > 0 ? (t - b.start) / fi : 1, fo > 0 ? (b.end - t) / fo : 1);
+    w.document.getElementById("block").style.opacity = Math.max(0, a);
+  }
+  $("time").textContent = fmt(t) + " / " + fmt(P.duration);
+  $("head").style.left = (t / P.duration * 100) + "%";
+  // horizontal sources are not cropped in "blur"/"pad" modes
+  const v = $("video"), horizontal = v.videoWidth / v.videoHeight > 0.8, fit = P.render.fit;
+  v.style.objectFit = fit === "crop" || (fit === "auto" && !horizontal) ? "cover" : "contain";
+}
+function tick() { draw(); requestAnimationFrame(tick); }
+requestAnimationFrame(tick);
+function redraw() { lastShown = -2; draw(); }
+
+function fmt(t) { const m = Math.floor(t / 60), s = (t % 60).toFixed(1).padStart(4, "0"); return `${m}:${s}`; }
+function esc(s) { return (s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function togglePlay() { const v = $("video"); v.paused ? v.play() : v.pause(); }
+$("video").addEventListener("play", () => $("play").textContent = "⏸ Pause");
+$("video").addEventListener("pause", () => $("play").textContent = "▶︎ Lecture");
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, textarea, select") || $("editor").classList.contains("hidden")) return;
+  if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+  if (e.code === "ArrowRight") step(1);
+  if (e.code === "ArrowLeft") step(-1);
+});
+function seek(t) { $("video").currentTime = Math.max(0, t); redraw(); }
+function playBlock(i) { seek(P.blocks[i].start); $("video").play(); }
+function step(d) {
+  const i = currentIndex($("video").currentTime);
+  const j = Math.min(P.blocks.length - 1, Math.max(0, (i < 0 ? 0 : i) + d));
+  seek(P.blocks[j].start + 0.01);
+}
+
+function renderTimeline() {
+  const tl = $("timeline");
+  tl.querySelectorAll(".seg").forEach(x => x.remove());
+  P.blocks.forEach((b, i) => {
+    const s = document.createElement("div");
+    s.className = "seg" + (b.highlight ? " hl" : "");
+    s.style.left = (b.start / P.duration * 100) + "%";
+    s.style.width = ((b.end - b.start) / P.duration * 100) + "%";
+    s.textContent = b.kind === "verse" ? b.ayah : "★";
+    tl.insertBefore(s, $("head"));
+  });
+  tl.onclick = (e) => { const r = tl.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * P.duration); };
+}
+
+function renderBlocks() {
+  $("blocks").innerHTML = P.blocks.map((b, i) => {
+    const label = b.kind === "verse" ? `${b.ayah}.` : b.kind === "basmala" ? "Basmala" : "Isti'adha";
+    const words = b.tr.split(/\s+/);
+    const canSplit = b.kind === "verse" && words.length === b.words.length;
+    const next = P.blocks[i + 1];
+    const canMerge = next && next.kind === b.kind && next.ayah === b.ayah && next.a0 === b.a1;
+    return `<div class="block" id="b${i}">
+      <div class="top">
+        <span class="num" onclick="playBlock(${i})" title="écouter">▶ ${label}</span>
+        <div class="times">
+          <button class="small ghost" onclick="nudge(${i},'start',-0.05)">−</button>
+          <input value="${b.start.toFixed(2)}" onchange="setTime(${i},'start',this.value)">
+          <button class="small ghost" onclick="nudge(${i},'start',0.05)">+</button>
+          <span class="muted">→</span>
+          <button class="small ghost" onclick="nudge(${i},'end',-0.05)">−</button>
+          <input value="${b.end.toFixed(2)}" onchange="setTime(${i},'end',this.value)">
+          <button class="small ghost" onclick="nudge(${i},'end',0.05)">+</button>
+          <button class="small ghost" onclick="toPlayhead(${i})" title="mettre le début à la position de lecture">⤓ ici</button>
+        </div>
+      </div>
+      <div class="ar">${esc(b.ar)}</div>
+      <div class="words">${words.map((w, k) => `<span class="${canSplit && k > 0 ? "cut" : ""}"
+          ${canSplit && k > 0 ? `onclick="splitAt(${i},${k})" title="couper avant « ${esc(w)} » (${fmt(b.words[k].t0)})"` : ""}>${esc(w)}</span>`).join("")}</div>
+      <textarea oninput="setFr(${i}, this.value)">${esc(b.fr)}</textarea>
+      <div class="tools">
+        <label class="toggle"><input type="checkbox" ${b.highlight ? "checked" : ""} onchange="setHl(${i}, this.checked)"> ✨ Mise en valeur (couleurs)</label>
+        <span class="grow"></span>
+        ${canMerge ? `<button class="small" onclick="mergeNext(${i})">Fusionner avec le suivant ↓</button>` : ""}
+        <button class="small ghost" onclick="removeBlock(${i})" title="supprimer ce sous-titre">🗑</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function changed(rerender = false) {
+  if (rerender) { renderBlocks(); renderTimeline(); }
+  redraw();
+  $("saved").textContent = "Enregistrement…";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, 500);
+}
+async function save() {
+  await api(`/api/projects/${encodeURIComponent(P.id)}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: P.title, reciter: P.reciter, blocks: P.blocks, render: P.render }) });
+  $("saved").textContent = "✓ Enregistré";
+}
+function setMeta() { P.title = $("e-title").value; P.reciter = $("e-reciter").value; changed(); }
+function setRender() {
+  const fade = parseFloat($("r-fade").value);
+  Object.assign(P.render, {
+    size: $("r-size").value, quality: $("r-quality").value, fit: $("r-fit").value,
+    fade_in: isNaN(fade) ? 0.25 : fade, fade_out: isNaN(fade) ? 0.25 : fade, show_header: $("r-header").checked,
+    trim_start: parseFloat($("r-trim-start").value) || 0, trim_end: parseFloat($("r-trim-end").value) || null,
+  });
+  changed();
+}
+function setFr(i, v) { P.blocks[i].fr = v; changed(); }
+function setHl(i, v) { P.blocks[i].highlight = v; changed(true); }
+function setTime(i, key, v) {
+  const t = Math.max(0, Math.min(P.duration, parseFloat(v)));
+  if (isNaN(t)) return renderBlocks();
+  const b = P.blocks[i];
+  b[key] = Math.round(t * 1000) / 1000;
+  // keep neighbours touching, as in the automatic timing
+  if (key === "start" && P.blocks[i - 1] && Math.abs(P.blocks[i - 1].end - b.start) < 1.6) P.blocks[i - 1].end = b.start;
+  if (key === "end" && P.blocks[i + 1] && Math.abs(P.blocks[i + 1].start - b.end) < 1.6) P.blocks[i + 1].start = b.end;
+  if (b.end <= b.start) b.end = b.start + 0.2;
+  changed(true);
+  seek(key === "start" ? b.start : Math.max(b.start, b.end - 0.6));
+}
+function nudge(i, key, d) { setTime(i, key, P.blocks[i][key] + d); }
+function toPlayhead(i) { setTime(i, "start", $("video").currentTime); }
+function removeBlock(i) {
+  if (!confirm("Supprimer ce sous-titre ?")) return;
+  const b = P.blocks[i], prev = P.blocks[i - 1];
+  if (prev && Math.abs(prev.end - b.start) < 0.01) prev.end = b.end;
+  P.blocks.splice(i, 1); changed(true);
+}
+async function splitAt(i, k) {
+  await save();
+  P = await api(`/api/projects/${encodeURIComponent(P.id)}/split`, { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ index: i, word: k }) });
+  renderBlocks(); renderTimeline(); redraw();
+}
+async function mergeNext(i) {
+  await save();
+  P = await api(`/api/projects/${encodeURIComponent(P.id)}/merge`, { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ index: i }) });
+  renderBlocks(); renderTimeline(); redraw();
+}
+async function retimeAll() {
+  if (!confirm("Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)")) return;
+  await save();
+  P = await api(`/api/projects/${encodeURIComponent(P.id)}/retime`, { method: "POST" });
+  renderBlocks(); renderTimeline(); redraw();
+}
+async function reanalyze() {
+  if (!confirm("Réanalyser ? Les modifications des sous-titres seront remplacées.")) return;
+  await save();
+  $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
+  try {
+    const { job } = await api(`/api/projects/${encodeURIComponent(P.id)}/analyze`, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ first_verse: $("a-first").value, last_verse: $("a-last").value || null }) });
+    await follow(job, $("r-stage"), $("r-bar"));
+    const id = P.id; P = null; await openProject(id);
+    $("r-box").classList.add("hidden");
+  } catch (e) { $("r-error").textContent = e.message; }
+}
+
+async function renderVideo() {
+  await save();
+  $("render").disabled = true; $("r-done").classList.add("hidden");
+  $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
+  try {
+    const { job } = await api(`/api/projects/${encodeURIComponent(P.id)}/render`, { method: "POST" });
+    const name = await follow(job, $("r-stage"), $("r-bar"));
+    $("r-box").classList.add("hidden");
+    showDone(name);
+  } catch (e) { $("r-error").textContent = e.message; }
+  finally { $("render").disabled = false; }
+}
+function showDone(name) {
+  const box = $("r-done");
+  box.classList.remove("hidden");
+  box.innerHTML = `✅ <b>${esc(name)}</b><div class="row" style="margin-top:8px">
+    <a href="/api/output/${encodeURIComponent(name)}" target="_blank"><button class="small">Voir</button></a>
+    <a href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small">Télécharger</button></a>
+    <button class="small" onclick="fetch('/api/reveal/${encodeURIComponent(name)}', {method:'POST'})">Afficher dans le dossier</button></div>`;
+}
+
+init();
+</script>
+</body>
+</html>
