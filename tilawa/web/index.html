@@ -9,6 +9,7 @@
   :root {
     --bg: #0f1214; --panel: #171b1f; --panel2: #1e2328; --line: #2a3036; --text: #e8eaed; --muted: #9aa3ab;
     --accent: #5fd3c6; --accent2: #f3df8f; --pink: #ef86d6; --danger: #ff7a7a; --radius: 12px;
+    --tl-h: 214px;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -19,21 +20,27 @@
   button.primary:disabled { opacity: .5; cursor: default; }
   button.ghost { background: transparent; }
   button.small { padding: 3px 8px; font-size: 13px; }
+  button.on { background: var(--accent); color: #062421; border-color: var(--accent); }
   input, select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+  input[type=range] { padding: 0; accent-color: var(--accent); }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
   label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 5px; }
-  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  h3 { margin: 0 0 12px; font-size: 16px; }
+  h4 { margin: 18px 0 8px; font-size: 14px; color: var(--accent2); }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 20; }
   header h1 { font-size: 17px; margin: 0; letter-spacing: .3px; cursor: pointer; }
   header h1 span { color: var(--accent); }
   header .grow { flex: 1; }
-  main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+  main { padding: 20px; max-width: 1500px; margin: 0 auto; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .grid3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
   .field { margin-bottom: 14px; }
   .muted { color: var(--muted); }
+  .small { font-size: 13px; }
   .hidden { display: none !important; }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row .grow { flex: 1; }
 
   /* home */
   #home { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 20px; align-items: start; }
@@ -50,20 +57,29 @@
   .error { color: var(--danger); white-space: pre-wrap; font-size: 13px; margin-top: 8px; }
 
   /* editor */
-  #editor { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 20px; align-items: start; }
-  .stage-col { position: sticky; top: 70px; }
-  .stage { position: relative; width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: var(--radius); overflow: hidden; }
-  .stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  body.editing main { padding-bottom: calc(var(--tl-h) + 24px); }
+  #editor { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
+  .stage-col { position: sticky; top: 70px; display: flex; flex-direction: column; width: min-content; }
+  .stage { position: relative; height: clamp(360px, calc(100vh - var(--tl-h) - 210px), 780px); aspect-ratio: 9 / 16;
+           background: #000; border-radius: var(--radius); overflow: hidden; user-select: none; }
+  #bg-layers, .layer, #dim, #hit { position: absolute; inset: 0; }
+  #bg-layers { z-index: 0; overflow: hidden; }  /* own stacking context: clips are ordered inside it */
+  #dim { z-index: 1; } .stage iframe { z-index: 2; } .outline, .guide { z-index: 3; } #hit { z-index: 4; }
+  .layer { overflow: hidden; background: #000; transform-origin: 50% 50%; }
+  .layer .fill { position: absolute; left: -8%; top: -8%; width: 116%; height: 116%; filter: blur(16px) brightness(.92); }
+  .layer .pic { position: absolute; object-fit: fill; max-width: none; }
+  #dim { pointer-events: none; }
   .stage iframe { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; border: 0; transform-origin: 0 0; pointer-events: none; }
-  .transport { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-  .transport .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; min-width: 110px; }
-  .timeline { position: relative; height: 34px; background: var(--panel2); border-radius: 8px; margin-top: 10px; cursor: pointer; overflow: hidden; }
-  .timeline .seg { position: absolute; top: 5px; bottom: 5px; border-radius: 4px; background: #2f5d58; border: 1px solid #3f7b74; font-size: 10px; color: #cfe; overflow: hidden; padding: 1px 3px; white-space: nowrap; }
-  .timeline .seg.hl { background: #5a3a57; border-color: #8a5a86; }
-  .timeline .seg.active { background: var(--accent); color: #062421; }
-  .timeline .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent2); }
-  .settings { margin-top: 14px; }
-  .settings summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
+  #hit { cursor: grab; touch-action: none; }
+  #hit.text { cursor: move; }
+  #hit.dragging { cursor: grabbing; }
+  .guide { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--pink); pointer-events: none; display: none; }
+  .outline { position: absolute; border: 1px dashed rgba(255,255,255,.55); border-radius: 6px; pointer-events: none; display: none; }
+  .transport { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .transport .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .render-box { margin-top: 10px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; position: sticky; top: 58px; background: var(--bg); padding: 8px 0; z-index: 4; }
+  .tabs button { border-radius: 20px; padding: 6px 14px; }
   .blocks { display: grid; gap: 10px; }
   .block { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
   .block.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
@@ -72,20 +88,71 @@
   .block .times { display: flex; gap: 4px; align-items: center; font-variant-numeric: tabular-nums; font-size: 13px; }
   .block .times input { width: 74px; padding: 3px 6px; text-align: center; }
   .block .ar { font: 30px/1.9 "Amiri Quran", serif; direction: rtl; text-align: right; margin: 6px 0 2px; }
-  .block .words { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+  .block .tr { color: var(--accent2); font-size: 14px; margin-bottom: 4px; }
+  .block textarea.ar-edit { font: 26px/1.8 "Amiri Quran", serif; direction: rtl; text-align: right; min-height: 70px; }
+  .block .words { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; align-items: center; }
   .block .words span { font-size: 13px; padding: 1px 6px; border-radius: 6px; background: var(--panel2); color: var(--accent2); cursor: pointer; border: 1px solid transparent; }
   .block .words span:hover { border-color: var(--pink); }
   .block .words span.cut::before { content: "✂ "; color: var(--pink); }
+  .block .words em { font-style: normal; font-size: 12px; color: var(--muted); margin-right: 2px; }
   .block textarea { min-height: 54px; resize: vertical; }
   .block .tools { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
   .block .tools .grow { flex: 1; }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #4a3f1c; color: var(--accent2); }
   .toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); cursor: pointer; }
   .toggle input { width: auto; }
   .help { font-size: 13px; color: var(--muted); background: var(--panel2); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
-  .done-box { background: rgba(95, 211, 198, .08); border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-top: 12px; }
+  .done-box { background: rgba(95, 211, 198, .08); border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-top: 10px; }
+  .slider { display: grid; grid-template-columns: 120px 1fr 52px; gap: 10px; align-items: center; margin: 6px 0; font-size: 13px; color: var(--muted); }
+  .slider output { text-align: right; font-variant-numeric: tabular-nums; }
+  .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin-top: 10px; }
+  .media { background: var(--panel2); border-radius: 10px; overflow: hidden; border: 1px solid var(--line); font-size: 12px; }
+  .media .th { height: 120px; background: #000 center / cover no-repeat; position: relative; }
+  .media .th video { width: 100%; height: 100%; object-fit: cover; }
+  .media .th .kind { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.6); border-radius: 6px; padding: 0 5px; }
+  .media .nm { padding: 4px 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  .media .act { display: flex; gap: 4px; padding: 6px; }
+  .media .act button { flex: 1; padding: 3px 4px; font-size: 12px; }
+  .clips { display: grid; gap: 6px; }
+  .cliprow { display: grid; grid-template-columns: 42px 1fr auto; gap: 10px; align-items: center; background: var(--panel2); border-radius: 10px; padding: 6px 8px; border: 1px solid transparent; cursor: pointer; }
+  .cliprow.sel { border-color: var(--accent); }
+  .cliprow .th { width: 42px; height: 56px; border-radius: 6px; background: #000 center / cover no-repeat; display: grid; place-items: center; font-size: 18px; }
+  .cliprow .meta small { color: var(--muted); display: block; }
+  .inspector { background: var(--panel2); border-radius: 10px; padding: 12px; margin-top: 10px; }
+
+  /* timeline */
+  .tl { position: fixed; left: 0; right: 0; bottom: 0; height: var(--tl-h); background: var(--panel); border-top: 1px solid var(--line); z-index: 15; display: flex; flex-direction: column; }
+  .tl-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .tl-bar .grow { flex: 1; }
+  .tl-body { flex: 1; display: grid; grid-template-columns: 96px minmax(0, 1fr); min-height: 0; }
+  .tl-labels { border-right: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .tl-labels div { display: flex; align-items: center; padding-left: 12px; }
+  .tl-scroll { overflow-x: auto; overflow-y: hidden; position: relative; }
+  .tl-content { position: relative; height: 100%; min-width: 100%; }
+  .tl-ruler { height: 22px; position: relative; border-bottom: 1px solid var(--line); cursor: text; }
+  .tl-ruler .tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); font-size: 10px; color: var(--muted); padding-left: 3px; }
+  .tl-track { position: relative; height: 46px; border-bottom: 1px solid var(--line); }
+  .tl-track.audio { height: 50px; }
+  .tl-labels .r { height: 22px; } .tl-labels .t { height: 46px; } .tl-labels .a { height: 50px; }
+  .clip, .seg { position: absolute; top: 5px; bottom: 5px; border-radius: 6px; overflow: hidden; white-space: nowrap; font-size: 11px; padding: 2px 6px; cursor: pointer; }
+  .clip { background: #22344a center / auto 100% repeat-x; border: 1px solid #36557a; color: #dfe9f5; text-shadow: 0 1px 2px #000; }
+  .clip.original { background-color: #2a3d2a; border-color: #4b6e4b; }
+  .clip.sel { border-color: var(--accent2); box-shadow: 0 0 0 1px var(--accent2) inset; }
+  .seg { background: #2f5d58; border: 1px solid #3f7b74; color: #cfe; }
+  .seg.hl { background: #5a3a57; border-color: #8a5a86; }
+  .seg.active { background: var(--accent); color: #062421; }
+  .h { position: absolute; top: 0; bottom: 0; width: 7px; cursor: ew-resize; z-index: 2; }
+  .h.l { left: 0; } .h.r { right: 0; }
+  .h:hover { background: rgba(243, 223, 143, .5); }
+  #tl-wave { position: absolute; left: 0; top: 3px; height: 44px; }
+  .shade { position: absolute; top: 22px; bottom: 0; background: rgba(0,0,0,.55); pointer-events: none; z-index: 3; }
+  .trim { position: absolute; top: 22px; bottom: 0; width: 10px; margin-left: -5px; cursor: ew-resize; z-index: 4; }
+  .trim::after { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: 2px; background: var(--pink); }
+  .tl-head { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent2); pointer-events: none; z-index: 5; }
+
   @media (max-width: 960px) {
     #home, #editor { grid-template-columns: 1fr; }
-    .stage-col { position: static; max-width: 420px; margin: 0 auto; }
+    .stage-col { position: static; margin: 0 auto; }
   }
 </style>
 </head>
@@ -94,6 +161,8 @@
   <h1 onclick="go('')">🎙️ Tilawa <span>Studio</span></h1>
   <div class="grow"></div>
   <span id="saved" class="muted" style="font-size:13px"></span>
+  <button id="undo" class="ghost small hidden" onclick="undo()" title="Annuler (⌘Z / Ctrl+Z)">↶ Annuler</button>
+  <button id="redo" class="ghost small hidden" onclick="redo()" title="Rétablir (⇧⌘Z / Ctrl+Y)">↷</button>
   <button onclick="go('')">Accueil</button>
 </header>
 
@@ -155,24 +224,113 @@
   <section id="editor" class="hidden">
     <div class="stage-col">
       <div class="stage" id="stage">
-        <video id="video" playsinline preload="auto"></video>
+        <div id="bg-layers">
+          <div class="layer" id="orig-layer"><canvas class="fill" width="54" height="96"></canvas><video id="video" class="pic" playsinline preload="auto"></video></div>
+        </div>
+        <div id="dim"></div>
         <iframe id="overlay" src="/overlay.html" title="aperçu"></iframe>
+        <div class="outline" id="outline"></div>
+        <div class="guide" id="guide"></div>
+        <div id="hit" title="Fais glisser un texte ou l'image pour les déplacer · pince ou Ctrl+molette pour zoomer"></div>
       </div>
       <div class="transport">
         <button id="play" onclick="togglePlay()">▶︎ Lecture</button>
+        <button class="ghost small" onclick="step(-1)" title="sous-titre précédent (←)">⏮</button>
+        <button class="ghost small" onclick="step(1)" title="sous-titre suivant (→)">⏭</button>
         <span class="time" id="time">0:00.0</span>
-        <button class="ghost small" onclick="step(-1)" title="bloc précédent">⏮</button>
-        <button class="ghost small" onclick="step(1)" title="bloc suivant">⏭</button>
       </div>
-      <div class="timeline" id="timeline"><div class="head" id="head"></div></div>
-
-      <div class="card settings">
-        <div class="grid2">
-          <div class="field"><label>Titre</label><input id="e-title" oninput="setMeta()"></div>
-          <div class="field"><label>Récitateur</label><input id="e-reciter" oninput="setMeta()"></div>
+      <div class="render-box">
+        <button id="render" class="primary" style="width:100%;padding:11px" onclick="renderVideo()">Créer la vidéo</button>
+        <div id="r-box" class="hidden">
+          <div id="r-stage" class="muted small" style="margin-top:10px"></div>
+          <div class="progress"><div id="r-bar"></div></div>
+          <div id="r-error" class="error"></div>
         </div>
-        <details>
-          <summary>Réglages de la vidéo</summary>
+        <div id="r-done" class="done-box hidden"></div>
+      </div>
+    </div>
+
+    <div>
+      <nav class="tabs">
+        <button data-tab="subs" onclick="setTab('subs')">Sous-titres</button>
+        <button data-tab="bg" onclick="setTab('bg')">Arrière-plan</button>
+        <button data-tab="text" onclick="setTab('text')">Textes</button>
+        <button data-tab="export" onclick="setTab('export')">Export</button>
+      </nav>
+
+      <!-- subtitles -->
+      <div id="tab-subs">
+        <div class="help">Chaque carte = un sous-titre. Vérifie la traduction et le moment d'apparition (▶ pour écouter).
+          Clique sur un mot phonétique pour <b>couper</b> le sous-titre avant ce mot, ✎ pour corriger l'arabe ou la phonétique.
+          Les horaires se règlent aussi en tirant les bords des sous-titres dans la timeline.</div>
+        <div id="notice" class="help hidden" style="border:1px solid var(--accent2)"></div>
+        <div id="blocks" class="blocks"></div>
+      </div>
+
+      <!-- background -->
+      <div id="tab-bg" class="hidden">
+        <div class="card">
+          <h3>Arrière-plan</h3>
+          <div class="row">
+            <button id="mode-orig" onclick="useOriginal()">🎥 Vidéo d'origine</button>
+            <button id="mode-own" onclick="useOwnMedia()">🖼️ Mes photos et vidéos</button>
+          </div>
+          <p class="muted small">Le son reste toujours celui de la récitation. Tu peux aussi mélanger : vidéo d'origine, puis une photo, etc.</p>
+
+          <h4>Mes médias</h4>
+          <div id="media-drop" class="drop" style="padding:14px">Dépose des photos ou des vidéos ici <span class="muted">ou</span> <strong>clique pour en choisir</strong>
+            <div id="media-status" class="muted small"></div></div>
+          <input id="media-file" type="file" multiple accept="image/*,video/*,.heic,.heif,.mkv,.mov,.webm" class="hidden">
+          <div id="media-list" class="media-grid"></div>
+
+          <h4>Séquence</h4>
+          <div id="clip-list" class="clips"></div>
+          <div class="row" style="margin-top:8px">
+            <button class="small" onclick="addOriginalClip()">+ Vidéo d'origine</button>
+            <button class="small" onclick="spreadEvenly()" title="même durée pour chaque élément">Répartir également</button>
+          </div>
+          <div id="inspector" class="inspector"></div>
+
+          <h4>Réglages</h4>
+          <div class="slider"><span>Assombrir</span><input id="bg-dim" type="range" min="0" max="0.7" step="0.01" oninput="setBg('dim', +this.value)"><output id="bg-dim-v"></output></div>
+          <div class="grid2" style="margin-top:8px">
+            <div class="field"><label>Derrière l'image (si elle ne remplit pas l'écran)</label>
+              <select id="bg-fill" onchange="setBg('fill', this.value)"><option value="blur">Image floutée</option><option value="black">Noir</option></select></div>
+            <div class="field"><label>Transition entre les éléments</label>
+              <select id="bg-tr" onchange="setBg('transition', +this.value)">
+                <option value="0">Coupe directe</option><option value="0.3">Fondu rapide</option>
+                <option value="0.5">Fondu</option><option value="1">Fondu lent</option></select></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- texts -->
+      <div id="tab-text" class="hidden">
+        <div class="card">
+          <h3>Textes</h3>
+          <div class="grid2">
+            <div class="field"><label>Titre</label><input id="e-title" oninput="setMeta()"></div>
+            <div class="field"><label>Récitateur</label><input id="e-reciter" oninput="setMeta()"></div>
+          </div>
+          <label class="toggle"><input id="r-header" type="checkbox" onchange="setRender()"> Afficher le titre et le récitateur</label>
+          <div class="help" style="margin-top:12px">Astuce : fais glisser le titre ou les sous-titres directement sur l'aperçu.
+            Pince sur le trackpad (ou Ctrl + molette) au-dessus d'un texte pour changer sa taille. Un trait rose apparaît quand le texte est centré.</div>
+          <h4>Titre et récitateur</h4>
+          <div class="slider"><span>Hauteur</span><input type="range" min="0" max="1750" step="1" data-var="--header-top"><output></output></div>
+          <div class="slider"><span>Taille</span><input type="range" min="0.5" max="2" step="0.01" data-var="--header-zoom"><output></output></div>
+          <button class="small" onclick="setVar('--header-x', 0)">Recentrer</button>
+          <h4>Sous-titres</h4>
+          <div class="slider"><span>Hauteur</span><input type="range" min="150" max="1800" step="1" data-var="--block-top"><output></output></div>
+          <div class="slider"><span>Taille</span><input type="range" min="0.5" max="2" step="0.01" data-var="--block-zoom"><output></output></div>
+          <button class="small" onclick="setVar('--block-x', 0)">Recentrer</button>
+          <div style="margin-top:16px"><button onclick="resetTexts()">Positions et tailles par défaut</button></div>
+        </div>
+      </div>
+
+      <!-- export -->
+      <div id="tab-export" class="hidden">
+        <div class="card">
+          <h3>Export</h3>
           <div class="grid2">
             <div class="field"><label>Résolution</label>
               <select id="r-size" onchange="setRender()">
@@ -188,56 +346,69 @@
                 <option value="high">Haute (fichier plus léger)</option>
                 <option value="prores">Master ProRes (pour retravailler au montage)</option>
               </select></div>
-            <div class="field"><label>Vidéo horizontale</label>
-              <select id="r-fit" onchange="setRender()">
-                <option value="auto">Automatique</option>
-                <option value="blur">Fond flouté</option>
-                <option value="crop">Recadrer au centre</option>
-                <option value="pad">Bandes noires</option>
-              </select></div>
-            <div class="field"><label>Fondu (secondes)</label>
+            <div class="field"><label>Fondu des sous-titres (s)</label>
               <input id="r-fade" type="number" step="0.05" min="0" max="1" onchange="setRender()"></div>
-            <div class="field"><label>Couper le début à (s)</label>
+            <div></div>
+            <div class="field"><label>Début de la vidéo (s)</label>
               <input id="r-trim-start" type="number" step="0.1" min="0" onchange="setRender()"></div>
-            <div class="field"><label>Couper la fin à (s)</label>
+            <div class="field"><label>Fin de la vidéo (s)</label>
               <input id="r-trim-end" type="number" step="0.1" min="0" placeholder="fin" onchange="setRender()"></div>
+            <div class="field"><label>Son : fondu d'entrée (s)</label>
+              <input id="r-afi" type="number" step="0.1" min="0" max="5" onchange="setRender()"></div>
+            <div class="field"><label>Son : fondu de sortie (s)</label>
+              <input id="r-afo" type="number" step="0.1" min="0" max="5" onchange="setRender()"></div>
           </div>
-          <label class="toggle"><input id="r-header" type="checkbox" onchange="setRender()"> Afficher le titre et le récitateur</label>
-          <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+          <p class="muted small" style="margin-top:0">Le début et la fin se règlent aussi en tirant les poignées roses de la timeline.</p>
+          <h4>Analyse</h4>
           <div class="row">
             <div style="width:90px"><label>Du verset</label><input id="a-first" type="number" min="1"></div>
             <div style="width:90px"><label>Au verset</label><input id="a-last" type="number" min="1" placeholder="auto"></div>
             <button style="align-self:end" onclick="reanalyze()">Réanalyser</button>
             <button style="align-self:end" class="ghost" onclick="retimeAll()" title="annule les modifications d'horaires">Horaires auto</button>
           </div>
-        </details>
-        <div style="margin-top:14px">
-          <button id="render" class="primary" style="width:100%;padding:11px" onclick="renderVideo()">Créer la vidéo</button>
-          <div id="r-box" class="hidden">
-            <div id="r-stage" class="muted" style="margin-top:10px"></div>
-            <div class="progress"><div id="r-bar"></div></div>
-            <div id="r-error" class="error"></div>
-          </div>
-          <div id="r-done" class="done-box hidden"></div>
         </div>
       </div>
     </div>
-
-    <div>
-      <div class="help">Chaque carte = un sous-titre. Vérifie la traduction et le moment d'apparition (▶ pour écouter).
-        Clique sur un mot phonétique pour <b>couper</b> le sous-titre avant ce mot. Les horaires sont en secondes.</div>
-      <div id="notice" class="help hidden" style="border:1px solid var(--accent2)"></div>
-      <div id="blocks" class="blocks"></div>
-    </div>
   </section>
 </main>
+
+<!-- TIMELINE -->
+<div class="tl hidden" id="timeline">
+  <div class="tl-bar">
+    <b>Timeline</b>
+    <span class="muted small">clic = se placer · tirer les bords pour changer les durées · poignées roses = début / fin de la vidéo</span>
+    <span class="grow"></span>
+    <button class="ghost small" onclick="tlZoom(1 / 1.5)" title="dézoomer">−</button>
+    <button class="ghost small" onclick="tlZoom(0)" title="tout voir">Tout</button>
+    <button class="ghost small" onclick="tlZoom(1.5)" title="zoomer (ou Ctrl + molette)">+</button>
+  </div>
+  <div class="tl-body">
+    <div class="tl-labels"><div class="r"></div><div class="t">Arrière-plan</div><div class="t">Sous-titres</div><div class="a">Audio</div></div>
+    <div class="tl-scroll" id="tl-scroll">
+      <div class="tl-content" id="tl-content">
+        <div class="tl-ruler" id="tl-ruler"></div>
+        <div class="tl-track" id="tl-bg"></div>
+        <div class="tl-track" id="tl-subs"></div>
+        <div class="tl-track audio" id="tl-audio"><canvas id="tl-wave"></canvas></div>
+        <div class="shade" id="shade-l"></div><div class="shade" id="shade-r"></div>
+        <div class="trim" id="trim-l" data-trim="start" title="début de la vidéo"></div>
+        <div class="trim" id="trim-r" data-trim="end" title="fin de la vidéo"></div>
+        <div class="tl-head" id="tl-head"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const STAGES = { queued: "En attente…", download: "Téléchargement de la vidéo…", preview: "Préparation de l'aperçu…",
   audio: "Lecture de l'audio…", model: "Chargement du modèle de récitation…", listening: "Écoute de la récitation…",
   aligning: "Recherche de chaque mot…", done: "Terminé", overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…" };
-let surahs = [], P = null, saveTimer = null, overlayReady = false;
+// same values as overlay.html and render.py
+const TEXT_DEFAULTS = { "--header-top": 140, "--header-x": 0, "--header-zoom": 1, "--block-top": 1188, "--block-x": 0, "--block-zoom": 1 };
+const MOTION_ZOOM = 1.12;
+let surahs = [], P = null, saveTimer = null, overlayReady = false, tab = "subs", selClip = 0, wave = null;
+const editing = new Set();  // cards whose Arabic / phonetic are being corrected
 
 async function api(path, opts = {}) {
   let r;
@@ -250,6 +421,8 @@ async function api(path, opts = {}) {
   }
   return r.json();
 }
+const json = (body) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const pid = () => encodeURIComponent(P.id);
 
 // ---------------------------------------------------------------- routing
 function go(hash) { location.hash = hash; }
@@ -258,6 +431,9 @@ async function route() {
   const m = location.hash.match(/^#p\/(.+)$/);
   $("home").classList.toggle("hidden", !!m);
   $("editor").classList.toggle("hidden", !m);
+  $("timeline").classList.toggle("hidden", !m);
+  document.body.classList.toggle("editing", !!m);
+  $("undo").classList.toggle("hidden", !m); $("redo").classList.toggle("hidden", !m);
   if (m) await openProject(decodeURIComponent(m[1]));
   else { $("video").pause(); loadProjects(); }
 }
@@ -268,7 +444,7 @@ async function overlayLoaded() {
   const w = $("overlay").contentWindow;
   if (overlayReady || !w || !w.setHeader || !w.ready) return;
   await w.ready;
-  overlayReady = true; lastShown = -2; fitOverlay(); draw();
+  overlayReady = true; fitOverlay(); redraw();
 }
 $("overlay").addEventListener("load", overlayLoaded);
 overlayLoaded();
@@ -280,15 +456,20 @@ async function init() {
   $("surah").onchange = () => { $("first").max = surahs[$("surah").value - 1].verses; $("title").value = titleFor($("surah").value); };
   $("surah").onchange();
   const rec = JSON.parse(localStorage.getItem("reciters") || "[]");
-  $("reciters").innerHTML = rec.map(r => `<option value="${r}">`).join("");
-  const drop = $("drop");
-  drop.onclick = () => $("file").click();
-  $("file").onchange = () => { $("file-name").textContent = $("file").files[0]?.name || ""; if ($("file").files[0]) $("url").value = ""; };
-  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
-  drop.ondragleave = () => drop.classList.remove("over");
-  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); $("file").files = e.dataTransfer.files; $("file").onchange(); };
-  new ResizeObserver(fitOverlay).observe($("stage"));
+  $("reciters").innerHTML = rec.map(r => `<option value="${esc(r)}">`).join("");
+  dropZone($("drop"), $("file"), () => { $("file-name").textContent = $("file").files[0]?.name || ""; if ($("file").files[0]) $("url").value = ""; });
+  dropZone($("media-drop"), $("media-file"), () => importMedia([...$("media-file").files]));
+  new ResizeObserver(() => { fitOverlay(); tlRender(); }).observe($("stage"));
+  new ResizeObserver(() => tlRender()).observe($("tl-scroll"));
+  document.querySelectorAll("[data-var]").forEach(el => el.addEventListener("input", () => setVar(el.dataset.var, +el.value)));
   route();
+}
+function dropZone(zone, input, onfiles) {
+  zone.onclick = () => input.click();
+  input.onchange = onfiles;
+  zone.ondragover = (e) => { e.preventDefault(); zone.classList.add("over"); };
+  zone.ondragleave = () => zone.classList.remove("over");
+  zone.ondrop = (e) => { e.preventDefault(); zone.classList.remove("over"); input.files = e.dataTransfer.files; onfiles(); };
 }
 function titleFor(n) { return "SOURATE " + surahs[n - 1].name.toUpperCase().replace(/-/g, " "); }
 
@@ -343,22 +524,20 @@ async function follow(job, stageEl, barEl) {
 // ---------------------------------------------------------------- editor
 async function openProject(id) {
   if (!P || P.id !== id) {
-    P = await api(`/api/projects/${encodeURIComponent(id)}`);
-    $("video").src = `/api/projects/${encodeURIComponent(id)}/preview`;
+    const p = await api(`/api/projects/${encodeURIComponent(id)}`);
+    loadState(p);
+    $("video").src = `/api/projects/${pid()}/preview`;
     $("r-done").classList.add("hidden"); $("r-box").classList.add("hidden");
+    undoStack.length = 0; redoStack.length = 0; lastState = state();
+    wave = null;
+    api(`/api/projects/${pid()}/waveform`).then(w => { wave = w; tlRender(); });
   }
-  $("e-title").value = P.title; $("e-reciter").value = P.reciter;
-  const r = P.render;
-  $("r-size").value = r.size; $("r-quality").value = r.quality; $("r-fit").value = r.fit;
-  $("r-fade").value = r.fade_in; $("r-trim-start").value = r.trim_start || ""; $("r-trim-end").value = r.trim_end || "";
-  $("r-header").checked = r.show_header;
-  $("a-first").value = P.first_verse; $("a-last").value = P.last_verse || "";
-  renderBlocks(); renderTimeline(); draw();
+  refreshAll();
   if (P.output) showDone(P.output);
   const ayahs = P.blocks.filter(b => b.kind === "verse").map(b => b.ayah);
   const notice = $("notice");
   if (!ayahs.length) {
-    notice.textContent = "Aucun verset trouvé. Vérifie la sourate et le verset de départ, puis « Réanalyser ».";
+    notice.textContent = "Aucun verset trouvé. Vérifie la sourate et le verset de départ, puis « Réanalyser » (onglet Export).";
   } else if (Math.min(...ayahs) !== P.first_verse) {
     notice.textContent = `La récitation commence en fait au verset ${Math.min(...ayahs)} (tu avais indiqué ${P.first_verse}). ` +
       `Versets trouvés : ${Math.min(...ayahs)} à ${Math.max(...ayahs)}.`;
@@ -367,56 +546,148 @@ async function openProject(id) {
   }
   notice.classList.remove("hidden");
 }
+// project data from the server; drops preview elements of the previous project
+function loadState(p) {
+  if (!P || P.id !== p.id) {
+    for (const [src, L] of layers) if (src !== "original") { L.root.remove(); layers.delete(src); }
+    editing.clear(); selClip = 0;
+  }
+  P = p;
+  P.style = P.style || {};
+  selClip = Math.min(selClip, P.background.clips.length - 1);
+}
+function refreshAll() {
+  $("e-title").value = P.title; $("e-reciter").value = P.reciter;
+  const r = P.render;
+  $("r-size").value = r.size; $("r-quality").value = r.quality;
+  $("r-fade").value = r.fade_in; $("r-trim-start").value = r.trim_start || ""; $("r-trim-end").value = r.trim_end || "";
+  $("r-afi").value = r.audio_fade_in || 0; $("r-afo").value = r.audio_fade_out || 0;
+  $("r-header").checked = r.show_header;
+  $("a-first").value = P.first_verse; $("a-last").value = P.last_verse || "";
+  renderBlocks(); renderBgPanel(); syncTextSliders(); tlRender(); redraw();
+}
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  for (const k of ["subs", "bg", "text", "export"]) $("tab-" + k).classList.toggle("hidden", k !== t);
+  if (P && t === "text") syncTextSliders();
+  redraw();
+}
 
 function fitOverlay() {
   const w = $("stage").clientWidth;
   $("overlay").style.transform = `scale(${w / 1080})`;
 }
 
+// ---------------------------------------------------------------- undo
+const undoStack = [], redoStack = [];
+let lastState = null, lastPush = 0, lastGroup = null;
+function state() {
+  return JSON.stringify({ title: P.title, reciter: P.reciter, blocks: P.blocks, render: P.render, style: P.style, background: P.background });
+}
+// called after every change: remembers the state before it. Repeated changes
+// of the same thing (typing, moving a slider) are undone together.
+function remember(group) {
+  const now = state();
+  if (now === lastState) return;
+  if (!group || group !== lastGroup || Date.now() - lastPush > 1500 || !undoStack.length) {
+    undoStack.push(lastState);
+    if (undoStack.length > 200) undoStack.shift();
+  }
+  lastPush = Date.now(); lastGroup = group; redoStack.length = 0; lastState = now;
+}
+function applyState(s) { Object.assign(P, JSON.parse(s)); lastState = s; editing.clear(); refreshAll(); scheduleSave(); }
+function undo() { if (!undoStack.length) return; redoStack.push(state()); applyState(undoStack.pop()); lastGroup = null; }
+function redo() { if (!redoStack.length) return; undoStack.push(state()); applyState(redoStack.pop()); lastGroup = null; }
+
+// ---------------------------------------------------------------- saving
+function changed(what = {}) {
+  if (what.cards) renderBlocks();
+  if (what.bg) renderBgPanel();
+  if (what.cards || what.bg || what.tl) tlRender();
+  redraw(); remember(what.group); scheduleSave();
+}
+function scheduleSave() {
+  $("saved").textContent = "Enregistrement…";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, 500);
+}
+async function save() {
+  clearTimeout(saveTimer);
+  try {
+    await api(`/api/projects/${pid()}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: P.title, reciter: P.reciter, blocks: P.blocks, render: P.render, style: P.style, background: P.background }) });
+    $("saved").textContent = "✓ Enregistré";
+  } catch (e) { $("saved").textContent = "⚠ " + e.message; }
+}
+// a server-side edit (split, merge...) replaces the project
+async function serverEdit(path, body) {
+  await save();
+  const p = await api(`/api/projects/${pid()}/${path}`, body ? json(body) : { method: "POST" });
+  undoStack.push(lastState); redoStack.length = 0; lastGroup = null;
+  loadState(p); lastState = state(); refreshAll();
+}
+
+// ---------------------------------------------------------------- preview
 function payload(b) { return { num: b.kind === "verse" ? b.ayah + "." : "", fr: b.fr, ar: b.ar, tr: b.tr, highlight: b.highlight }; }
 function currentIndex(t) { return P.blocks.findIndex(b => t >= b.start && t < b.end); }
-let lastShown = -2;
+let lastShown = "", lastHeader = "", lastStyle = "";
 function draw() {
-  if (!P || !overlayReady) return;
-  const t = $("video").currentTime, w = $("overlay").contentWindow;
-  w.setHeader({ title: P.title, reciter: P.reciter, visible: P.render.show_header });
-  const i = currentIndex(t);
-  if (i !== lastShown) {
+  if (!P) return;
+  const t = $("video").currentTime;
+  updateBackground(t);
+  $("time").textContent = fmt(t) + " / " + fmt(P.duration);
+  tlHead(t);
+  if (!overlayReady) return;
+  const w = $("overlay").contentWindow;
+  const st = JSON.stringify(P.style);
+  if (st !== lastStyle) { w.setStyle(P.style); lastStyle = st; }
+  const hd = JSON.stringify([P.title, P.reciter, P.render.show_header]);
+  if (hd !== lastHeader) { w.setHeader({ title: P.title, reciter: P.reciter, visible: P.render.show_header }); lastHeader = hd; }
+  let i = currentIndex(t), sample = false;
+  // while placing the texts, show a subtitle even between two of them
+  if (i < 0 && tab === "text" && P.blocks.length) { i = nearestBlock(t); sample = true; }
+  const key = i + (sample ? "s" : "");
+  if (key !== lastShown) {
     w.setBlock(i >= 0 ? payload(P.blocks[i]) : null);
-    document.querySelectorAll(".block").forEach((el, k) => el.classList.toggle("active", k === i));
-    document.querySelectorAll(".timeline .seg").forEach((el, k) => el.classList.toggle("active", k === i));
-    if (i >= 0 && !$("video").paused) $("b" + i)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    lastShown = i;
+    document.querySelectorAll(".block").forEach((el, k) => el.classList.toggle("active", k === i && !sample));
+    document.querySelectorAll("#tl-subs .seg").forEach((el, k) => el.classList.toggle("active", k === i && !sample));
+    if (i >= 0 && !sample && !$("video").paused && tab === "subs") $("b" + i)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    lastShown = key;
   }
   // same fades as the final video
   if (i >= 0) {
     const b = P.blocks[i], fi = P.render.fade_in, fo = P.render.fade_out;
-    const a = Math.min(1, fi > 0 && i > 0 ? (t - b.start) / fi : 1, fo > 0 ? (b.end - t) / fo : 1);
+    const a = sample ? 1 : Math.min(1, fi > 0 && i > 0 ? (t - b.start) / fi : 1, fo > 0 ? (b.end - t) / fo : 1);
     w.document.getElementById("block").style.opacity = Math.max(0, a);
   }
-  $("time").textContent = fmt(t) + " / " + fmt(P.duration);
-  $("head").style.left = (t / P.duration * 100) + "%";
-  // horizontal sources are not cropped in "blur"/"pad" modes
-  const v = $("video"), horizontal = v.videoWidth / v.videoHeight > 0.8, fit = P.render.fit;
-  v.style.objectFit = fit === "crop" || (fit === "auto" && !horizontal) ? "cover" : "contain";
+}
+function nearestBlock(t) {
+  let best = 0;
+  P.blocks.forEach((b, k) => { if (Math.abs(b.start - t) < Math.abs(P.blocks[best].start - t)) best = k; });
+  return best;
 }
 function tick() { draw(); requestAnimationFrame(tick); }
 requestAnimationFrame(tick);
-function redraw() { lastShown = -2; draw(); }
+function redraw() { lastShown = ""; lastHeader = ""; lastStyle = ""; draw(); }
 
 function fmt(t) { const m = Math.floor(t / 60), s = (t % 60).toFixed(1).padStart(4, "0"); return `${m}:${s}`; }
-function esc(s) { return (s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 function togglePlay() { const v = $("video"); v.paused ? v.play() : v.pause(); }
 $("video").addEventListener("play", () => $("play").textContent = "⏸ Pause");
 $("video").addEventListener("pause", () => $("play").textContent = "▶︎ Lecture");
 document.addEventListener("keydown", (e) => {
-  if (e.target.matches("input, textarea, select") || $("editor").classList.contains("hidden")) return;
+  if ($("editor").classList.contains("hidden")) return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === "z" && !e.target.matches("input, textarea")) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.key.toLowerCase() === "y" && !e.target.matches("input, textarea")) { e.preventDefault(); redo(); return; }
+  if (e.target.matches("input, textarea, select")) return;
   if (e.code === "Space") { e.preventDefault(); togglePlay(); }
   if (e.code === "ArrowRight") step(1);
   if (e.code === "ArrowLeft") step(-1);
 });
-function seek(t) { $("video").currentTime = Math.max(0, t); redraw(); }
+function seek(t) { $("video").currentTime = Math.max(0, Math.min(P.duration, t)); redraw(); }
 function playBlock(i) { seek(P.blocks[i].start); $("video").play(); }
 function step(d) {
   const i = currentIndex($("video").currentTime);
@@ -424,27 +695,259 @@ function step(d) {
   seek(P.blocks[j].start + 0.01);
 }
 
-function renderTimeline() {
-  const tl = $("timeline");
-  tl.querySelectorAll(".seg").forEach(x => x.remove());
-  P.blocks.forEach((b, i) => {
-    const s = document.createElement("div");
-    s.className = "seg" + (b.highlight ? " hl" : "");
-    s.style.left = (b.start / P.duration * 100) + "%";
-    s.style.width = ((b.end - b.start) / P.duration * 100) + "%";
-    s.textContent = b.kind === "verse" ? b.ayah : "★";
-    tl.insertBefore(s, $("head"));
+// ---------------------------------------------------------------- background preview
+// Mirrors render.py: clips follow each other on the source timeline (the last
+// one runs to the end), crossfades are centred on the cuts.
+function clipTimes() {
+  const out = [], clips = P.background.clips, D = P.duration;
+  let t = 0;
+  clips.forEach((c, i) => {
+    if (t >= D) return;
+    const e = i === clips.length - 1 ? D : Math.min(D, t + Math.max(0.1, +c.dur || 0));
+    if (e > t) out.push({ c, i, s: t, e });
+    t = e;
   });
-  tl.onclick = (e) => { const r = tl.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * P.duration); };
+  return out;
+}
+function bgSpans() {
+  const t0 = P.render.trim_start || 0, t1 = P.render.trim_end || P.duration, tr = +P.background.transition || 0;
+  const sp = clipTimes().map(x => ({ ...x, s: Math.max(x.s, t0), e: Math.min(x.e, t1) })).filter(x => x.e - x.s >= 1 / 30);
+  sp.forEach((x, k) => { x.dIn = k ? Math.min(tr, (sp[k - 1].e - sp[k - 1].s) / 2, (x.e - x.s) / 2) : 0; });
+  sp.forEach((x, k) => { x.dOut = sp[k + 1]?.dIn || 0; x.a = x.s - x.dIn / 2; x.b = x.e + x.dOut / 2; });
+  return sp;
+}
+function sizeOf(src) {
+  if (src === "original") return [P.width, P.height];
+  const m = P.media.find(x => x.file === src);
+  return m ? [m.w, m.h] : [1080, 1920];
+}
+function coverZoom(w, h) { const r = (9 / 16) * h / w; return Math.max(r, 1 / r); }
+function place(mw, mh, c, W, H) {
+  const s = Math.min(W / mw, H / mh) * Math.max(0.05, +c.zoom || 1);
+  const w = mw * s, h = mh * s, x = W / 2 + (+c.x || 0) * W - w / 2, y = H / 2 + (+c.y || 0) * H - h / 2;
+  return { x, y, w, h, covers: x <= 0.5 && y <= 0.5 && x + w >= W - 0.5 && y + h >= H - 0.5 };
+}
+const mediaURL = (file) => `/api/projects/${pid()}/media/${encodeURIComponent(file)}`;
+const layers = new Map([["original", (() => {
+  const root = $("orig-layer"), fill = root.querySelector(".fill");
+  return { root, fill, ctx: fill.getContext("2d"), pic: $("video"), src: "original", video: true };
+})()]]);
+function layerFor(src) {
+  let L = layers.get(src);
+  if (L) return L;
+  const m = P.media.find(x => x.file === src);
+  const root = document.createElement("div"); root.className = "layer";
+  const fill = document.createElement("canvas"); fill.width = 54; fill.height = 96; fill.className = "fill";
+  const pic = document.createElement(m?.kind === "video" ? "video" : "img");
+  if (m?.kind === "video") { pic.muted = true; pic.playsInline = true; pic.preload = "auto"; }
+  pic.className = "pic"; pic.src = mediaURL(src); pic.draggable = false;
+  root.append(fill, pic); $("bg-layers").append(root);
+  L = { root, fill, ctx: fill.getContext("2d"), pic, src, video: m?.kind === "video" };
+  layers.set(src, L);
+  return L;
+}
+function activeSpans(t) {
+  const sp = bgSpans();
+  if (!sp.length) return [];
+  const act = sp.filter(x => t >= x.a && t < x.b);
+  return act.length ? act : [t < sp[0].a ? sp[0] : sp[sp.length - 1]];
+}
+function updateBackground(t) {
+  const st = $("stage"), W = st.clientWidth, H = st.clientHeight, playing = !$("video").paused;
+  const shown = new Set();
+  activeSpans(t).forEach((x, k) => {
+    const c = x.c, L = layerFor(c.src);
+    shown.add(L);
+    const incoming = k > 0 && x.dIn > 0 && t < x.s + x.dIn / 2;
+    L.root.style.opacity = incoming ? Math.max(0, Math.min(1, (t - x.a) / x.dIn)) : 1;
+    L.root.style.zIndex = k + 1;
+    L.root.style.visibility = "visible";
+    const p = Math.max(0, Math.min(1, (t - x.a) / Math.max(0.01, x.b - x.a)));
+    const m = c.motion === "in" ? 1 + (MOTION_ZOOM - 1) * p : c.motion === "out" ? MOTION_ZOOM - (MOTION_ZOOM - 1) * p : 1;
+    L.root.style.transform = m !== 1 ? `scale(${m})` : "";
+    const [mw, mh] = sizeOf(c.src), g = place(mw, mh, c, W, H);
+    Object.assign(L.pic.style, { left: g.x + "px", top: g.y + "px", width: g.w + "px", height: g.h + "px" });
+    const blur = !g.covers && P.background.fill !== "black";
+    L.fill.style.display = blur ? "" : "none";
+    if (blur) drawFill(L);
+    if (L.video && L.src !== "original") syncMedia(L, c, x, t, playing);
+  });
+  for (const L of layers.values()) if (!shown.has(L)) {
+    L.root.style.visibility = "hidden";  // the original keeps playing: it carries the sound
+    if (L.video && L.src !== "original" && !L.pic.paused) L.pic.pause();
+  }
+  $("dim").style.background = `rgba(0,0,0,${+P.background.dim || 0})`;
+}
+// blurred copy behind a picture that does not fill the frame (like the renderer)
+function drawFill(L) {
+  const el = L.pic;
+  if (!L.video && L.drawn) return;
+  if (L.video ? el.readyState < 2 : !el.complete || !el.naturalWidth) return;
+  const cw = L.fill.width, ch = L.fill.height, ew = el.videoWidth || el.naturalWidth, eh = el.videoHeight || el.naturalHeight;
+  const s = Math.max(cw / ew, ch / eh), sw = cw / s, sh = ch / s;
+  L.ctx.drawImage(el, (ew - sw) / 2, (eh - sh) / 2, sw, sh, 0, 0, cw, ch);
+  L.drawn = true;
+}
+function syncMedia(L, c, x, t, playing) {
+  const el = L.pic, m = P.media.find(y => y.file === c.src), dur = m?.dur || el.duration || 0;
+  let want = (+c.offset || 0) + (t - x.a);
+  if (dur > 0) want %= dur;
+  if (playing) {
+    if (el.paused) el.play().catch(() => {});
+    if (Math.abs(el.currentTime - want) > 0.3) el.currentTime = want;
+  } else {
+    if (!el.paused) el.pause();
+    if (Math.abs(el.currentTime - want) > 0.05) el.currentTime = want;
+  }
 }
 
+// ---------------------------------------------------------------- dragging on the preview
+const hit = $("hit");
+let drag = null;
+function stagePoint(e) {
+  const r = $("stage").getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top, W: r.width, H: r.height, k: 1080 / r.width };
+}
+// bounding box (1080-wide canvas units) of the visible header or subtitle texts
+function textBox(id) {
+  if (!overlayReady) return null;
+  const d = $("overlay").contentWindow.document, root = d.getElementById(id);
+  if (!root || root.hidden || root.style.display === "none") return null;
+  let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+  for (const el of root.querySelectorAll(".ol, #mic")) {
+    const q = el.getBoundingClientRect();
+    if (!q.width || el.style.display === "none") continue;
+    l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom);
+  }
+  return l < Infinity ? { l, t, r, b } : null;
+}
+function textAt(pt) {
+  const X = pt.x * pt.k, Y = pt.y * pt.k;
+  for (const id of ["block", "header"]) {
+    const q = textBox(id);
+    if (q && X >= q.l - 16 && X <= q.r + 16 && Y >= q.t - 16 && Y <= q.b + 16) return id;
+  }
+  return null;
+}
+function showOutline(id) {
+  const q = id && textBox(id), o = $("outline");
+  if (!q) { o.style.display = "none"; return; }
+  const k = $("stage").clientWidth / 1080;
+  Object.assign(o.style, { display: "block", left: (q.l - 10) * k + "px", top: (q.t - 10) * k + "px",
+    width: (q.r - q.l + 20) * k + "px", height: (q.b - q.t + 20) * k + "px" });
+}
+function getVar(k) { return P.style[k] != null ? parseFloat(P.style[k]) : TEXT_DEFAULTS[k]; }
+function setVar(k, v, quiet) {
+  if (Math.abs(v - TEXT_DEFAULTS[k]) < 1e-6) delete P.style[k];
+  else P.style[k] = k.endsWith("zoom") ? String(Math.round(v * 1000) / 1000) : Math.round(v) + "px";
+  syncTextSliders();
+  if (!quiet) changed({ group: "var" + k });
+}
+function syncTextSliders() {
+  document.querySelectorAll("[data-var]").forEach(el => {
+    const v = getVar(el.dataset.var);
+    el.value = v;
+    el.nextElementSibling.textContent = el.dataset.var.endsWith("zoom") ? Math.round(v * 100) + " %" : Math.round(v);
+  });
+}
+function resetTexts() { for (const k in TEXT_DEFAULTS) delete P.style[k]; syncTextSliders(); changed(); }
+function currentClip() {
+  const act = activeSpans($("video").currentTime);
+  return act.length ? act[act.length - 1].i : 0;
+}
+hit.addEventListener("pointerdown", (e) => {
+  if (!P) return;
+  const pt = stagePoint(e), id = textAt(pt);
+  hit.setPointerCapture(e.pointerId);
+  if (id) {
+    const pre = id === "block" ? "--block" : "--header";
+    drag = { kind: "text", pre, x0: e.clientX, y0: e.clientY, top: getVar(pre + "-top"), x: getVar(pre + "-x"), k: pt.k, moved: false };
+  } else {
+    const i = currentClip(), c = P.background.clips[i];
+    drag = { kind: "bg", i, x0: e.clientX, y0: e.clientY, cx: +c.x || 0, cy: +c.y || 0, W: pt.W, H: pt.H, moved: false };
+  }
+  hit.classList.add("dragging");
+});
+hit.addEventListener("pointermove", (e) => {
+  if (!P) return;
+  if (!drag) {
+    const id = textAt(stagePoint(e));
+    hit.classList.toggle("text", !!id); showOutline(id);
+    return;
+  }
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+  if (!drag.moved) return;
+  let snapped = false;
+  if (drag.kind === "text") {
+    let x = drag.x + dx * drag.k;
+    if (Math.abs(x) < 14) { x = 0; snapped = true; }
+    setVar(drag.pre + "-top", Math.max(0, Math.min(1800, drag.top + dy * drag.k)), true);
+    setVar(drag.pre + "-x", Math.max(-500, Math.min(500, x)), true);
+    showOutline(drag.pre === "--block" ? "block" : "header");
+  } else {
+    const c = P.background.clips[drag.i];
+    let x = drag.cx + dx / drag.W, y = drag.cy + dy / drag.H;
+    if (Math.abs(x) < 0.015) { x = 0; snapped = true; }
+    if (Math.abs(y) < 0.01) y = 0;
+    c.x = Math.round(x * 1e4) / 1e4; c.y = Math.round(y * 1e4) / 1e4;
+  }
+  $("guide").style.display = snapped ? "block" : "none";
+  draw();
+});
+hit.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  hit.classList.remove("dragging"); $("guide").style.display = "none";
+  if (d.moved) { changed(d.kind === "bg" ? { bg: true } : {}); return; }
+  // a simple click opens the matching settings
+  if (d.kind === "text") setTab("text");
+  else { selClip = d.i; setTab("bg"); renderBgPanel(); tlRender(); }
+});
+hit.addEventListener("pointerleave", () => { if (!drag) { showOutline(null); } });
+hit.addEventListener("wheel", (e) => {
+  if (!P || !(e.ctrlKey || e.metaKey)) return;  // trackpad pinch arrives as ctrl + wheel
+  e.preventDefault();
+  const f = Math.exp(-e.deltaY * 0.01), id = textAt(stagePoint(e));
+  if (id) {
+    const k = (id === "block" ? "--block" : "--header") + "-zoom";
+    setVar(k, Math.max(0.5, Math.min(2, getVar(k) * f)), true);
+    showOutline(id);
+  } else {
+    const c = P.background.clips[currentClip()];
+    c.zoom = Math.round(Math.max(0.2, Math.min(8, (+c.zoom || 1) * f)) * 1e4) / 1e4;
+    if (tab === "bg") renderInspector();
+  }
+  draw();
+  clearTimeout(hit.wheelTimer);
+  hit.wheelTimer = setTimeout(() => changed({ group: "wheel" }), 300);
+}, { passive: false });
+
+// ---------------------------------------------------------------- subtitles tab
+function chipWords(b) {
+  const tr = b.tr.split(/\s+/);
+  return tr.length === b.words.length ? tr : b.words.map(w => w.w);
+}
 function renderBlocks() {
   $("blocks").innerHTML = P.blocks.map((b, i) => {
     const label = b.kind === "verse" ? `${b.ayah}.` : b.kind === "basmala" ? "Basmala" : "Isti'adha";
-    const words = b.tr.split(/\s+/);
-    const canSplit = b.kind === "verse" && words.length === b.words.length;
+    const words = chipWords(b);
+    const canSplit = b.kind === "verse" && words.length > 1;
     const next = P.blocks[i + 1];
     const canMerge = next && next.kind === b.kind && next.ayah === b.ayah && next.a0 === b.a1;
+    const text = editing.has(i) ? `
+      <label style="margin-top:8px">Arabe</label>
+      <textarea class="ar-edit" dir="rtl" lang="ar" oninput="setText(${i}, 'ar', this.value)">${esc(b.ar)}</textarea>
+      <label style="margin-top:6px">Phonétique</label>
+      <input value="${esc(b.tr)}" oninput="setText(${i}, 'tr', this.value)">
+      <div class="row" style="margin:8px 0">
+        <button class="small" onclick="editText(${i}, false)">✓ Terminé</button>
+        ${b.kind === "verse" ? `<button class="small ghost" onclick="restoreText(${i})">↺ Texte d'origine</button>` : ""}
+      </div>` : `
+      <div class="ar">${esc(b.ar)}</div>
+      ${b.edited ? `<div class="tr">${esc(b.tr)}</div>` : ""}
+      <div class="words"><em>${canSplit ? "Couper avant :" : ""}</em>${words.map((w, k) => `<span class="${canSplit && k > 0 ? "cut" : ""}"
+          ${canSplit && k > 0 ? `onclick="splitAt(${i},${k})" title="couper avant « ${esc(w)} » (${fmt(b.words[k].t0)})"` : ""}>${esc(w)}</span>`).join("")}</div>`;
     return `<div class="block" id="b${i}">
       <div class="top">
         <span class="num" onclick="playBlock(${i})" title="écouter">▶ ${label}</span>
@@ -458,45 +961,26 @@ function renderBlocks() {
           <button class="small ghost" onclick="nudge(${i},'end',0.05)">+</button>
           <button class="small ghost" onclick="toPlayhead(${i})" title="mettre le début à la position de lecture">⤓ ici</button>
         </div>
+        ${b.edited ? `<span class="badge">corrigé</span>` : ""}
       </div>
-      <div class="ar">${esc(b.ar)}</div>
-      <div class="words">${words.map((w, k) => `<span class="${canSplit && k > 0 ? "cut" : ""}"
-          ${canSplit && k > 0 ? `onclick="splitAt(${i},${k})" title="couper avant « ${esc(w)} » (${fmt(b.words[k].t0)})"` : ""}>${esc(w)}</span>`).join("")}</div>
+      ${text}
       <textarea oninput="setFr(${i}, this.value)">${esc(b.fr)}</textarea>
       <div class="tools">
         <label class="toggle"><input type="checkbox" ${b.highlight ? "checked" : ""} onchange="setHl(${i}, this.checked)"> ✨ Mise en valeur (couleurs)</label>
         <span class="grow"></span>
+        ${editing.has(i) ? "" : `<button class="small ghost" onclick="editText(${i}, true)" title="corriger l'arabe ou la phonétique">✎ Corriger</button>`}
         ${canMerge ? `<button class="small" onclick="mergeNext(${i})">Fusionner avec le suivant ↓</button>` : ""}
         <button class="small ghost" onclick="removeBlock(${i})" title="supprimer ce sous-titre">🗑</button>
       </div>
     </div>`;
   }).join("");
 }
-
-function changed(rerender = false) {
-  if (rerender) { renderBlocks(); renderTimeline(); }
-  redraw();
-  $("saved").textContent = "Enregistrement…";
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(save, 500);
-}
-async function save() {
-  await api(`/api/projects/${encodeURIComponent(P.id)}`, { method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: P.title, reciter: P.reciter, blocks: P.blocks, render: P.render }) });
-  $("saved").textContent = "✓ Enregistré";
-}
-function setMeta() { P.title = $("e-title").value; P.reciter = $("e-reciter").value; changed(); }
-function setRender() {
-  const fade = parseFloat($("r-fade").value);
-  Object.assign(P.render, {
-    size: $("r-size").value, quality: $("r-quality").value, fit: $("r-fit").value,
-    fade_in: isNaN(fade) ? 0.25 : fade, fade_out: isNaN(fade) ? 0.25 : fade, show_header: $("r-header").checked,
-    trim_start: parseFloat($("r-trim-start").value) || 0, trim_end: parseFloat($("r-trim-end").value) || null,
-  });
-  changed();
-}
-function setFr(i, v) { P.blocks[i].fr = v; changed(); }
-function setHl(i, v) { P.blocks[i].highlight = v; changed(true); }
+function editText(i, on) { on ? editing.add(i) : editing.delete(i); renderBlocks(); }
+function setText(i, key, v) { P.blocks[i][key] = v; P.blocks[i].edited = true; changed({ group: key + i }); }
+async function restoreText(i) { editing.delete(i); await serverEdit("restore", { index: i }); }
+function setFr(i, v) { P.blocks[i].fr = v; changed({ group: "fr" + i }); }
+function setHl(i, v) { P.blocks[i].highlight = v; changed({ tl: true }); }
+function setMeta() { P.title = $("e-title").value; P.reciter = $("e-reciter").value; changed({ group: "meta" }); }
 function setTime(i, key, v) {
   const t = Math.max(0, Math.min(P.duration, parseFloat(v)));
   if (isNaN(t)) return renderBlocks();
@@ -506,7 +990,7 @@ function setTime(i, key, v) {
   if (key === "start" && P.blocks[i - 1] && Math.abs(P.blocks[i - 1].end - b.start) < 1.6) P.blocks[i - 1].end = b.start;
   if (key === "end" && P.blocks[i + 1] && Math.abs(P.blocks[i + 1].start - b.end) < 1.6) P.blocks[i + 1].start = b.end;
   if (b.end <= b.start) b.end = b.start + 0.2;
-  changed(true);
+  changed({ cards: true });
   seek(key === "start" ? b.start : Math.max(b.start, b.end - 0.6));
 }
 function nudge(i, key, d) { setTime(i, key, P.blocks[i][key] + d); }
@@ -515,46 +999,215 @@ function removeBlock(i) {
   if (!confirm("Supprimer ce sous-titre ?")) return;
   const b = P.blocks[i], prev = P.blocks[i - 1];
   if (prev && Math.abs(prev.end - b.start) < 0.01) prev.end = b.end;
-  P.blocks.splice(i, 1); changed(true);
+  P.blocks.splice(i, 1); editing.clear(); changed({ cards: true });
 }
-async function splitAt(i, k) {
-  await save();
-  P = await api(`/api/projects/${encodeURIComponent(P.id)}/split`, { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ index: i, word: k }) });
-  renderBlocks(); renderTimeline(); redraw();
+function warnEdited(...idx) {
+  return !idx.some(i => P.blocks[i]?.edited) ||
+    confirm("Tes corrections de l'arabe / de la phonétique de ce sous-titre seront remplacées par le texte d'origine. Continuer ?");
 }
-async function mergeNext(i) {
-  await save();
-  P = await api(`/api/projects/${encodeURIComponent(P.id)}/merge`, { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ index: i }) });
-  renderBlocks(); renderTimeline(); redraw();
-}
+async function splitAt(i, k) { if (warnEdited(i)) { editing.clear(); await serverEdit("split", { index: i, word: k }); } }
+async function mergeNext(i) { if (warnEdited(i, i + 1)) { editing.clear(); await serverEdit("merge", { index: i }); } }
 async function retimeAll() {
   if (!confirm("Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)")) return;
-  await save();
-  P = await api(`/api/projects/${encodeURIComponent(P.id)}/retime`, { method: "POST" });
-  renderBlocks(); renderTimeline(); redraw();
+  await serverEdit("retime");
 }
 async function reanalyze() {
   if (!confirm("Réanalyser ? Les modifications des sous-titres seront remplacées.")) return;
   await save();
   $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
   try {
-    const { job } = await api(`/api/projects/${encodeURIComponent(P.id)}/analyze`, { method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ first_verse: $("a-first").value, last_verse: $("a-last").value || null }) });
+    const { job } = await api(`/api/projects/${pid()}/analyze`,
+      json({ first_verse: $("a-first").value, last_verse: $("a-last").value || null }));
     await follow(job, $("r-stage"), $("r-bar"));
     const id = P.id; P = null; await openProject(id);
     $("r-box").classList.add("hidden");
   } catch (e) { $("r-error").textContent = e.message; }
 }
 
+// ---------------------------------------------------------------- background tab
+function mediaThumb(src) {
+  if (src === "original") return "";
+  const m = P.media.find(x => x.file === src);
+  return m && m.kind === "image" ? `background-image:url('${mediaURL(src)}')` : "";
+}
+function clipName(c) {
+  if (c.src === "original") return "Vidéo d'origine";
+  return P.media.find(x => x.file === c.src)?.name || c.src;
+}
+function renderBgPanel() {
+  const clips = P.background.clips, onlyOrig = clips.length === 1 && clips[0].src === "original";
+  $("mode-orig").classList.toggle("on", onlyOrig);
+  $("mode-own").classList.toggle("on", clips.every(c => c.src !== "original"));
+  $("media-list").innerHTML = P.media.map(m => `<div class="media">
+      <div class="th" style="${m.kind === "image" ? `background-image:url('${mediaURL(m.file)}')` : ""}">
+        ${m.kind === "video" ? `<video src="${mediaURL(m.file)}#t=0.5" muted preload="metadata"></video>` : ""}
+        <span class="kind">${m.kind === "video" ? "🎞 " + fmt(m.dur) : "🖼"}</span></div>
+      <div class="nm" title="${esc(m.name)}">${esc(m.name)}</div>
+      <div class="act"><button onclick="addClip('${m.file}')">+ Ajouter</button>
+        <button class="ghost" style="flex:0" onclick="deleteMedia('${m.file}')" title="retirer ce média">🗑</button></div>
+    </div>`).join("");
+  const times = clipTimes();
+  $("clip-list").innerHTML = clips.map((c, i) => {
+    const x = times.find(y => y.i === i), last = i === clips.length - 1;
+    const when = x ? `${fmt(x.s)} → ${fmt(x.e)}` : "après la fin (non visible)";
+    return `<div class="cliprow ${i === selClip ? "sel" : ""}" onclick="selectClip(${i})">
+      <div class="th" style="${mediaThumb(c.src)}">${c.src === "original" ? "🎥" : P.media.find(m => m.file === c.src)?.kind === "video" ? "🎞" : ""}</div>
+      <div class="meta"><b>${esc(clipName(c))}</b><small>${when}${last ? " · jusqu'à la fin" : ""}${c.motion !== "none" ? " · mouvement" : ""}</small></div>
+      <div class="row" style="gap:4px" onclick="event.stopPropagation()">
+        <button class="small ghost" onclick="moveClip(${i},-1)" ${i ? "" : "disabled"} title="monter">↑</button>
+        <button class="small ghost" onclick="moveClip(${i},1)" ${last ? "disabled" : ""} title="descendre">↓</button>
+        <button class="small ghost" onclick="removeClip(${i})" ${clips.length > 1 ? "" : "disabled"} title="retirer de la séquence">🗑</button>
+      </div></div>`;
+  }).join("");
+  $("bg-dim").value = P.background.dim || 0; $("bg-dim-v").textContent = Math.round((P.background.dim || 0) * 100) + " %";
+  $("bg-fill").value = P.background.fill || "blur";
+  $("bg-tr").value = String(P.background.transition ?? 0.5);
+  if (![...$("bg-tr").options].some(o => o.selected)) $("bg-tr").value = "0.5";
+  renderInspector();
+}
+function renderInspector() {
+  const c = P.background.clips[selClip];
+  if (!c) { $("inspector").innerHTML = ""; return; }
+  const [w, h] = sizeOf(c.src), last = selClip === P.background.clips.length - 1;
+  const m = P.media.find(x => x.file === c.src);
+  $("inspector").innerHTML = `<b>${esc(clipName(c))}</b> <span class="muted small">— cadrage (ou fais glisser l'image sur l'aperçu)</span>
+    <div class="slider"><span>Zoom</span><input type="range" min="0.3" max="5" step="0.01" value="${c.zoom}"
+        oninput="setClip('zoom', +this.value, true)"><output>${Math.round(c.zoom * 100)} %</output></div>
+    <div class="row" style="gap:6px">
+      <button class="small" onclick="setClip('zoom', ${coverZoom(w, h).toFixed(4)}); setClip('x', 0); setClip('y', 0)">Remplir l'écran</button>
+      <button class="small" onclick="setClip('zoom', 1); setClip('x', 0); setClip('y', 0)">Image entière</button>
+      <button class="small" onclick="setClip('x', 0); setClip('y', 0)">Centrer</button>
+    </div>
+    <div class="grid2" style="margin-top:10px">
+      <div class="field"><label>Mouvement</label><select onchange="setClip('motion', this.value)">
+        <option value="none" ${c.motion === "none" ? "selected" : ""}>Aucun</option>
+        <option value="in" ${c.motion === "in" ? "selected" : ""}>Zoom avant lent</option>
+        <option value="out" ${c.motion === "out" ? "selected" : ""}>Zoom arrière lent</option></select></div>
+      <div class="field"><label>Durée (s)</label>${last ? `<input disabled value="jusqu'à la fin">`
+        : `<input type="number" min="0.3" step="0.1" value="${(+c.dur).toFixed(1)}" onchange="setClip('dur', Math.max(0.3, +this.value)); renderBgPanel()">`}</div>
+      ${m?.kind === "video" ? `<div class="field"><label>Commencer la vidéo à (s)</label>
+        <input type="number" min="0" step="0.1" value="${(+c.offset || 0).toFixed(1)}" onchange="setClip('offset', Math.max(0, +this.value))"></div>` : ""}
+    </div>`;
+}
+function selectClip(i) {
+  selClip = i;
+  const x = clipTimes().find(y => y.i === i), t = $("video").currentTime;
+  if (x && (t < x.s || t >= x.e)) seek(x.s + Math.min(0.5, (x.e - x.s) / 2));
+  renderBgPanel(); tlRender();
+}
+function setClip(key, v, live) {
+  P.background.clips[selClip][key] = v;
+  if (live) { draw(); renderInspectorValue(); clearTimeout(setClip.t); setClip.t = setTimeout(() => changed({ tl: true, group: "clip" + key }), 250); return; }
+  changed({ bg: true });
+}
+function renderInspectorValue() {
+  const out = $("inspector").querySelector("output"), c = P.background.clips[selClip];
+  if (out) out.textContent = Math.round(c.zoom * 100) + " %";
+}
+function setBg(key, v) { P.background[key] = v; if (key === "dim") $("bg-dim-v").textContent = Math.round(v * 100) + " %"; changed({ tl: true, group: "bg" + key }); }
+function newClip(src) {
+  const [w, h] = sizeOf(src);
+  return { src, dur: 5, zoom: Math.round(coverZoom(w, h) * 1e4) / 1e4, x: 0, y: 0, motion: "none", offset: 0 };
+}
+// the clip before the new one stops running "to the end": give it a real duration
+function makeRoomAfter(i) {
+  const x = clipTimes().find(y => y.i === i), c = P.background.clips[i];
+  if (x && i === P.background.clips.length - 1) c.dur = Math.max(1, Math.round((x.e - x.s) / 2 * 10) / 10);
+}
+function addClip(src) {
+  const clips = P.background.clips, at = Math.min(selClip, clips.length - 1);
+  makeRoomAfter(at);
+  const c = newClip(src);
+  if (P.media.find(m => m.file === src)?.kind === "image") c.motion = "in";
+  clips.splice(at + 1, 0, c); selClip = at + 1;
+  changed({ bg: true }); selectClip(selClip);
+}
+function addOriginalClip() {
+  const orig = P.background.clips.find(c => c.src === "original");
+  const clips = P.background.clips, at = Math.min(selClip, clips.length - 1);
+  makeRoomAfter(at);
+  clips.splice(at + 1, 0, orig ? { ...orig, dur: 5 } : newClip("original")); selClip = at + 1;
+  changed({ bg: true }); selectClip(selClip);
+}
+function moveClip(i, d) {
+  const clips = P.background.clips, j = i + d;
+  if (j < 0 || j >= clips.length) return;
+  [clips[i], clips[j]] = [clips[j], clips[i]];
+  // durations stay with the positions, so the cuts do not move
+  [clips[i].dur, clips[j].dur] = [clips[j].dur, clips[i].dur];
+  selClip = j; changed({ bg: true });
+}
+function removeClip(i) {
+  const clips = P.background.clips;
+  if (clips.length < 2) return;
+  clips.splice(i, 1); selClip = Math.min(selClip, clips.length - 1); changed({ bg: true });
+}
+function spreadEvenly() {
+  const clips = P.background.clips, t0 = P.render.trim_start || 0, t1 = P.render.trim_end || P.duration;
+  const n = clips.length, d = Math.round((t1 - t0) / n * 10) / 10;
+  clips.forEach((c, i) => c.dur = i === 0 ? d + t0 : d);
+  changed({ bg: true });
+}
+function useOriginal() {
+  const clips = P.background.clips;
+  if (clips.length === 1 && clips[0].src === "original") return;
+  if (!confirm("Revenir à la vidéo d'origine seule ? (tes médias restent dans la bibliothèque)")) return;
+  const orig = clips.find(c => c.src === "original");
+  P.background.clips = [orig ? { ...orig, motion: "none" } : newClip("original")];
+  selClip = 0; changed({ bg: true });
+}
+let wantOwn = false;
+function useOwnMedia() {
+  if (!P.media.length) { wantOwn = true; $("media-file").click(); return; }
+  if (P.background.clips.some(c => c.src === "original") &&
+      !confirm("Remplacer la vidéo d'origine par tes photos et vidéos (le son de la récitation est gardé) ?")) return;
+  P.background.clips = P.media.map(m => ({ ...newClip(m.file), motion: m.kind === "image" ? "in" : "none" }));
+  selClip = 0; spreadEvenly(); changed({ bg: true });
+}
+async function importMedia(files) {
+  if (!files.length) return;
+  const status = $("media-status");
+  let ok = 0;
+  for (const [k, f] of files.entries()) {
+    status.textContent = `Import de « ${f.name} » (${k + 1}/${files.length})…`;
+    const fd = new FormData(); fd.append("file", f);
+    try { P.media.push(await api(`/api/projects/${pid()}/media`, { method: "POST", body: fd })); ok++; }
+    catch (e) { alert(`${f.name} : ${e.message}`); }
+  }
+  status.textContent = ok ? `${ok} média(s) importé(s). Clique « + Ajouter » pour les placer dans la séquence.` : "";
+  $("media-file").value = "";
+  if (wantOwn && ok) { wantOwn = false; P.background.clips = P.background.clips.filter(c => c.src !== "original");
+    P.background.clips = P.media.map(m => ({ ...newClip(m.file), motion: m.kind === "image" ? "in" : "none" })); selClip = 0; spreadEvenly(); }
+  wantOwn = false;
+  changed({ bg: true });
+}
+async function deleteMedia(file) {
+  if (!confirm("Retirer ce média du projet ?")) return;
+  await save();
+  const p = await api(`/api/projects/${pid()}/media/${encodeURIComponent(file)}`, { method: "DELETE" });
+  layers.get(file)?.root.remove(); layers.delete(file);
+  undoStack.length = 0; redoStack.length = 0;  // older states may point to the deleted file
+  loadState(p); lastState = state(); refreshAll();
+}
+
+// ---------------------------------------------------------------- export tab
+function setRender() {
+  const num = (id, d) => { const v = parseFloat($(id).value); return isNaN(v) ? d : v; };
+  const fade = num("r-fade", 0.25);
+  Object.assign(P.render, {
+    size: $("r-size").value, quality: $("r-quality").value,
+    fade_in: fade, fade_out: fade, show_header: $("r-header").checked,
+    trim_start: Math.max(0, num("r-trim-start", 0)), trim_end: num("r-trim-end", null),
+    audio_fade_in: Math.max(0, num("r-afi", 0)), audio_fade_out: Math.max(0, num("r-afo", 0)),
+  });
+  changed({ tl: true });
+}
 async function renderVideo() {
   await save();
   $("render").disabled = true; $("r-done").classList.add("hidden");
   $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
   try {
-    const { job } = await api(`/api/projects/${encodeURIComponent(P.id)}/render`, { method: "POST" });
+    const { job } = await api(`/api/projects/${pid()}/render`, { method: "POST" });
     const name = await follow(job, $("r-stage"), $("r-bar"));
     $("r-box").classList.add("hidden");
     showDone(name);
@@ -570,6 +1223,129 @@ function showDone(name) {
     <button class="small" onclick="fetch('/api/reveal/${encodeURIComponent(name)}', {method:'POST'})">Afficher dans le dossier</button></div>`;
 }
 
+// ---------------------------------------------------------------- timeline
+let tlPps = 0;  // pixels per second; 0 = whole video visible
+function pps() {
+  const W = $("tl-scroll").clientWidth - 4;
+  return tlPps || Math.max(0.5, W / Math.max(1, P.duration));
+}
+function tlZoom(f) {
+  const sc = $("tl-scroll"), t = $("video").currentTime, before = pps();
+  tlPps = f ? Math.min(400, Math.max(($("tl-scroll").clientWidth - 4) / P.duration, before * f)) : 0;
+  tlRender();
+  sc.scrollLeft = t * pps() - sc.clientWidth / 2;
+}
+$("tl-scroll").addEventListener("wheel", (e) => {
+  if (!P || !(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault();
+  const sc = $("tl-scroll"), r = sc.getBoundingClientRect(), x = e.clientX - r.left;
+  const t = (sc.scrollLeft + x) / pps();
+  tlPps = Math.min(400, Math.max((sc.clientWidth - 4) / P.duration, pps() * Math.exp(-e.deltaY * 0.01)));
+  tlRender();
+  sc.scrollLeft = t * pps() - x;
+}, { passive: false });
+function tlRender() {
+  if (!P || $("timeline").classList.contains("hidden")) return;
+  const k = pps(), D = P.duration;
+  $("tl-content").style.width = Math.ceil(D * k) + "px";
+  const step = [0.5, 1, 2, 5, 10, 15, 30, 60, 120].find(s => s * k >= 56) || 300;
+  let ticks = "";
+  for (let s = 0; s <= D; s += step) ticks += `<div class="tick" style="left:${s * k}px">${fmt(s).replace(/\.0$/, "")}</div>`;
+  $("tl-ruler").innerHTML = ticks;
+  const times = clipTimes(), lastI = P.background.clips.length - 1;
+  $("tl-bg").innerHTML = times.map(x => `<div class="clip ${x.c.src === "original" ? "original" : ""} ${x.i === selClip ? "sel" : ""}"
+      data-i="${x.i}" style="left:${x.s * k}px;width:${Math.max(2, (x.e - x.s) * k)}px;${mediaThumb(x.c.src)}">
+      ${x.c.src === "original" ? "🎥 " : ""}${esc(clipName(x.c))}${x.i < lastI ? `<div class="h r" data-edge="clip"></div>` : ""}</div>`).join("");
+  $("tl-subs").innerHTML = P.blocks.map((b, i) => `<div class="seg ${b.highlight ? "hl" : ""}" data-i="${i}"
+      style="left:${b.start * k}px;width:${Math.max(2, (b.end - b.start) * k)}px" title="${esc(b.fr)}">
+      <div class="h l" data-edge="start"></div>${b.kind === "verse" ? b.ayah : "★"}<div class="h r" data-edge="end"></div></div>`).join("");
+  const t0 = P.render.trim_start || 0, t1 = P.render.trim_end || D;
+  $("shade-l").style.cssText = `left:0;width:${t0 * k}px`;
+  $("shade-r").style.cssText = `left:${t1 * k}px;width:${Math.max(0, (D - t1) * k)}px`;
+  $("trim-l").style.left = t0 * k + "px"; $("trim-r").style.left = t1 * k + "px";
+  drawWave(k);
+  lastShown = "";
+  tlHead($("video").currentTime);
+}
+function drawWave(k) {
+  const cv = $("tl-wave"), w = Math.min(32000, Math.ceil(P.duration * k)), h = 44, dpr = window.devicePixelRatio || 1;
+  cv.style.width = w + "px"; cv.style.height = h + "px";
+  cv.width = Math.round(w * dpr); cv.height = h * dpr;
+  if (!wave) return;
+  const ctx = cv.getContext("2d"), per = wave.length / P.duration;
+  ctx.scale(dpr, dpr); ctx.fillStyle = "#4f8f88";
+  for (let x = 0; x < w; x++) {
+    const a = Math.floor(x / k * per), b = Math.max(a + 1, Math.floor((x + 1) / k * per));
+    let m = 0;
+    for (let j = a; j < b && j < wave.length; j++) m = Math.max(m, wave[j]);
+    const y = Math.max(0.5, m * (h / 2 - 1));
+    ctx.fillRect(x, h / 2 - y, 1, y * 2);
+  }
+}
+function tlHead(t) {
+  if (!P) return;
+  const k = pps(), sc = $("tl-scroll"), x = t * k;
+  $("tl-head").style.left = x + "px";
+  if (!$("video").paused && !tlDrag && (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth - 30)) sc.scrollLeft = x - 40;
+}
+let tlDrag = null;
+function tlTime(e) { const r = $("tl-content").getBoundingClientRect(); return Math.max(0, Math.min(P.duration, (e.clientX - r.left) / pps())); }
+function snapTime(t, exclude) {
+  // background cuts snap to subtitle changes and to the playhead
+  const k = pps(), cands = [$("video").currentTime, ...P.blocks.flatMap(b => [b.start, b.end])];
+  let best = t;
+  for (const c of cands) if (Math.abs(c - t) * k < 8 && Math.abs(c - t) < Math.abs(best - t) + 1e-9) best = c;
+  return best;
+}
+$("tl-content").addEventListener("pointerdown", (e) => {
+  if (!P) return;
+  const el = e.target, seg = el.closest(".seg"), clip = el.closest(".clip");
+  $("tl-content").setPointerCapture(e.pointerId);
+  if (el.dataset.trim) tlDrag = { kind: "trim", which: el.dataset.trim };
+  else if (seg && el.dataset.edge) {
+    const i = +seg.dataset.i, b = P.blocks[i], edge = el.dataset.edge;
+    const nb = edge === "start" ? P.blocks[i - 1] : P.blocks[i + 1];
+    const linked = nb && Math.abs(edge === "start" ? nb.end - b.start : nb.start - b.end) < 0.01;
+    tlDrag = { kind: "edge", i, edge, linked };
+  } else if (clip && el.dataset.edge) tlDrag = { kind: "clip", i: +clip.dataset.i, s: clipTimes().find(x => x.i === +clip.dataset.i).s };
+  else if (clip) { selClip = +clip.dataset.i; if (tab !== "bg") setTab("bg"); renderBgPanel(); tlRender(); seek(tlTime(e)); tlDrag = { kind: "scrub" }; }
+  else if (seg) { const i = +seg.dataset.i; seek(tlTime(e)); if (tab === "subs") $("b" + i)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); tlDrag = { kind: "scrub" }; }
+  else { seek(tlTime(e)); tlDrag = { kind: "scrub" }; }
+});
+$("tl-content").addEventListener("pointermove", (e) => {
+  if (!tlDrag) return;
+  const t = tlTime(e), d = tlDrag;
+  d.moved = true;
+  if (d.kind === "scrub") { seek(t); return; }
+  if (d.kind === "trim") {
+    if (d.which === "start") P.render.trim_start = Math.round(Math.min(t, (P.render.trim_end || P.duration) - 1) * 100) / 100;
+    else { const v = Math.round(Math.max(t, (P.render.trim_start || 0) + 1) * 100) / 100; P.render.trim_end = v >= P.duration - 0.02 ? null : v; }
+    seek(d.which === "start" ? P.render.trim_start : (P.render.trim_end || P.duration) - 0.05);
+  } else if (d.kind === "edge") {
+    const b = P.blocks[d.i], prev = P.blocks[d.i - 1], next = P.blocks[d.i + 1], v = Math.round(t * 1000) / 1000;
+    if (d.edge === "start") {
+      b.start = Math.max(d.linked ? prev.start + 0.1 : prev ? prev.end : 0, Math.min(b.end - 0.1, v));
+      if (d.linked) prev.end = b.start;
+      seek(b.start);
+    } else {
+      b.end = Math.min(d.linked ? next.end - 0.1 : next ? next.start : P.duration, Math.max(b.start + 0.1, v));
+      if (d.linked) next.start = b.end;
+      seek(Math.max(b.start, b.end - 0.05));
+    }
+  } else if (d.kind === "clip") {
+    P.background.clips[d.i].dur = Math.round(Math.max(0.3, snapTime(t) - d.s) * 1000) / 1000;
+    seek(d.s + P.background.clips[d.i].dur);
+  }
+  tlRender();
+});
+$("tl-content").addEventListener("pointerup", () => {
+  const d = tlDrag; tlDrag = null;
+  if (!d || !d.moved || d.kind === "scrub") return;
+  if (d.kind === "trim") { $("r-trim-start").value = P.render.trim_start || ""; $("r-trim-end").value = P.render.trim_end || ""; }
+  changed({ cards: d.kind === "edge", bg: d.kind === "clip", tl: true });
+});
+
+setTab("subs");
 init();
 </script>
 </body>

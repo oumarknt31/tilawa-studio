@@ -27,10 +27,29 @@ class Project:
     reciter: str = ""
     title: str = ""
     duration: float = 0.0
+    width: int = 0  # source picture size (rotation applied)
+    height: int = 0
     blocks: list[dict] = field(default_factory=list)
     render: dict = field(default_factory=lambda: asdict(render.RenderOptions()))
     segment: dict = field(default_factory=lambda: asdict(segment.Options()))
-    style: dict = field(default_factory=dict)
+    style: dict = field(default_factory=dict)  # CSS variables of the overlay (text positions and sizes)
+    background: dict | None = None  # see render.default_background; None = the original video alone
+    media: list[dict] = field(default_factory=list)  # imported photos/videos: {file, name, kind, w, h, dur}
+
+    @property
+    def media_dir(self) -> Path:
+        return self.folder / "media"
+
+    def ensure_size(self) -> None:
+        """Projects made before width/height were stored."""
+        if not self.width:
+            info = media.probe(self.video_path)
+            self.width, self.height = info.width, info.height
+            self.save()
+
+    def get_background(self) -> dict:
+        self.ensure_size()
+        return self.background or render.default_background(self.width, self.height, self.render.get("fit", "auto"))
 
     @property
     def video_path(self) -> Path:
@@ -71,7 +90,7 @@ def create(folder: Path, source: str, surah: int, first_verse: int, last_verse: 
     progress("preview", 0.5)
     media.make_preview(path, folder / "preview.mp4")
     p = Project(folder, path.name, surah, first_verse, last_verse, reciter.strip(),
-                title.strip() or render.surah_title(surah), info.duration)
+                title.strip() or render.surah_title(surah), info.duration, info.width, info.height)
     p.save()
     return p
 
@@ -125,4 +144,44 @@ def make_video(p: Project, out_dir: Path | None = None, progress: Progress | Non
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     out_dir = out_dir or p.folder
     out_dir.mkdir(parents=True, exist_ok=True)
-    return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / output_name(p), opt, p.style, progress)
+    return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / output_name(p), opt, p.style, progress,
+                         p.get_background(), p.media_dir)
+
+
+def add_media(p: Project, src: Path, name: str) -> dict:
+    """Import a photo or video to use as background."""
+    import uuid
+
+    p.media_dir.mkdir(exist_ok=True)
+    stem = "m" + uuid.uuid4().hex[:10]
+    ext = src.suffix.lower()
+    if ext in media.IMAGE_EXTS:
+        dst = p.media_dir / f"{stem}.png"
+        w, h = media.import_image(src, dst)
+        item = {"file": dst.name, "name": name, "kind": "image", "w": w, "h": h, "dur": 0.0}
+    else:
+        dst = p.media_dir / f"{stem}{ext}"
+        shutil.copy2(src, dst)
+        info = media.probe(dst)
+        # the editor plays a light H.264 copy; the render uses the original
+        media.make_preview(dst, p.media_dir / f"{stem}.preview.mp4")
+        item = {"file": dst.name, "name": name, "kind": "video", "w": info.width, "h": info.height,
+                "dur": round(info.duration, 3)}
+    p.media.append(item)
+    p.save()
+    return item
+
+
+def waveform(p: Project, per_second: int = 50) -> list[float]:
+    """Peak level (0..1) of the audio, `per_second` values per second, for the timeline."""
+    cache = p.folder / "waveform.json"
+    if cache.exists():
+        return json.loads(cache.read_text())
+    audio = media.load_audio(p.video_path, 8000)
+    hop = 8000 // per_second
+    n = len(audio) // hop
+    peaks = np.abs(audio[: n * hop]).reshape(n, hop).max(axis=1) if n else np.zeros(0)
+    peaks = peaks / max(1e-6, float(np.percentile(peaks, 99.5)) if n else 1.0)
+    out = [round(min(1.0, float(x)), 3) for x in peaks]
+    cache.write_text(json.dumps(out))
+    return out

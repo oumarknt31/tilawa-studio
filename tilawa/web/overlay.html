@@ -24,7 +24,9 @@
     --hl-grad: linear-gradient(90deg, #ef86d6 0%, #b9a8de 50%, #82dcdb 100%);
     --hl-arabic-grad: linear-gradient(90deg, #7fded0 0%, #a9c6c4 50%, #e3a6a6 100%);
     --hl-phonetic: #f09aa4;
-    --block-top: 1188px;
+    /* placement, changed by dragging the texts in the editor */
+    --header-top: 140px; --header-x: 0px; --header-zoom: 1;
+    --block-top: 1188px; --block-x: 0px; --block-zoom: 1;
   }
   html, body { margin: 0; padding: 0; background: transparent; }
   body { width: 1080px; height: 1920px; overflow: hidden; position: relative; transform-origin: 0 0; }
@@ -42,13 +44,15 @@
   .ol > .f { position: relative; }
   .grad > .f { background: var(--g); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
-  #header { position: absolute; top: 140px; left: 0; right: 0; text-align: center; }
+  #header { position: absolute; top: var(--header-top); left: 0; right: 0; text-align: center; transform: translateX(var(--header-x)); }
+  #header > .zoom { zoom: var(--header-zoom); }
+  #block > .zoom { zoom: var(--block-zoom); }
   #title { font: 700 64px/1.1 var(--latin); letter-spacing: .5px; --g: var(--title-grad); --sw: 7px; white-space: nowrap; }
   #reciter { font: 700 34px/1.2 var(--latin); --g: var(--reciter-grad); --sw: 5px; }
   #reciter-line { margin-top: 30px; }
   #mic { font-size: 30px; margin-right: 10px; vertical-align: 4px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
 
-  #block { position: absolute; top: var(--block-top); left: 70px; right: 70px; text-align: center; }
+  #block { position: absolute; top: var(--block-top); left: 70px; right: 70px; text-align: center; transform: translateX(var(--block-x)); }
   #block[hidden] { display: none; }
   #num { font: 400 34px/1 var(--latin); color: var(--white); --sw: 5px; }
   #fr-box { min-height: 86px; display: flex; align-items: center; justify-content: center; margin-top: 10px; }
@@ -64,16 +68,16 @@
 </style>
 </head>
 <body>
-  <div id="header">
+  <div id="header"><div class="zoom">
     <div><span id="title" class="ol grad"></span></div>
     <div id="reciter-line"><span id="mic">🎙️</span><span id="reciter" class="ol grad"></span></div>
-  </div>
-  <div id="block" hidden>
+  </div></div>
+  <div id="block" hidden><div class="zoom">
     <div><span id="num" class="ol"></span></div>
     <div id="fr-box"><span id="fr" class="ol"></span></div>
     <div id="ar-box"><span id="ar" class="ol" lang="ar"></span></div>
     <div><span id="tr" class="ol"></span></div>
-  </div>
+  </div></div>
 <script>
   function setText(el, text) {
     el.replaceChildren();
@@ -124,9 +128,11 @@
     setText(document.getElementById("tr"), b.tr);
     for (const id of ["fr", "ar"]) document.getElementById(id).classList.toggle("grad", !!b.highlight);
   };
-  // style overrides: {"--block-top": "1150px", ...}
+  // style overrides: {"--block-top": "1150px", ...}; keys left out go back to the defaults above
   window.setStyle = function (vars) {
-    for (const [k, v] of Object.entries(vars || {})) document.documentElement.style.setProperty(k, v);
+    const root = document.documentElement.style;
+    for (const k of [...root]) if (k.startsWith("--") && !(k in (vars || {}))) root.removeProperty(k);
+    for (const [k, v] of Object.entries(vars || {})) root.setProperty(k, v);
   };
   window.ready = document.fonts.ready;
 </script>

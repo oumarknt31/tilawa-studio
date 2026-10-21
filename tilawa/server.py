@@ -23,7 +23,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import project, quran, render, segment
+from . import media, project, quran, render, segment
 from .cli import HOME
 
 PKG = Path(__file__).parent
@@ -97,6 +97,8 @@ def _public(p: project.Project) -> dict:
     d["folder"] = None
     d["id"] = p.folder.name
     d["surah_info"] = quran.surah(p.surah)
+    d["background"] = p.get_background()
+    d["width"], d["height"] = p.width, p.height
     out = VIDEOS / (project.output_name(p) + (".mov" if p.render.get("quality") == "prores" else ".mp4"))
     d["output"] = out.name if out.exists() else None
     return d
@@ -165,6 +167,11 @@ def save_project(pid: str, body: dict):
     for key in ("title", "reciter", "blocks", "render", "style", "segment"):
         if key in body:
             setattr(p, key, body[key])
+    if "background" in body:
+        known = {m["file"] for m in p.media} | {"original"}
+        bg = body["background"]
+        bg["clips"] = [c for c in bg.get("clips", []) if c.get("src") in known] or p.get_background()["clips"]
+        p.background = bg
     p.save()
     return _public(p)
 
@@ -209,6 +216,18 @@ def merge(pid: str, body: dict):
     return _public(p)
 
 
+@app.post("/api/projects/{pid}/restore")
+def restore_text(pid: str, body: dict):
+    """Undo hand corrections of a verse block's Arabic and phonetic text."""
+    p = project.Project.load(_folder(pid))
+    b = segment.Block.from_dict(p.blocks[int(body["index"])])
+    if b.kind == "verse":
+        segment.verse_texts(b)
+        p.blocks[int(body["index"])] = b.to_dict()
+        p.save()
+    return _public(p)
+
+
 @app.post("/api/projects/{pid}/retime")
 def retime(pid: str):
     """Recompute on-screen times from the voice timings (undo manual timing edits)."""
@@ -232,6 +251,57 @@ def start_render(pid: str):
 def delete_project(pid: str):
     shutil.rmtree(_folder(pid))
     return {"ok": True}
+
+
+@app.post("/api/projects/{pid}/media")
+def add_media(pid: str, file: UploadFile = File(...)):
+    """Import a photo or video to use as background (runs in the request: a few seconds)."""
+    folder = _folder(pid)
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in VIDEO_EXTS | media.IMAGE_EXTS:
+        raise HTTPException(400, "Format non reconnu : choisis une photo (jpg, png, heic…) ou une vidéo.")
+    tmp = folder / f"import{ext}"
+    with tmp.open("wb") as f:
+        shutil.copyfileobj(file.file, f, length=8 << 20)
+    try:
+        p = project.Project.load(folder)
+        return project.add_media(p, tmp, Path(file.filename).name)
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(400, "Impossible de lire ce fichier (photo ou vidéo abîmée, ou format non pris en charge).")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+@app.delete("/api/projects/{pid}/media/{name}")
+def delete_media(pid: str, name: str):
+    p = project.Project.load(_folder(pid))
+    p.media = [m for m in p.media if m["file"] != name]
+    if p.background:
+        p.background["clips"] = [c for c in p.background["clips"] if c["src"] != name] or None
+        if p.background["clips"] is None:
+            p.background = None
+    p.save()
+    for f in p.media_dir.glob(Path(name).stem + "*"):
+        f.unlink()
+    return _public(p)
+
+
+@app.get("/api/projects/{pid}/media/{name}")
+def get_media(pid: str, name: str):
+    """Media for the editor (light H.264 copy of videos)."""
+    folder = _folder(pid) / "media"
+    f = folder / Path(name).name
+    preview = folder / f"{f.stem}.preview.mp4"
+    f = preview if preview.exists() else f
+    if not f.is_file():
+        raise HTTPException(404)
+    return FileResponse(f)
+
+
+@app.get("/api/projects/{pid}/waveform")
+def waveform(pid: str):
+    return project.waveform(project.Project.load(_folder(pid)))
 
 
 @app.get("/api/projects/{pid}/preview")

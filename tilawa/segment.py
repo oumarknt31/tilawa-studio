@@ -59,6 +59,7 @@ class Block:
     voice_start: float = 0.0  # when the reciter actually starts / stops this block
     voice_end: float = 0.0
     words: list[dict] = field(default_factory=list)  # per-word timings, for the editor
+    edited: bool = False  # Arabic / phonetic corrected by hand in the editor
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -426,11 +427,12 @@ def retime(blocks: list[Block], duration: float, opt: Options | None = None) -> 
 
 # ---------------------------------------------------------------- editing
 
-def _verse_texts(b: Block) -> None:
+def verse_texts(b: Block) -> None:
     """Refresh the Arabic and phonetic text of a verse block from its word range."""
     v = quran.verse(b.surah, b.ayah)
     b.ar = v.display_text(v.align_to_display[b.a0], v.align_to_display[b.a1])
     b.tr = v.translit_text(b.a0, b.a1)
+    b.edited = False
 
 
 def split_block(blocks: list[Block], i: int, k: int) -> None:
@@ -452,7 +454,7 @@ def split_block(blocks: list[Block], i: int, k: int) -> None:
     local = (frac - lo) / max(hi - lo, 1e-6)
     first.fr, second.fr = split_french(b.fr, [local], [v.align[first.a1]])
     for x in (first, second):
-        _verse_texts(x)
+        verse_texts(x)
     second.highlight = _is_tasbih(v, second.a0)
     blocks[i: i + 1] = [first, second]
 
@@ -467,5 +469,5 @@ def merge_blocks(blocks: list[Block], i: int) -> None:
     a.fr = (a.fr + " " + b.fr).strip()
     a.highlight = a.highlight and b.highlight
     if a.kind == "verse":
-        _verse_texts(a)
+        verse_texts(a)
     del blocks[i + 1]

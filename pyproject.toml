@@ -16,6 +16,8 @@ dependencies = [
     "certifi",
     "static-ffmpeg>=2.7",
     "numba>=0.68.0",
+    "pillow>=13.0.0",
+    "pillow-heif>=1.8.1",
 ]
 
 [project.scripts]

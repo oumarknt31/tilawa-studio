@@ -36,17 +36,34 @@ L'installation télécharge les composants, le modèle de reconnaissance de la r
 2. **Nouvelle vidéo** : dépose le fichier vidéo (ou colle un lien YouTube / Instagram / TikTok),
    choisis la sourate, le premier verset récité (une approximation suffit), le nom du récitateur.
 3. **Analyser** : le logiciel écoute la récitation et retrouve chaque mot (10 à 60 secondes).
-4. **Vérifie** dans l'éditeur : l'aperçu montre le résultat final sur la vidéo.
-   - ▶ sur une carte pour réécouter ce passage ;
-   - modifie la traduction directement dans la case ;
-   - clique sur un mot phonétique (✂) pour **couper** un sous-titre avant ce mot,
-     ou *Fusionner avec le suivant* pour en réunir deux ;
-   - −/+ pour décaler un sous-titre de 0,05 s, *⤓ ici* pour le caler sur la lecture ;
-   - ✨ *Mise en valeur* pour les passages en couleurs (activé automatiquement pour « Subhana Allah »).
+4. **Vérifie et personnalise** dans l'éditeur. L'aperçu montre exactement le résultat final.
+   - **Sous-titres** :
+     - ▶ sur une carte pour réécouter ce passage ;
+     - modifie la traduction directement dans la case ;
+     - ✎ *Corriger* pour modifier l'arabe ou la phonétique (↺ pour revenir au texte d'origine) ;
+     - clique sur un mot phonétique (✂) pour **couper** un sous-titre avant ce mot,
+       ou *Fusionner avec le suivant* pour en réunir deux ;
+     - −/+ pour décaler un sous-titre de 0,05 s, *⤓ ici* pour le caler sur la lecture ;
+     - ✨ *Mise en valeur* pour les passages en couleurs (activé automatiquement pour « Subhana Allah »).
+   - **Arrière-plan** : garde la vidéo d'origine, ou importe **tes photos et vidéos**
+     (jpg, png, heic de l'iPhone, mp4, mov…) ; le son reste celui de la récitation.
+     - Tu peux aussi mélanger les deux, dans l'ordre que tu veux, avec des fondus.
+     - Pour chaque élément : zoom, position, *Remplir l'écran* / *Image entière*,
+       et un zoom lent (avant ou arrière) pour les photos.
+     - Fais glisser l'image sur l'aperçu pour la déplacer ; pince le trackpad (ou Ctrl + molette) pour zoomer.
+     - *Assombrir* rend les textes plus lisibles sur une image claire.
+   - **Textes** : fais glisser le titre ou les sous-titres sur l'aperçu pour les placer.
+     Pince (ou Ctrl + molette) au-dessus d'un texte pour changer sa taille ; les curseurs font la même chose.
+   - **Timeline** (en bas) :
+     - tire les bords d'un sous-titre pour changer son horaire, et le bord d'un élément d'arrière-plan pour changer sa durée ;
+     - les **poignées roses** coupent le début et la fin de la vidéo ;
+     - Ctrl + molette pour zoomer.
+   - **Export** : résolution, qualité, fondus du son au début et à la fin.
+   - ↶ *Annuler* (⌘Z / Ctrl+Z) annule la dernière modification.
 5. **Créer la vidéo**. Les vidéos sont enregistrées dans le dossier `Tilawa Studio/Videos`
    de ton dossier personnel.
 
-Raccourcis dans l'éditeur : `Espace` lecture/pause, `←` `→` sous-titre précédent/suivant.
+Raccourcis dans l'éditeur : `Espace` lecture/pause, `←` `→` sous-titre précédent/suivant, `⌘Z` / `Ctrl+Z` annuler.
 
 ### Réglages de la vidéo
 
@@ -57,7 +74,7 @@ Raccourcis dans l'éditeur : `Espace` lecture/pause, `←` `→` sous-titre pré
 | Qualité *Maximale* | H.264 CRF 12, preset *slower* : visuellement identique à la source, lisible partout |
 | Qualité *10-bit (H.265)* | encore plus fidèle (dégradés), fichiers plus légers, moins compatible avec les vieux appareils |
 | *Master ProRes* | pour retravailler la vidéo dans CapCut / Premiere / Final Cut sans perte |
-| Vidéo horizontale | *Fond flouté* garde toute l'image, *Recadrer* remplit l'écran |
+| Vidéo horizontale | onglet *Arrière-plan* : *Image entière* (fond flouté ou noir) ou *Remplir l'écran*, ou n'importe quel zoom |
 
 Les vidéos HDR (iPhone) sont converties automatiquement pour que le texte garde la bonne luminosité.
 
@@ -84,7 +101,11 @@ uv run tilawa make "https://youtube.com/shorts/..." --surah 67 --from 1 --size 2
    à l'endroit qui correspond à l'arabe, à l'aide de mots repères (قل → « Dis », سبحان → « Gloire »…).
 4. **Rendu** (`tilawa/render.py`) — le texte est dessiné par Chromium (mise en forme arabe
    parfaite, contours, dégradés, émojis) directement à la résolution finale, puis ffmpeg pose
-   ces images sur la vidéo d'origine avec les fondus et encode une seule fois.
+   ces images sur l'arrière-plan avec les fondus et encode une seule fois. Pour l'arrière-plan,
+   seule la partie visible de chaque image est recadrée puis redimensionnée (un seul
+   rééchantillonnage), et le zoom lent est calculé au sous-pixel près (pas de tremblement).
+   Les photos sont importées sans perte : rotation de l'iPhone appliquée, couleurs Display P3
+   converties en sRGB.
 
 Tests : `uv run python -m pytest -q`
 

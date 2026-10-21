@@ -155,3 +155,36 @@ def make_preview(src: Path, dst: Path) -> Path:
         check=True,
     )
     return dst
+
+
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".avif", ".tif", ".tiff", ".bmp"}
+
+
+def import_image(src: Path, dst: Path) -> tuple[int, int]:
+    """Normalise a photo for the renderer and the browser alike: EXIF rotation
+    applied, colour profile converted to sRGB (iPhone photos are Display P3),
+    transparency flattened on black, saved losslessly as PNG."""
+    import io
+
+    import pillow_heif
+    from PIL import Image, ImageCms, ImageOps
+
+    pillow_heif.register_heif_opener()
+    with Image.open(src) as im:
+        im = ImageOps.exif_transpose(im)
+        icc = im.info.get("icc_profile")
+        if im.mode in ("RGBA", "LA", "P"):
+            im = im.convert("RGBA")
+            flat = Image.new("RGB", im.size, "black")
+            flat.paste(im, mask=im.getchannel("A"))
+            im = flat
+        elif im.mode != "RGB":
+            im = im.convert("RGB")
+        if icc:
+            try:
+                im = ImageCms.profileToProfile(im, ImageCms.ImageCmsProfile(io.BytesIO(icc)),
+                                               ImageCms.createProfile("sRGB"), outputMode="RGB")
+            except Exception:
+                pass  # broken profile: keep the pixels as they are
+        im.save(dst, "PNG", compress_level=3)
+        return im.size
