@@ -67,12 +67,18 @@ class VideoInfo:
         return self.color_transfer in ("smpte2084", "arib-std-b67")
 
 
+VIDEO_FORMATS = {"mov", "mp4", "matroska", "webm", "avi", "mpegts", "flv", "mpeg", "3gp"}
+
+
 def probe(path: str | Path) -> VideoInfo:
     out = subprocess.run(
         [tools()[1], "-v", "error", "-print_format", "json", "-show_streams", "-show_format", str(path)],
         capture_output=True, text=True, check=True,
     ).stdout
     d = json.loads(out)
+    # playlist-like formats (hls, concat...) can pull in other files from the disk: real video containers only
+    if not set(d.get("format", {}).get("format_name", "").split(",")) & VIDEO_FORMATS:
+        raise ValueError(f"{path}: format vidéo non pris en charge")
     v = next((s for s in d["streams"] if s["codec_type"] == "video"), None)
     a = next((s for s in d["streams"] if s["codec_type"] == "audio"), None)
     if v is None:

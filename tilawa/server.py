@@ -19,8 +19,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import project, quran, render, segment
@@ -35,6 +35,19 @@ app.mount("/fonts", StaticFiles(directory=PKG / "fonts"), name="fonts")
 _pool = ThreadPoolExecutor(max_workers=1)
 _jobs: dict[str, dict] = {}
 _lock = threading.Lock()
+VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".3gp"}
+
+
+@app.middleware("http")
+async def local_only(request: Request, call_next):
+    # other websites open in the browser can reach 127.0.0.1 too: refuse DNS-rebound hosts and cross-site writes
+    local = ("127.0.0.1", "localhost")
+    if (request.headers.get("host") or "").rsplit(":", 1)[0] not in local:
+        return PlainTextResponse("Forbidden", 403)
+    origin = request.headers.get("origin")
+    if request.method not in ("GET", "HEAD") and origin and origin.split("://", 1)[-1].rsplit(":", 1)[0] not in local:
+        return PlainTextResponse("Forbidden", 403)
+    return await call_next(request)
 
 
 # ---------------------------------------------------------------- jobs
@@ -117,12 +130,16 @@ async def new_project(surah: int = Form(...), first_verse: int = Form(...), last
         raise HTTPException(400, str(e))
     if not url and not file:
         raise HTTPException(400, "Choisis un fichier vidéo ou colle un lien.")
+    if url and not file and not url.strip().startswith(("http://", "https://")):
+        raise HTTPException(400, "Le lien doit commencer par https://")
+    if file and Path(file.filename or "").suffix.lower() not in VIDEO_EXTS:
+        raise HTTPException(400, "Format non reconnu : choisis une vidéo (" + ", ".join(sorted(VIDEO_EXTS)) + ").")
     slug = re.sub(r"[^\w-]+", "-", f"{quran.surah(surah)['name']}-{first_verse}-{time.strftime('%Y%m%d-%H%M%S')}")
     folder = PROJECTS / slug
     folder.mkdir(parents=True, exist_ok=True)
     source = url.strip()
     if file:
-        dst = folder / f"upload{Path(file.filename or 'video.mp4').suffix.lower()}"
+        dst = folder / f"upload{Path(file.filename).suffix.lower()}"
         with dst.open("wb") as f:
             shutil.copyfileobj(file.file, f, length=8 << 20)
         source = str(dst)

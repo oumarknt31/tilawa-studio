@@ -4,6 +4,7 @@ JSON so it can be reviewed and edited before rendering."""
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -115,7 +116,7 @@ def output_name(p: Project) -> str:
     rng = found_verses(p)
     name = quran.surah(p.surah)["name"].replace("'", "").replace(" ", "-")
     verses = f"{rng[0]}-{rng[1]}" if rng and rng[0] != rng[1] else f"{rng[0]}" if rng else ""
-    reciter = p.reciter.replace(" ", "-")
+    reciter = re.sub(r"[^\w-]+", "-", p.reciter).strip("-")  # also keeps "/" and ".." out of the file name
     return "_".join(x for x in (name, verses, reciter) if x)
 
 
