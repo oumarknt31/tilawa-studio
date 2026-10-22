@@ -89,7 +89,11 @@
   .block .times input { width: 74px; padding: 3px 6px; text-align: center; }
   .block .ar { font: 30px/1.9 "Amiri Quran", serif; direction: rtl; text-align: right; margin: 6px 0 2px; }
   .block .tr { color: var(--accent2); font-size: 14px; margin-bottom: 4px; }
-  .block textarea.ar-edit { font: 26px/1.8 "Amiri Quran", serif; direction: rtl; text-align: right; min-height: 70px; }
+  .block textarea.ar-edit { font: 30px/1.9 "Amiri Quran", serif; direction: rtl; text-align: right; min-height: 0;
+    field-sizing: content; background: transparent; border-color: transparent; resize: none; margin: 4px 0 2px; padding: 2px 6px; }
+  .block input.tr-edit { color: var(--accent2); background: transparent; border-color: transparent; padding: 3px 6px; font-size: 14px; }
+  .block .ar-edit:hover, .block .tr-edit:hover { border-color: var(--line); }
+  .block .ar-edit:focus, .block .tr-edit:focus { border-color: var(--accent); background: var(--bg); }
   .block .words { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; align-items: center; }
   .block .words span { font-size: 13px; padding: 1px 6px; border-radius: 6px; background: var(--panel2); color: var(--accent2); cursor: pointer; border: 1px solid transparent; }
   .block .words span:hover { border-color: var(--pink); }
@@ -102,6 +106,7 @@
   .toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); cursor: pointer; }
   .toggle input { width: auto; }
   .help { font-size: 13px; color: var(--muted); background: var(--panel2); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .done-box a { color: inherit; text-decoration: none; }
   .done-box { background: rgba(95, 211, 198, .08); border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-top: 10px; }
   .slider { display: grid; grid-template-columns: 120px 1fr 52px; gap: 10px; align-items: center; margin: 6px 0; font-size: 13px; color: var(--muted); }
   .slider output { text-align: right; font-variant-numeric: tabular-nums; }
@@ -119,6 +124,25 @@
   .cliprow .th { width: 42px; height: 56px; border-radius: 6px; background: #000 center / cover no-repeat; display: grid; place-items: center; font-size: 18px; }
   .cliprow .meta small { color: var(--muted); display: block; }
   .inspector { background: var(--panel2); border-radius: 10px; padding: 12px; margin-top: 10px; }
+  .inspector .sec { margin: 14px 0 6px; font-size: 13px; color: var(--accent2); font-weight: 600; }
+  /* Premiere-style transform: arrow pad + number fields with draggable labels */
+  .xform { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .pad { display: grid; grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(3, 26px); gap: 2px; }
+  .pad button { padding: 0; font-size: 11px; line-height: 1; }
+  .pad .up { grid-area: 1 / 2; } .pad .left { grid-area: 2 / 1; } .pad .right { grid-area: 2 / 3; } .pad .down { grid-area: 3 / 2; }
+  .fields { display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; }
+  .nf { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .nf input { width: 78px; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums; color: #8ec5ff; }
+  .nf .unit { color: var(--muted); font-size: 12px; }
+  .scrub { color: var(--muted); cursor: ew-resize; user-select: none; border-bottom: 1px dotted var(--muted); }
+  .scrub:hover { color: var(--text); }
+  .adj { display: grid; grid-template-columns: 120px 1fr 70px; gap: 10px; align-items: center; margin: 3px 0; font-size: 13px; }
+  .adj span { color: var(--muted); cursor: pointer; } .adj span:hover { color: var(--text); }
+  .adj input[type=number] { padding: 3px 6px; text-align: right; }
+  .crow { display: flex; gap: 8px; align-items: center; margin: 4px 0; font-size: 13px; color: var(--muted); }
+  .crow > span:first-child { width: 150px; }
+  .crow input[type=color] { width: 44px; height: 28px; padding: 2px; border-radius: 6px; cursor: pointer; }
+  .crow .arrow { color: var(--muted); }
 
   /* timeline */
   .tl { position: fixed; left: 0; right: 0; bottom: 0; height: var(--tl-h); background: var(--panel); border-top: 1px solid var(--line); z-index: 15; display: flex; flex-direction: column; }
@@ -227,6 +251,7 @@
         <div id="bg-layers">
           <div class="layer" id="orig-layer"><canvas class="fill" width="54" height="96"></canvas><video id="video" class="pic" playsinline preload="auto"></video></div>
         </div>
+        <svg id="filters" width="0" height="0" style="position:absolute"></svg>
         <div id="dim"></div>
         <iframe id="overlay" src="/overlay.html" title="aperçu"></iframe>
         <div class="outline" id="outline"></div>
@@ -287,6 +312,7 @@
           <div id="clip-list" class="clips"></div>
           <div class="row" style="margin-top:8px">
             <button class="small" onclick="addOriginalClip()">+ Vidéo d'origine</button>
+            <button class="small" onclick="syncToVerses()" title="un élément par verset, le dernier jusqu'à la fin">Caler sur les versets</button>
             <button class="small" onclick="spreadEvenly()" title="même durée pour chaque élément">Répartir également</button>
           </div>
           <div id="inspector" class="inspector"></div>
@@ -313,17 +339,32 @@
             <div class="field"><label>Récitateur</label><input id="e-reciter" oninput="setMeta()"></div>
           </div>
           <label class="toggle"><input id="r-header" type="checkbox" onchange="setRender()"> Afficher le titre et le récitateur</label>
-          <div class="help" style="margin-top:12px">Astuce : fais glisser le titre ou les sous-titres directement sur l'aperçu.
-            Pince sur le trackpad (ou Ctrl + molette) au-dessus d'un texte pour changer sa taille. Un trait rose apparaît quand le texte est centré.</div>
+          <div class="help" style="margin-top:12px">Positions en pixels sur l'image 1080 × 1920. Tape une valeur, utilise les flèches
+            (Maj = 10 px, reste appuyé pour répéter) ou fais glisser le nom d'un réglage vers la gauche / la droite.
+            Tu peux aussi faire glisser les textes directement sur l'aperçu.</div>
           <h4>Titre et récitateur</h4>
-          <div class="slider"><span>Hauteur</span><input type="range" min="0" max="1750" step="1" data-var="--header-top"><output></output></div>
-          <div class="slider"><span>Taille</span><input type="range" min="0.5" max="2" step="0.01" data-var="--header-zoom"><output></output></div>
-          <button class="small" onclick="setVar('--header-x', 0)">Recentrer</button>
+          <div class="xform">
+            <div class="pad"><button data-nudge="hdr.y:-1" class="up" title="monter">▲</button><button data-nudge="hdr.x:-1" class="left" title="gauche">◀</button>
+              <button data-nudge="hdr.x:1" class="right" title="droite">▶</button><button data-nudge="hdr.y:1" class="down" title="descendre">▼</button></div>
+            <div class="fields">
+              <div class="nf"><span class="scrub" data-scrub="hdr.x">Position X</span><input type="number" step="1" data-ctl="hdr.x"><span class="unit">px</span></div>
+              <div class="nf"><span class="scrub" data-scrub="hdr.y">Position Y</span><input type="number" step="1" data-ctl="hdr.y"><span class="unit">px</span></div>
+              <div class="nf"><span class="scrub" data-scrub="hdr.s">Échelle</span><input type="number" step="1" data-ctl="hdr.s"><span class="unit">%</span></div>
+              <button class="small" onclick="setVar('--header-x', 0)">Recentrer</button>
+            </div></div>
           <h4>Sous-titres</h4>
-          <div class="slider"><span>Hauteur</span><input type="range" min="150" max="1800" step="1" data-var="--block-top"><output></output></div>
-          <div class="slider"><span>Taille</span><input type="range" min="0.5" max="2" step="0.01" data-var="--block-zoom"><output></output></div>
-          <button class="small" onclick="setVar('--block-x', 0)">Recentrer</button>
-          <div style="margin-top:16px"><button onclick="resetTexts()">Positions et tailles par défaut</button></div>
+          <div class="xform">
+            <div class="pad"><button data-nudge="blk.y:-1" class="up" title="monter">▲</button><button data-nudge="blk.x:-1" class="left" title="gauche">◀</button>
+              <button data-nudge="blk.x:1" class="right" title="droite">▶</button><button data-nudge="blk.y:1" class="down" title="descendre">▼</button></div>
+            <div class="fields">
+              <div class="nf"><span class="scrub" data-scrub="blk.x">Position X</span><input type="number" step="1" data-ctl="blk.x"><span class="unit">px</span></div>
+              <div class="nf"><span class="scrub" data-scrub="blk.y">Position Y</span><input type="number" step="1" data-ctl="blk.y"><span class="unit">px</span></div>
+              <div class="nf"><span class="scrub" data-scrub="blk.s">Échelle</span><input type="number" step="1" data-ctl="blk.s"><span class="unit">%</span></div>
+              <button class="small" onclick="setVar('--block-x', 0)">Recentrer</button>
+            </div></div>
+          <h4>Couleurs</h4>
+          <div id="colors"></div>
+          <div style="margin-top:16px"><button onclick="resetTexts()">Positions, tailles et couleurs par défaut</button></div>
         </div>
       </div>
 
@@ -403,12 +444,12 @@
 const $ = (id) => document.getElementById(id);
 const STAGES = { queued: "En attente…", download: "Téléchargement de la vidéo…", preview: "Préparation de l'aperçu…",
   audio: "Lecture de l'audio…", model: "Chargement du modèle de récitation…", listening: "Écoute de la récitation…",
-  aligning: "Recherche de chaque mot…", done: "Terminé", overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…" };
+  aligning: "Recherche de chaque mot…", done: "Terminé", overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…",
+  prepare: "Préparation des vidéos en aller-retour…" };
 // same values as overlay.html and render.py
 const TEXT_DEFAULTS = { "--header-top": 140, "--header-x": 0, "--header-zoom": 1, "--block-top": 1188, "--block-x": 0, "--block-zoom": 1 };
 const MOTION_ZOOM = 1.12;
 let surahs = [], P = null, saveTimer = null, overlayReady = false, tab = "subs", selClip = 0, wave = null;
-const editing = new Set();  // cards whose Arabic / phonetic are being corrected
 
 async function api(path, opts = {}) {
   let r;
@@ -461,7 +502,6 @@ async function init() {
   dropZone($("media-drop"), $("media-file"), () => importMedia([...$("media-file").files]));
   new ResizeObserver(() => { fitOverlay(); tlRender(); }).observe($("stage"));
   new ResizeObserver(() => tlRender()).observe($("tl-scroll"));
-  document.querySelectorAll("[data-var]").forEach(el => el.addEventListener("input", () => setVar(el.dataset.var, +el.value)));
   route();
 }
 function dropZone(zone, input, onfiles) {
@@ -550,7 +590,8 @@ async function openProject(id) {
 function loadState(p) {
   if (!P || P.id !== p.id) {
     for (const [src, L] of layers) if (src !== "original") { L.root.remove(); layers.delete(src); }
-    editing.clear(); selClip = 0;
+    $("filters").replaceChildren(); layers.get("original").adjKey = undefined;
+    selClip = 0;
   }
   P = p;
   P.style = P.style || {};
@@ -564,13 +605,13 @@ function refreshAll() {
   $("r-afi").value = r.audio_fade_in || 0; $("r-afo").value = r.audio_fade_out || 0;
   $("r-header").checked = r.show_header;
   $("a-first").value = P.first_verse; $("a-last").value = P.last_verse || "";
-  renderBlocks(); renderBgPanel(); syncTextSliders(); tlRender(); redraw();
+  renderBlocks(); renderBgPanel(); refreshCtls(); renderColors(); tlRender(); redraw();
 }
 function setTab(t) {
   tab = t;
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
   for (const k of ["subs", "bg", "text", "export"]) $("tab-" + k).classList.toggle("hidden", k !== t);
-  if (P && t === "text") syncTextSliders();
+  if (P) refreshCtls();
   redraw();
 }
 
@@ -596,7 +637,7 @@ function remember(group) {
   }
   lastPush = Date.now(); lastGroup = group; redoStack.length = 0; lastState = now;
 }
-function applyState(s) { Object.assign(P, JSON.parse(s)); lastState = s; editing.clear(); refreshAll(); scheduleSave(); }
+function applyState(s) { Object.assign(P, JSON.parse(s)); lastState = s; refreshAll(); scheduleSave(); }
 function undo() { if (!undoStack.length) return; redoStack.push(state()); applyState(undoStack.pop()); lastGroup = null; }
 function redo() { if (!redoStack.length) return; undoStack.push(state()); applyState(redoStack.pop()); lastGroup = null; }
 
@@ -730,21 +771,59 @@ function place(mw, mh, c, W, H) {
 const mediaURL = (file) => `/api/projects/${pid()}/media/${encodeURIComponent(file)}`;
 const layers = new Map([["original", (() => {
   const root = $("orig-layer"), fill = root.querySelector(".fill");
-  return { root, fill, ctx: fill.getContext("2d"), pic: $("video"), src: "original", video: true };
+  return { root, fill, ctx: fill.getContext("2d"), pic: $("video"), src: "original", video: true, n: 0 };
 })()]]);
-function layerFor(src) {
-  let L = layers.get(src);
+let layerCount = 0;
+// imported videos looping back and forth play their forward + backward cycle
+const isPingpong = (c) => c.src !== "original" && P.media.find(x => x.file === c.src)?.kind === "video" && (c.loop || "pingpong") === "pingpong";
+function layerFor(c) {
+  const key = c.src + (isPingpong(c) ? "#pp" : "");
+  let L = layers.get(key);
   if (L) return L;
-  const m = P.media.find(x => x.file === src);
+  const m = P.media.find(x => x.file === c.src);
   const root = document.createElement("div"); root.className = "layer";
   const fill = document.createElement("canvas"); fill.width = 54; fill.height = 96; fill.className = "fill";
   const pic = document.createElement(m?.kind === "video" ? "video" : "img");
   if (m?.kind === "video") { pic.muted = true; pic.playsInline = true; pic.preload = "auto"; }
-  pic.className = "pic"; pic.src = mediaURL(src); pic.draggable = false;
+  pic.className = "pic"; pic.src = mediaURL(c.src) + (isPingpong(c) ? "?pp=1" : ""); pic.draggable = false;
   root.append(fill, pic); $("bg-layers").append(root);
-  L = { root, fill, ctx: fill.getContext("2d"), pic, src, video: m?.kind === "video" };
-  layers.set(src, L);
+  L = { root, fill, ctx: fill.getContext("2d"), pic, src: c.src, video: m?.kind === "video", n: ++layerCount, pp: isPingpong(c) };
+  layers.set(key, L);
   return L;
+}
+// colour correction: the same curves and saturation matrix as the renderer (render.py)
+function toneTable(a, ch) {
+  const ev = +a.exposure || 0, con = (+a.contrast || 0) / 100, hi = (+a.highlights || 0) / 100, sh = (+a.shadows || 0) / 100;
+  const temp = (+a.temperature || 0) / 100, tint = (+a.tint || 0) / 100;
+  const wb = [1 + 0.12 * temp + 0.04 * tint, 1 - 0.08 * tint, 1 - 0.12 * temp + 0.04 * tint][ch];
+  const gain = Math.pow(2, ev / 2.2) * wb, c = Math.pow(2, con), out = [];
+  for (let i = 0; i < 256; i++) {
+    let x = (i / 255 * gain - 0.5) * c + 0.5;
+    x = Math.min(1, Math.max(0, x));
+    x += 0.3 * hi * 6.75 * x * x * (1 - x) + 0.3 * sh * 6.75 * x * (1 - x) * (1 - x);
+    out.push(Math.min(1, Math.max(0, x)).toFixed(5));
+  }
+  return out.join(" ");
+}
+const neutral = (a) => !a || ADJUST.every(([k]) => !+a[k]);
+function applyAdjust(L, a) {
+  const key = neutral(a) ? "" : JSON.stringify(a);
+  if (L.adjKey === key) return;
+  L.adjKey = key;
+  if (!key) { L.root.style.filter = ""; return; }
+  const id = "adj" + L.n, ns = "http://www.w3.org/2000/svg";
+  let f = document.getElementById(id);
+  if (!f) {
+    f = document.createElementNS(ns, "filter"); f.id = id;
+    f.setAttribute("color-interpolation-filters", "sRGB");
+    const ct = document.createElementNS(ns, "feComponentTransfer");
+    for (const ch of ["R", "G", "B"]) { const fn = document.createElementNS(ns, "feFunc" + ch); fn.setAttribute("type", "table"); ct.append(fn); }
+    const cm = document.createElementNS(ns, "feColorMatrix"); cm.setAttribute("type", "saturate");
+    f.append(ct, cm); $("filters").append(f);
+  }
+  [...f.firstChild.children].forEach((fn, ch) => fn.setAttribute("tableValues", toneTable(a, ch)));
+  f.lastChild.setAttribute("values", String(1 + (+a.saturation || 0) / 100));
+  L.root.style.filter = `url(#${id})`;
 }
 function activeSpans(t) {
   const sp = bgSpans();
@@ -756,7 +835,8 @@ function updateBackground(t) {
   const st = $("stage"), W = st.clientWidth, H = st.clientHeight, playing = !$("video").paused;
   const shown = new Set();
   activeSpans(t).forEach((x, k) => {
-    const c = x.c, L = layerFor(c.src);
+    const c = x.c, L = layerFor(c);
+    applyAdjust(L, c.adjust);
     shown.add(L);
     const incoming = k > 0 && x.dIn > 0 && t < x.s + x.dIn / 2;
     L.root.style.opacity = incoming ? Math.max(0, Math.min(1, (t - x.a) / x.dIn)) : 1;
@@ -789,7 +869,7 @@ function drawFill(L) {
   L.drawn = true;
 }
 function syncMedia(L, c, x, t, playing) {
-  const el = L.pic, m = P.media.find(y => y.file === c.src), dur = m?.dur || el.duration || 0;
+  const el = L.pic, m = P.media.find(y => y.file === c.src), dur = L.pp ? el.duration || 0 : m?.dur || el.duration || 0;
   let want = (+c.offset || 0) + (t - x.a);
   if (dur > 0) want %= dur;
   if (playing) {
@@ -840,17 +920,105 @@ function getVar(k) { return P.style[k] != null ? parseFloat(P.style[k]) : TEXT_D
 function setVar(k, v, quiet) {
   if (Math.abs(v - TEXT_DEFAULTS[k]) < 1e-6) delete P.style[k];
   else P.style[k] = k.endsWith("zoom") ? String(Math.round(v * 1000) / 1000) : Math.round(v) + "px";
-  syncTextSliders();
+  refreshCtls();
   if (!quiet) changed({ group: "var" + k });
 }
-function syncTextSliders() {
-  document.querySelectorAll("[data-var]").forEach(el => {
-    const v = getVar(el.dataset.var);
-    el.value = v;
-    el.nextElementSibling.textContent = el.dataset.var.endsWith("zoom") ? Math.round(v * 100) + " %" : Math.round(v);
+function resetTexts() { P.style = {}; refreshCtls(); renderColors(); changed(); }
+
+// ---------------------------------------------------------------- number controls
+// Premiere-style: type a value, use the arrows (Shift = x10, hold to repeat)
+// or drag the label sideways. CTL[name] = {get, set, step}.
+const clipNow = () => P.background.clips[selClip];
+const CTL = {
+  "hdr.x": { get: () => 540 + getVar("--header-x"), set: v => setVar("--header-x", v - 540, true), step: 1 },
+  "hdr.y": { get: () => getVar("--header-top"), set: v => setVar("--header-top", v, true), step: 1 },
+  "hdr.s": { get: () => getVar("--header-zoom") * 100, set: v => setVar("--header-zoom", Math.max(20, Math.min(400, v)) / 100, true), step: 1 },
+  "blk.x": { get: () => 540 + getVar("--block-x"), set: v => setVar("--block-x", v - 540, true), step: 1 },
+  "blk.y": { get: () => getVar("--block-top"), set: v => setVar("--block-top", v, true), step: 1 },
+  "blk.s": { get: () => getVar("--block-zoom") * 100, set: v => setVar("--block-zoom", Math.max(20, Math.min(400, v)) / 100, true), step: 1 },
+  // background: centre of the picture in the 1080 x 1920 frame, scale 100 % = whole picture visible
+  "clip.x": { get: () => 540 + (+clipNow().x || 0) * 1080, set: v => clipNow().x = Math.round((v - 540) / 1080 * 1e5) / 1e5, step: 1 },
+  "clip.y": { get: () => 960 + (+clipNow().y || 0) * 1920, set: v => clipNow().y = Math.round((v - 960) / 1920 * 1e5) / 1e5, step: 1 },
+  "clip.s": { get: () => (+clipNow().zoom || 1) * 100, set: v => clipNow().zoom = Math.max(5, Math.min(1000, v)) / 100, step: 1 },
+};
+const ADJUST = [  // colour correction of a background element: [key, label, min, max, step]
+  ["exposure", "Exposition", -3, 3, 0.05], ["contrast", "Contraste", -100, 100, 1], ["highlights", "Hautes lumières", -100, 100, 1],
+  ["shadows", "Ombres", -100, 100, 1], ["saturation", "Saturation", -100, 100, 1], ["temperature", "Température", -100, 100, 1],
+  ["tint", "Teinte", -100, 100, 1]];
+for (const [k, , min, max, step] of ADJUST) {
+  CTL["adj." + k] = { step, get: () => +(clipNow().adjust || {})[k] || 0,
+    set: v => { const c = clipNow(); c.adjust = { ...(c.adjust || {}), [k]: Math.round(Math.max(min, Math.min(max, v)) / step) * step }; } };
+}
+function fmtCtl(name, v) { return name.startsWith("adj.exposure") ? (+v).toFixed(2) : String(Math.round(v * 10) / 10); }
+function refreshCtls() {
+  document.querySelectorAll("[data-ctl]").forEach(el => {
+    const c = CTL[el.dataset.ctl];
+    if (!c || !P || (document.activeElement === el && el.type === "number")) return;
+    el.value = fmtCtl(el.dataset.ctl, c.get());
   });
 }
-function resetTexts() { for (const k in TEXT_DEFAULTS) delete P.style[k]; syncTextSliders(); changed(); }
+// apply a control's new value: live preview now, saved (and undoable) a moment later
+function ctlSet(name, v) {
+  if (!isFinite(v)) return;
+  CTL[name].set(v);
+  refreshCtls(); draw();
+  clearTimeout(ctlSet.t);
+  ctlSet.t = setTimeout(() => changed({ tl: true, group: "ctl" + name }), 250);
+}
+document.addEventListener("change", (e) => { const n = e.target.dataset?.ctl; if (n) ctlSet(n, parseFloat(e.target.value)); });
+document.addEventListener("input", (e) => { const n = e.target.dataset?.ctl; if (n && e.target.type === "range") ctlSet(n, parseFloat(e.target.value)); });
+document.addEventListener("pointerdown", (e) => {
+  const nudge = e.target.closest?.("[data-nudge]"), scrub = e.target.closest?.("[data-scrub]");
+  if (nudge) {
+    e.preventDefault();
+    const [name, dir] = nudge.dataset.nudge.split(":"), mult = e.shiftKey ? 10 : 1;
+    const go = () => ctlSet(name, CTL[name].get() + CTL[name].step * +dir * mult);
+    go();
+    let timer = setTimeout(function rep() { go(); timer = setTimeout(rep, 40); }, 350);
+    const stop = () => { clearTimeout(timer); removeEventListener("pointerup", stop); nudge.removeEventListener("pointerleave", stop); };
+    addEventListener("pointerup", stop); nudge.addEventListener("pointerleave", stop);
+  } else if (scrub) {
+    e.preventDefault();
+    const name = scrub.dataset.scrub, x0 = e.clientX, v0 = CTL[name].get();
+    const move = (ev) => ctlSet(name, v0 + (ev.clientX - x0) * CTL[name].step * (ev.shiftKey ? 10 : 1));
+    const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
+    addEventListener("pointermove", move); addEventListener("pointerup", up);
+  }
+});
+
+// ---------------------------------------------------------------- text colours
+const COLORS = [  // [label, css variable(s), default(s)]; two colours = gradient
+  ["Titre", ["--title-c1", "--title-c2"], ["#f07ad6", "#86dde6"], "--title-grad"],
+  ["Récitateur", ["--reciter-c1", "--reciter-c2"], ["#86dccb", "#e6a1a5"], "--reciter-grad"],
+  ["Numéro du verset", ["--num-color"], ["#f6f6f8"]],
+  ["Traduction", ["--fr-color"], ["#f6f6f8"]],
+  ["Arabe", ["--ar-color"], ["#f6f6f8"]],
+  ["Phonétique", ["--tr-color"], ["#f3df8f"]],
+  ["Contour", ["--outline"], ["#0b0b0d"]],
+];
+function renderColors() {
+  $("colors").innerHTML = COLORS.map(([label, vars, defs], r) => `<div class="crow"><span>${label}</span>
+    ${vars.map((v, k) => `${k ? `<span class="arrow" title="dégradé">→</span>` : ""}<input type="color" value="${P.style[v] || defs[k]}"
+      oninput="setColor(${r}, ${k}, this.value)" title="${vars.length > 1 ? (k ? "fin du dégradé" : "début du dégradé") : ""}">`).join("")}
+    <button class="small ghost" onclick="resetColor(${r})" title="couleur d'origine">↺</button></div>`).join("");
+}
+function setColor(r, k, value) {
+  const [, vars, defs, grad] = COLORS[r];
+  P.style[vars[k]] = value;
+  if (grad) {
+    const c = vars.map((v, j) => P.style[v] || defs[j]);
+    P.style[grad] = `linear-gradient(90deg, ${c[0]} 0%, ${c[1]} 100%)`;
+  }
+  draw();
+  clearTimeout(setColor.t);
+  setColor.t = setTimeout(() => changed({ group: "color" + r }), 250);
+}
+function resetColor(r) {
+  const [, vars, , grad] = COLORS[r];
+  for (const v of vars) delete P.style[v];
+  if (grad) delete P.style[grad];
+  renderColors(); changed();
+}
 function currentClip() {
   const act = activeSpans($("video").currentTime);
   return act.length ? act[act.length - 1].i : 0;
@@ -864,6 +1032,7 @@ hit.addEventListener("pointerdown", (e) => {
     drag = { kind: "text", pre, x0: e.clientX, y0: e.clientY, top: getVar(pre + "-top"), x: getVar(pre + "-x"), k: pt.k, moved: false };
   } else {
     const i = currentClip(), c = P.background.clips[i];
+    if (selClip !== i) { selClip = i; renderBgPanel(); }
     drag = { kind: "bg", i, x0: e.clientX, y0: e.clientY, cx: +c.x || 0, cy: +c.y || 0, W: pt.W, H: pt.H, moved: false };
   }
   hit.classList.add("dragging");
@@ -891,6 +1060,7 @@ hit.addEventListener("pointermove", (e) => {
     if (Math.abs(x) < 0.015) { x = 0; snapped = true; }
     if (Math.abs(y) < 0.01) y = 0;
     c.x = Math.round(x * 1e4) / 1e4; c.y = Math.round(y * 1e4) / 1e4;
+    refreshCtls();
   }
   $("guide").style.display = snapped ? "block" : "none";
   draw();
@@ -914,9 +1084,10 @@ hit.addEventListener("wheel", (e) => {
     setVar(k, Math.max(0.5, Math.min(2, getVar(k) * f)), true);
     showOutline(id);
   } else {
-    const c = P.background.clips[currentClip()];
-    c.zoom = Math.round(Math.max(0.2, Math.min(8, (+c.zoom || 1) * f)) * 1e4) / 1e4;
-    if (tab === "bg") renderInspector();
+    if (selClip !== currentClip()) { selClip = currentClip(); renderBgPanel(); }
+    const c = P.background.clips[selClip];
+    c.zoom = Math.round(Math.max(0.05, Math.min(10, (+c.zoom || 1) * f)) * 1e4) / 1e4;
+    refreshCtls();
   }
   draw();
   clearTimeout(hit.wheelTimer);
@@ -926,7 +1097,7 @@ hit.addEventListener("wheel", (e) => {
 // ---------------------------------------------------------------- subtitles tab
 function chipWords(b) {
   const tr = b.tr.split(/\s+/);
-  return tr.length === b.words.length ? tr : b.words.map(w => w.w);
+  return tr.length === b.words.length ? tr : b.words.map(w => w.tr || w.w);
 }
 function renderBlocks() {
   $("blocks").innerHTML = P.blocks.map((b, i) => {
@@ -935,19 +1106,6 @@ function renderBlocks() {
     const canSplit = b.kind === "verse" && words.length > 1;
     const next = P.blocks[i + 1];
     const canMerge = next && next.kind === b.kind && next.ayah === b.ayah && next.a0 === b.a1;
-    const text = editing.has(i) ? `
-      <label style="margin-top:8px">Arabe</label>
-      <textarea class="ar-edit" dir="rtl" lang="ar" oninput="setText(${i}, 'ar', this.value)">${esc(b.ar)}</textarea>
-      <label style="margin-top:6px">Phonétique</label>
-      <input value="${esc(b.tr)}" oninput="setText(${i}, 'tr', this.value)">
-      <div class="row" style="margin:8px 0">
-        <button class="small" onclick="editText(${i}, false)">✓ Terminé</button>
-        ${b.kind === "verse" ? `<button class="small ghost" onclick="restoreText(${i})">↺ Texte d'origine</button>` : ""}
-      </div>` : `
-      <div class="ar">${esc(b.ar)}</div>
-      ${b.edited ? `<div class="tr">${esc(b.tr)}</div>` : ""}
-      <div class="words"><em>${canSplit ? "Couper avant :" : ""}</em>${words.map((w, k) => `<span class="${canSplit && k > 0 ? "cut" : ""}"
-          ${canSplit && k > 0 ? `onclick="splitAt(${i},${k})" title="couper avant « ${esc(w)} » (${fmt(b.words[k].t0)})"` : ""}>${esc(w)}</span>`).join("")}</div>`;
     return `<div class="block" id="b${i}">
       <div class="top">
         <span class="num" onclick="playBlock(${i})" title="écouter">▶ ${label}</span>
@@ -963,21 +1121,30 @@ function renderBlocks() {
         </div>
         ${b.edited ? `<span class="badge">corrigé</span>` : ""}
       </div>
-      ${text}
+      <textarea class="ar-edit" dir="rtl" lang="ar" rows="1" spellcheck="false" title="clique pour corriger l'arabe"
+        oninput="setText(${i}, 'ar', this.value)">${esc(b.ar)}</textarea>
+      <input class="tr-edit" value="${esc(b.tr)}" spellcheck="false" title="clique pour corriger la phonétique"
+        oninput="setText(${i}, 'tr', this.value)">
+      ${canSplit ? `<div class="words"><em>Couper avant :</em>${words.map((w, k) => k === 0 ? "" : `<span class="cut"
+          onclick="splitAt(${i},${k})" title="couper avant « ${esc(w)} » (${fmt(b.words[k].t0)})">${esc(w)}</span>`).join("")}</div>` : ""}
       <textarea oninput="setFr(${i}, this.value)">${esc(b.fr)}</textarea>
       <div class="tools">
         <label class="toggle"><input type="checkbox" ${b.highlight ? "checked" : ""} onchange="setHl(${i}, this.checked)"> ✨ Mise en valeur (couleurs)</label>
         <span class="grow"></span>
-        ${editing.has(i) ? "" : `<button class="small ghost" onclick="editText(${i}, true)" title="corriger l'arabe ou la phonétique">✎ Corriger</button>`}
+        ${b.edited && b.kind === "verse" ? `<button class="small ghost" onclick="restoreText(${i})" title="annuler tes corrections de l'arabe et de la phonétique">↺ Texte d'origine</button>` : ""}
         ${canMerge ? `<button class="small" onclick="mergeNext(${i})">Fusionner avec le suivant ↓</button>` : ""}
         <button class="small ghost" onclick="removeBlock(${i})" title="supprimer ce sous-titre">🗑</button>
       </div>
     </div>`;
   }).join("");
 }
-function editText(i, on) { on ? editing.add(i) : editing.delete(i); renderBlocks(); }
-function setText(i, key, v) { P.blocks[i][key] = v; P.blocks[i].edited = true; changed({ group: key + i }); }
-async function restoreText(i) { editing.delete(i); await serverEdit("restore", { index: i }); }
+function setText(i, key, v) {
+  const b = P.blocks[i], first = !b.edited;
+  b[key] = v; b.edited = true;
+  changed({ group: key + i });
+  if (first) { const top = $("b" + i).querySelector(".top"); top.insertAdjacentHTML("beforeend", `<span class="badge">corrigé</span>`); }
+}
+async function restoreText(i) { await serverEdit("restore", { index: i }); }
 function setFr(i, v) { P.blocks[i].fr = v; changed({ group: "fr" + i }); }
 function setHl(i, v) { P.blocks[i].highlight = v; changed({ tl: true }); }
 function setMeta() { P.title = $("e-title").value; P.reciter = $("e-reciter").value; changed({ group: "meta" }); }
@@ -999,14 +1166,14 @@ function removeBlock(i) {
   if (!confirm("Supprimer ce sous-titre ?")) return;
   const b = P.blocks[i], prev = P.blocks[i - 1];
   if (prev && Math.abs(prev.end - b.start) < 0.01) prev.end = b.end;
-  P.blocks.splice(i, 1); editing.clear(); changed({ cards: true });
+  P.blocks.splice(i, 1); changed({ cards: true });
 }
 function warnEdited(...idx) {
   return !idx.some(i => P.blocks[i]?.edited) ||
     confirm("Tes corrections de l'arabe / de la phonétique de ce sous-titre seront remplacées par le texte d'origine. Continuer ?");
 }
-async function splitAt(i, k) { if (warnEdited(i)) { editing.clear(); await serverEdit("split", { index: i, word: k }); } }
-async function mergeNext(i) { if (warnEdited(i, i + 1)) { editing.clear(); await serverEdit("merge", { index: i }); } }
+async function splitAt(i, k) { if (warnEdited(i)) await serverEdit("split", { index: i, word: k }); }
+async function mergeNext(i) { if (warnEdited(i, i + 1)) await serverEdit("merge", { index: i }); }
 async function retimeAll() {
   if (!confirm("Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)")) return;
   await serverEdit("retime");
@@ -1070,44 +1237,70 @@ function renderInspector() {
   if (!c) { $("inspector").innerHTML = ""; return; }
   const [w, h] = sizeOf(c.src), last = selClip === P.background.clips.length - 1;
   const m = P.media.find(x => x.file === c.src);
-  $("inspector").innerHTML = `<b>${esc(clipName(c))}</b> <span class="muted small">— cadrage (ou fais glisser l'image sur l'aperçu)</span>
-    <div class="slider"><span>Zoom</span><input type="range" min="0.3" max="5" step="0.01" value="${c.zoom}"
-        oninput="setClip('zoom', +this.value, true)"><output>${Math.round(c.zoom * 100)} %</output></div>
-    <div class="row" style="gap:6px">
-      <button class="small" onclick="setClip('zoom', ${coverZoom(w, h).toFixed(4)}); setClip('x', 0); setClip('y', 0)">Remplir l'écran</button>
-      <button class="small" onclick="setClip('zoom', 1); setClip('x', 0); setClip('y', 0)">Image entière</button>
-      <button class="small" onclick="setClip('x', 0); setClip('y', 0)">Centrer</button>
+  $("inspector").innerHTML = `<b>${esc(clipName(c))}</b>
+    <div class="sec">Position et échelle <span class="muted" style="font-weight:400">— ou fais glisser l'image sur l'aperçu</span></div>
+    <div class="xform">
+      <div class="pad"><button data-nudge="clip.y:-1" class="up">▲</button><button data-nudge="clip.x:-1" class="left">◀</button>
+        <button data-nudge="clip.x:1" class="right">▶</button><button data-nudge="clip.y:1" class="down">▼</button></div>
+      <div class="fields">
+        <div class="nf"><span class="scrub" data-scrub="clip.x">Position X</span><input type="number" step="1" data-ctl="clip.x"><span class="unit">px</span></div>
+        <div class="nf"><span class="scrub" data-scrub="clip.y">Position Y</span><input type="number" step="1" data-ctl="clip.y"><span class="unit">px</span></div>
+        <div class="nf"><span class="scrub" data-scrub="clip.s" title="100 % = image entière visible">Échelle</span><input type="number" step="1" data-ctl="clip.s"><span class="unit">%</span></div>
+      </div>
     </div>
-    <div class="grid2" style="margin-top:10px">
+    <div class="row" style="gap:6px;margin-top:8px">
+      <button class="small" onclick="frameClip(${coverZoom(w, h).toFixed(4)})">Remplir l'écran</button>
+      <button class="small" onclick="frameClip(1)">Image entière</button>
+      <button class="small" onclick="frameClip()">Centrer</button>
+    </div>
+    <div class="grid2" style="margin-top:12px">
       <div class="field"><label>Mouvement</label><select onchange="setClip('motion', this.value)">
         <option value="none" ${c.motion === "none" ? "selected" : ""}>Aucun</option>
         <option value="in" ${c.motion === "in" ? "selected" : ""}>Zoom avant lent</option>
         <option value="out" ${c.motion === "out" ? "selected" : ""}>Zoom arrière lent</option></select></div>
       <div class="field"><label>Durée (s)</label>${last ? `<input disabled value="jusqu'à la fin">`
-        : `<input type="number" min="0.3" step="0.1" value="${(+c.dur).toFixed(1)}" onchange="setClip('dur', Math.max(0.3, +this.value)); renderBgPanel()">`}</div>
-      ${m?.kind === "video" ? `<div class="field"><label>Commencer la vidéo à (s)</label>
+        : `<input type="number" min="0.3" step="0.1" value="${(+c.dur).toFixed(2)}" onchange="setDur(+this.value)">`}</div>
+      ${m?.kind === "video" ? `
+      <div class="field"><label>Si la vidéo est plus courte</label><select onchange="setClip('loop', this.value)">
+        <option value="pingpong" ${(c.loop || "pingpong") === "pingpong" ? "selected" : ""}>Aller-retour (boucle parfaite)</option>
+        <option value="loop" ${c.loop === "loop" ? "selected" : ""}>Recommencer au début</option></select></div>
+      <div class="field"><label>Commencer la vidéo à (s)</label>
         <input type="number" min="0" step="0.1" value="${(+c.offset || 0).toFixed(1)}" onchange="setClip('offset', Math.max(0, +this.value))"></div>` : ""}
+    </div>
+    <div class="sec">Couleur <span class="muted" style="font-weight:400">— clic sur un nom pour le remettre à zéro</span></div>
+    ${ADJUST.map(([k, label, min, max, step]) => `<div class="adj"><span onclick="ctlSet('adj.${k}', 0)">${label}</span>
+      <input type="range" min="${min}" max="${max}" step="${step}" data-ctl="adj.${k}">
+      <input type="number" min="${min}" max="${max}" step="${step}" data-ctl="adj.${k}"></div>`).join("")}
+    <div class="row" style="gap:6px;margin-top:8px">
+      <button class="small" onclick="setClip('adjust', {})">Réinitialiser la couleur</button>
+      <button class="small" onclick="adjustAll()">Appliquer à tous les éléments</button>
     </div>`;
+  refreshCtls();
 }
+function frameClip(zoom) {
+  const c = clipNow();
+  if (zoom) c.zoom = Math.round(zoom * 1e4) / 1e4;
+  c.x = 0; c.y = 0;
+  refreshCtls(); changed({ tl: true });
+}
+function adjustAll() {
+  const a = { ...(clipNow().adjust || {}) };
+  P.background.clips.forEach(c => c.adjust = { ...a });
+  changed({ bg: true });
+}
+function setDur(v) { clipNow().dur = Math.max(0.3, v); P.background.auto = false; changed({ bg: true }); }
 function selectClip(i) {
   selClip = i;
   const x = clipTimes().find(y => y.i === i), t = $("video").currentTime;
   if (x && (t < x.s || t >= x.e)) seek(x.s + Math.min(0.5, (x.e - x.s) / 2));
   renderBgPanel(); tlRender();
 }
-function setClip(key, v, live) {
-  P.background.clips[selClip][key] = v;
-  if (live) { draw(); renderInspectorValue(); clearTimeout(setClip.t); setClip.t = setTimeout(() => changed({ tl: true, group: "clip" + key }), 250); return; }
-  changed({ bg: true });
-}
-function renderInspectorValue() {
-  const out = $("inspector").querySelector("output"), c = P.background.clips[selClip];
-  if (out) out.textContent = Math.round(c.zoom * 100) + " %";
-}
+function setClip(key, v) { P.background.clips[selClip][key] = v; changed({ bg: true }); }
 function setBg(key, v) { P.background[key] = v; if (key === "dim") $("bg-dim-v").textContent = Math.round(v * 100) + " %"; changed({ tl: true, group: "bg" + key }); }
 function newClip(src) {
-  const [w, h] = sizeOf(src);
-  return { src, dur: 5, zoom: Math.round(coverZoom(w, h) * 1e4) / 1e4, x: 0, y: 0, motion: "none", offset: 0 };
+  const [w, h] = sizeOf(src), m = P.media.find(x => x.file === src);
+  return { src, dur: 5, zoom: Math.round(coverZoom(w, h) * 1e4) / 1e4, x: 0, y: 0, offset: 0,
+           motion: m?.kind === "image" ? "in" : "none", loop: "pingpong", adjust: {} };
 }
 // the clip before the new one stops running "to the end": give it a real duration
 function makeRoomAfter(i) {
@@ -1117,16 +1310,14 @@ function makeRoomAfter(i) {
 function addClip(src) {
   const clips = P.background.clips, at = Math.min(selClip, clips.length - 1);
   makeRoomAfter(at);
-  const c = newClip(src);
-  if (P.media.find(m => m.file === src)?.kind === "image") c.motion = "in";
-  clips.splice(at + 1, 0, c); selClip = at + 1;
+  clips.splice(at + 1, 0, newClip(src)); selClip = at + 1; P.background.auto = false;
   changed({ bg: true }); selectClip(selClip);
 }
 function addOriginalClip() {
   const orig = P.background.clips.find(c => c.src === "original");
   const clips = P.background.clips, at = Math.min(selClip, clips.length - 1);
   makeRoomAfter(at);
-  clips.splice(at + 1, 0, orig ? { ...orig, dur: 5 } : newClip("original")); selClip = at + 1;
+  clips.splice(at + 1, 0, orig ? { ...orig, dur: 5 } : newClip("original")); selClip = at + 1; P.background.auto = false;
   changed({ bg: true }); selectClip(selClip);
 }
 function moveClip(i, d) {
@@ -1140,13 +1331,42 @@ function moveClip(i, d) {
 function removeClip(i) {
   const clips = P.background.clips;
   if (clips.length < 2) return;
-  clips.splice(i, 1); selClip = Math.min(selClip, clips.length - 1); changed({ bg: true });
+  clips.splice(i, 1); selClip = Math.min(selClip, clips.length - 1);
+  if (P.background.auto) timeToVerses();
+  changed({ bg: true });
 }
 function spreadEvenly() {
   const clips = P.background.clips, t0 = P.render.trim_start || 0, t1 = P.render.trim_end || P.duration;
   const n = clips.length, d = Math.round((t1 - t0) / n * 10) / 10;
   clips.forEach((c, i) => c.dur = i === 0 ? d + t0 : d);
+  P.background.auto = false;
   changed({ bg: true });
+}
+// first on-screen moment of each verse, in order
+function verseStarts() {
+  const seen = new Set(), out = [];
+  for (const b of P.blocks) if (b.kind === "verse" && !seen.has(b.ayah)) { seen.add(b.ayah); out.push(b.start); }
+  return out;
+}
+// one element per verse: the 2nd starts with the 2nd verse, etc.; the last runs to the end
+function timeToVerses() {
+  const clips = P.background.clips, starts = verseStarts();
+  if (clips.length > starts.length) { // more elements than verses: same duration each
+    const d = Math.round(P.duration / clips.length * 10) / 10;
+    clips.forEach(c => c.dur = d);
+    return;
+  }
+  let t = 0;
+  clips.forEach((c, i) => { if (i < clips.length - 1) { c.dur = Math.round((starts[i + 1] - t) * 1000) / 1000; t = starts[i + 1]; } });
+}
+function syncToVerses() { timeToVerses(); P.background.auto = true; changed({ bg: true }); }
+// all imported media, in order, each on its own verse (settings kept for media already placed)
+function buildOwnSequence() {
+  const old = new Map(P.background.clips.map(c => [c.src, c]));
+  P.background.clips = P.media.map(m => old.has(m.file) ? { ...old.get(m.file) } : newClip(m.file));
+  P.background.auto = true;
+  timeToVerses();
+  selClip = 0;
 }
 function useOriginal() {
   const clips = P.background.clips;
@@ -1154,15 +1374,15 @@ function useOriginal() {
   if (!confirm("Revenir à la vidéo d'origine seule ? (tes médias restent dans la bibliothèque)")) return;
   const orig = clips.find(c => c.src === "original");
   P.background.clips = [orig ? { ...orig, motion: "none" } : newClip("original")];
+  P.background.auto = false;
   selClip = 0; changed({ bg: true });
 }
 let wantOwn = false;
 function useOwnMedia() {
   if (!P.media.length) { wantOwn = true; $("media-file").click(); return; }
-  if (P.background.clips.some(c => c.src === "original") &&
-      !confirm("Remplacer la vidéo d'origine par tes photos et vidéos (le son de la récitation est gardé) ?")) return;
-  P.background.clips = P.media.map(m => ({ ...newClip(m.file), motion: m.kind === "image" ? "in" : "none" }));
-  selClip = 0; spreadEvenly(); changed({ bg: true });
+  const custom = !P.background.auto && P.background.clips.some(c => c.src !== "original");
+  if (custom && !confirm("Recréer la séquence avec tous tes médias, un par verset ? (tes durées réglées à la main seront remplacées)")) return;
+  buildOwnSequence(); changed({ bg: true });
 }
 async function importMedia(files) {
   if (!files.length) return;
@@ -1174,10 +1394,15 @@ async function importMedia(files) {
     try { P.media.push(await api(`/api/projects/${pid()}/media`, { method: "POST", body: fd })); ok++; }
     catch (e) { alert(`${f.name} : ${e.message}`); }
   }
-  status.textContent = ok ? `${ok} média(s) importé(s). Clique « + Ajouter » pour les placer dans la séquence.` : "";
   $("media-file").value = "";
-  if (wantOwn && ok) { wantOwn = false; P.background.clips = P.background.clips.filter(c => c.src !== "original");
-    P.background.clips = P.media.map(m => ({ ...newClip(m.file), motion: m.kind === "image" ? "in" : "none" })); selClip = 0; spreadEvenly(); }
+  const onlyOrig = P.background.clips.every(c => c.src === "original");
+  // photos/videos replace the original background, one per verse, unless the
+  // sequence was arranged by hand (then « + Ajouter » places them)
+  if (ok && (wantOwn || onlyOrig || P.background.auto)) {
+    buildOwnSequence();
+    status.textContent = P.media.length === 1 ? "Ton média remplit toute la vidéo." :
+      `${P.media.length} médias, un par verset (le dernier jusqu'à la fin).`;
+  } else status.textContent = ok ? `${ok} média(s) importé(s). Clique « + Ajouter » pour les placer dans la séquence.` : "";
   wantOwn = false;
   changed({ bg: true });
 }
@@ -1185,7 +1410,7 @@ async function deleteMedia(file) {
   if (!confirm("Retirer ce média du projet ?")) return;
   await save();
   const p = await api(`/api/projects/${pid()}/media/${encodeURIComponent(file)}`, { method: "DELETE" });
-  layers.get(file)?.root.remove(); layers.delete(file);
+  for (const k of [file, file + "#pp"]) { layers.get(k)?.root.remove(); layers.delete(k); }
   undoStack.length = 0; redoStack.length = 0;  // older states may point to the deleted file
   loadState(p); lastState = state(); refreshAll();
 }
@@ -1334,6 +1559,7 @@ $("tl-content").addEventListener("pointermove", (e) => {
     }
   } else if (d.kind === "clip") {
     P.background.clips[d.i].dur = Math.round(Math.max(0.3, snapTime(t) - d.s) * 1000) / 1000;
+    P.background.auto = false;
     seek(d.s + P.background.clips[d.i].dur);
   }
   tlRender();

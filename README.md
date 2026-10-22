@@ -40,20 +40,24 @@ L'installation télécharge les composants, le modèle de reconnaissance de la r
    - **Sous-titres** :
      - ▶ sur une carte pour réécouter ce passage ;
      - modifie la traduction directement dans la case ;
-     - ✎ *Corriger* pour modifier l'arabe ou la phonétique (↺ pour revenir au texte d'origine) ;
+     - corrige l'arabe ou la phonétique en cliquant dessus (↺ *Texte d'origine* pour annuler) ;
      - clique sur un mot phonétique (✂) pour **couper** un sous-titre avant ce mot,
        ou *Fusionner avec le suivant* pour en réunir deux ;
      - −/+ pour décaler un sous-titre de 0,05 s, *⤓ ici* pour le caler sur la lecture ;
      - ✨ *Mise en valeur* pour les passages en couleurs (activé automatiquement pour « Subhana Allah »).
    - **Arrière-plan** : garde la vidéo d'origine, ou importe **tes photos et vidéos**
      (jpg, png, heic de l'iPhone, mp4, mov…) ; le son reste celui de la récitation.
-     - Tu peux aussi mélanger les deux, dans l'ordre que tu veux, avec des fondus.
-     - Pour chaque élément : zoom, position, *Remplir l'écran* / *Image entière*,
-       et un zoom lent (avant ou arrière) pour les photos.
+     - **1 média** : il remplit toute la vidéo. **Plusieurs** : un par verset (le 2e arrive avec le 2e verset…),
+       le dernier jusqu'à la fin. *Caler sur les versets* / *Répartir également* pour refaire le minutage.
+     - Une vidéo plus courte que sa place est jouée en **aller-retour** (avant puis à l'envers) : boucle sans saut.
+     - Tu peux aussi mélanger vidéo d'origine et médias, dans l'ordre que tu veux, avec des fondus.
+     - Pour chaque élément : position X/Y et échelle (comme dans Premiere), *Remplir l'écran* / *Image entière*,
+       zoom lent, et **couleur** : exposition, contraste, hautes lumières, ombres, saturation, température, teinte.
      - Fais glisser l'image sur l'aperçu pour la déplacer ; pince le trackpad (ou Ctrl + molette) pour zoomer.
      - *Assombrir* rend les textes plus lisibles sur une image claire.
-   - **Textes** : fais glisser le titre ou les sous-titres sur l'aperçu pour les placer.
-     Pince (ou Ctrl + molette) au-dessus d'un texte pour changer sa taille ; les curseurs font la même chose.
+   - **Textes** : position X/Y en pixels (flèches, Maj = 10 px, ou fais glisser le nom du réglage) et échelle,
+     pour le titre et pour les sous-titres ; ou fais-les glisser sur l'aperçu.
+     **Couleurs** de chaque texte : titre et récitateur (dégradé), numéro, traduction, arabe, phonétique, contour.
    - **Timeline** (en bas) :
      - tire les bords d'un sous-titre pour changer son horaire, et le bord d'un élément d'arrière-plan pour changer sa durée ;
      - les **poignées roses** coupent le début et la fin de la vidéo ;

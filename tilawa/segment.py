@@ -387,7 +387,8 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
                     v.display_text(d0, d1), fr, v.translit_text(a0, a1),
                     highlight=_is_tasbih(v, a0),
                     voice_start=ws[0].start, voice_end=ws[-1].end,
-                    words=[{"t0": round(o.start, 3), "t1": round(o.end, 3), "w": o.word.text} for o in ws],
+                    words=[{"t0": round(o.start, 3), "t1": round(o.end, 3), "w": o.word.text,
+                            "tr": v.translit_text(a0 + k, a0 + k + 1)} for k, o in enumerate(ws)],
                 ))
         else:
             ws = group[0]

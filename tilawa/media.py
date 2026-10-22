@@ -188,3 +188,48 @@ def import_image(src: Path, dst: Path) -> tuple[int, int]:
                 pass  # broken profile: keep the pixels as they are
         im.save(dst, "PNG", compress_level=3)
         return im.size
+
+
+def pingpong(src: Path, dst: Path, preview: bool = False) -> Path:
+    """One back-and-forth cycle of a video (forward, then backward), which
+    loops without a jump. The turning frames are not repeated. Reversing
+    needs the frames in memory, so the backward half is made in short
+    chunks. Full quality: 10-bit x264 at CRF 8 (visually lossless)."""
+    info = probe(src)
+    fps = info.fps_str
+    rate = info.fps
+    work = dst.parent / f".{dst.stem}-parts"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    if preview:
+        enc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "24", "-pix_fmt", "yuv420p", "-g", "15"]
+    else:
+        tags = []
+        for opt, val in (("-color_primaries", info.color_primaries), ("-color_trc", info.color_transfer),
+                         ("-colorspace", info.color_space), ("-color_range", info.color_range)):
+            if val and val != "unknown":
+                tags += [opt, val]
+        enc = ["-c:v", "libx264", "-preset", "fast", "-crf", "8",
+               "-pix_fmt", "yuv420p10le" if info.bit_depth > 8 else "yuv420p", *tags]
+    ff = [tools()[0], "-y", "-v", "error"]
+    fwd = work / "0000.mkv"
+    subprocess.run([*ff, "-i", str(src), "-an", "-vf", "setpts=PTS-STARTPTS", "-fps_mode", "cfr", "-r", fps, *enc,
+                    str(fwd)], check=True)
+    n = round(probe(fwd).duration * rate)
+    # frames n-2 .. 1, newest chunk first
+    chunk = max(8, min(120, int(4e8 / max(1, info.width * info.height * 3))))
+    parts = [fwd]
+    b = n - 1
+    while b > 1:
+        a = max(1, b - chunk)
+        out = work / f"{len(parts):04d}.mkv"
+        subprocess.run([*ff, "-copyts", "-ss", f"{max(0.0, a / rate - 1):.3f}", "-i", str(fwd), "-an",
+                        "-vf", f"trim=start={(a - 0.5) / rate:.4f}:end={(b - 0.5) / rate:.4f},setpts=PTS-STARTPTS,reverse",
+                        "-fps_mode", "cfr", "-r", fps, *enc, str(out)], check=True)
+        parts.append(out)
+        b = a
+    lst = work / "list.txt"
+    lst.write_text("".join(f"file '{p.name}'\n" for p in parts))
+    subprocess.run([*ff, "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(dst)], check=True)
+    shutil.rmtree(work, ignore_errors=True)
+    return dst

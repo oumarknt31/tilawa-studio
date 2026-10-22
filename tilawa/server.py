@@ -288,11 +288,17 @@ def delete_media(pid: str, name: str):
 
 
 @app.get("/api/projects/{pid}/media/{name}")
-def get_media(pid: str, name: str):
-    """Media for the editor (light H.264 copy of videos)."""
+def get_media(pid: str, name: str, pp: bool = False):
+    """Media for the editor (light H.264 copy of videos; `pp`: its forward +
+    backward cycle, made on first use)."""
     folder = _folder(pid) / "media"
     f = folder / Path(name).name
     preview = folder / f"{f.stem}.preview.mp4"
+    if pp and preview.exists():
+        cycle = folder / f"{f.stem}.pp.preview.mp4"
+        if not cycle.exists():
+            media.pingpong(preview, cycle, preview=True)
+        preview = cycle
     f = preview if preview.exists() else f
     if not f.is_file():
         raise HTTPException(404)

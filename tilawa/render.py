@@ -218,6 +218,54 @@ def motion_filter(w: int, h: int, motion: str, frames: int) -> str:
             f"scale={w}:{h}:{SCALE}")
 
 
+# ---------------------------------------------------------------- colour
+#
+# Colour correction of a background clip, done exactly like the editor's
+# preview (an SVG filter in sRGB): a per-channel tone curve (exposure, white
+# balance, contrast, highlights, shadows) sampled at 256 points, then the CSS
+# saturation matrix. Keep in sync with toneTable() in web/index.html.
+
+ADJUST_KEYS = ("exposure", "contrast", "highlights", "shadows", "saturation", "temperature", "tint")
+
+
+def tone_table(adj: dict, ch: int) -> list[float]:
+    """Output level (0..1) for each of 256 input levels of channel ch (0 R, 1 G, 2 B)."""
+    ev = float(adj.get("exposure") or 0)
+    con = float(adj.get("contrast") or 0) / 100
+    hi = float(adj.get("highlights") or 0) / 100
+    sh = float(adj.get("shadows") or 0) / 100
+    temp = float(adj.get("temperature") or 0) / 100
+    tint = float(adj.get("tint") or 0) / 100
+    wb = (1 + 0.12 * temp + 0.04 * tint, 1 - 0.08 * tint, 1 - 0.12 * temp + 0.04 * tint)[ch]
+    gain = 2 ** (ev / 2.2) * wb
+    c = 2 ** con
+    out = []
+    for i in range(256):
+        x = (i / 255 * gain - 0.5) * c + 0.5
+        x = min(1.0, max(0.0, x))
+        x += 0.3 * hi * 6.75 * x * x * (1 - x) + 0.3 * sh * 6.75 * x * (1 - x) * (1 - x)
+        out.append(round(min(1.0, max(0.0, x)), 5))
+    return out
+
+
+def is_neutral(adj: dict | None) -> bool:
+    return not adj or all(not float(adj.get(k) or 0) for k in ADJUST_KEYS)
+
+
+def adjust_filter(adj: dict, cube: Path) -> str:
+    """Filter applying the colour correction; writes the curves to `cube`
+    (referenced by its bare name: ffmpeg runs inside that folder)."""
+    tables = [tone_table(adj, ch) for ch in range(3)]
+    cube.write_text("LUT_1D_SIZE 256\n" + "".join(f"{r} {g} {b}\n" for r, g, b in zip(*tables)))
+    s = 1 + float(adj.get("saturation") or 0) / 100
+    mix = (f"colorchannelmixer=rr={0.213 + 0.787 * s:.5f}:rg={0.715 - 0.715 * s:.5f}:rb={0.072 - 0.072 * s:.5f}:"
+           f"gr={0.213 - 0.213 * s:.5f}:gg={0.715 + 0.285 * s:.5f}:gb={0.072 - 0.072 * s:.5f}:"
+           f"br={0.213 - 0.213 * s:.5f}:bg={0.715 - 0.715 * s:.5f}:bb={0.072 + 0.928 * s:.5f}")
+    return (f"scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=gbrp16le,"
+            f"lut1d=file={cube.name}:interp=linear,{mix},"
+            f"scale=out_color_matrix=bt709:out_range=tv,format=yuv444p")
+
+
 def _prep(info: media.VideoInfo | None) -> str:
     """Bring any source to BT.709 limited-range yuv444p."""
     pre = f"{TONEMAP}," if info is not None and info.is_hdr and "zscale" in media.encoders() else ""
@@ -235,8 +283,17 @@ class _Inputs:
         return self.n - 1
 
 
+def pingpong_file(f: Path) -> Path:
+    """Forward + backward cycle of an imported video, made once and kept."""
+    pp = f.with_name(f"{f.stem}.pp.mkv")
+    if not pp.exists():
+        media.pingpong(f, pp)
+    return pp
+
+
 def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: Path | None,
-                      t0: float, t1: float, w: int, h: int, inputs: _Inputs, graph: list[str]) -> str:
+                      t0: float, t1: float, w: int, h: int, inputs: _Inputs, graph: list[str],
+                      work: Path, progress: Callable[[str, float], None]) -> str:
     """Adds the background (w x h, yuv444p, t1 - t0 long) to the graph; returns its label."""
     fps, rate = info.fps_str, info.fps
     spans = []
@@ -272,7 +329,12 @@ def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: P
                 head = f"[{k}:v]{_prep(None)}"
             else:
                 sinfo = media.probe(f)
-                k = inputs.add("-stream_loop", "-1", "-ss", f"{float(c.get('offset') or 0):.3f}", "-i", str(f))
+                offset = float(c.get("offset") or 0)
+                if c.get("loop", "pingpong") == "pingpong" and length > sinfo.duration - offset + 0.05:
+                    # longer than the video: play it forward, then backward, and so on
+                    progress("prepare", 0.0)
+                    f = pingpong_file(f)
+                k = inputs.add("-stream_loop", "-1", "-ss", f"{offset:.3f}", "-i", str(f))
                 head = f"[{k}:v]trim=duration={length:.3f},setpts=PTS-STARTPTS,{_prep(sinfo)}"
         sw, sh = (sinfo.width, sinfo.height) if sinfo else (sw, sh)
         chain = head + "," + frame_filter(sw, sh, fw, fh, float(c.get("zoom") or 1), float(c.get("x") or 0),
@@ -281,6 +343,8 @@ def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: P
             chain += f",loop=loop={frames - 1}:size=1:start=0,setpts=N/({fps})/TB"
         if motion != "none":
             chain += "," + motion_filter(w, h, motion, frames)
+        if not is_neutral(c.get("adjust")):
+            chain += "," + adjust_filter(c["adjust"], work / f"adjust{i}.cube")
         # constant rate and a common time base, as the crossfades require
         chain += f",trim=duration={length:.3f},setpts=PTS-STARTPTS,settb=AVTB,fps={fps},format=yuv444p"
         graph.append(f"{chain}[c{i}]")
@@ -340,6 +404,9 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
            background: dict | None = None, media_dir: Path | None = None) -> Path:
     opt = opt or RenderOptions()
     progress = progress or (lambda stage, f: None)
+    # absolute paths: ffmpeg runs inside the work folder
+    video, out = Path(video).resolve(), Path(out).resolve()
+    media_dir = Path(media_dir).resolve() if media_dir else None
     info = media.probe(video)
     w, h = output_size(info, opt)
     t0 = max(0.0, opt.trim_start)
@@ -374,7 +441,7 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     audio = inputs.add("-ss", f"{t0:.3f}", "-to", f"{t1:.3f}", "-i", str(video))
     graph: list[str] = []
     base = _background_graph(background or default_background(info.width, info.height, opt.fit),
-                             info, video, media_dir, t0, t1, w, h, inputs, graph)
+                             info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress)
     hdr = inputs.add("-i", str(header[0]))
     graph.append(f"{still(hdr, total)}[hdr]")
     graph.append(f"[{base}][hdr]overlay=x=0:y={header[1]}:format=yuv444:eof_action=pass[v0]")
@@ -407,7 +474,7 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
            "-fps_mode", "cfr", "-r", fps, *vargs,
            *_audio_args(info, t0 > 0 or t1 < info.duration or afi > 0 or afo > 0),
            "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=work)
     for line in proc.stdout:
         m = re.match(r"out_time_us=(\d+)", line)
         if m:
