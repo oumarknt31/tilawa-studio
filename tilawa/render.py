@@ -14,6 +14,7 @@ import mimetypes
 import re
 from fractions import Fraction
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -38,7 +39,8 @@ _OLD_SIZES = {"1080x1920": "hd", "1440x2560": "2k", "2160x3840": "4k"}
 class RenderOptions:
     size: str = "auto"  # "auto" (native when the source has the right shape) | "hd" | "2k" | "4k"
     fit: str = "auto"  # framing when the project has no background clips: "auto" | "crop" | "blur" | "pad"
-    quality: str = "max"  # "max" (H.264 CRF 12) | "high" (CRF 16) | "hevc" (10-bit H.265) | "prores" (editing master) | "png" (still)
+    quality: str = "max"  # "max" | "high" (lighter file) | "hevc" (10-bit H.265) | "prores" (editing master)
+    #                       | "studio" (x264 slower, very slow) | "png" (still); see _encode_args
     fade_in: float = 0.25
     fade_out: float = 0.25
     show_header: bool = True
@@ -219,6 +221,8 @@ def frame_filter(sw: int, sh: int, w: int, h: int, zoom: float, x: float, y: flo
     resampling, and no huge intermediate frames when zoomed in). What the
     picture does not cover shows a blurred copy of it, or black."""
     s = min(w / sw, h / sh) * max(0.05, zoom)
+    if abs(s - 1) * max(w, h) < 2:  # within a pixel of 1:1: copy the pixels, a resampling would only soften them
+        s = 1.0
     X = w / 2 + x * w - sw * s / 2
     Y = h / 2 + y * h - sh * s / 2
     cx0, cy0 = max(0, math.floor(-X / s)), max(0, math.floor(-Y / s))
@@ -238,9 +242,10 @@ def frame_filter(sw: int, sh: int, w: int, h: int, zoom: float, x: float, y: flo
     ox, oy = min(max(0, ox), w - tw), min(max(0, oy), h - th)
     if fill == "black":
         return f"{pic},pad={w}:{h}:{ox}:{oy}:black"
-    bw, bh = w // 4 // 2 * 2, h // 4 // 2 * 2
+    bw, bh = max(2, w // 4 // 2 * 2), max(2, h // 4 // 2 * 2)
+    radius = max(1, round(min(bw, bh) * 20 / 270))  # the same blur whatever the working size
     return (f"split=2[{tag}bg][{tag}fg];[{tag}bg]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},"
-            f"boxblur=20:2,scale={w}:{h}:{SCALE},eq=brightness=-0.08[{tag}bgb];[{tag}fg]{pic}[{tag}fgs];"
+            f"boxblur={radius}:2,scale={w}:{h}:{SCALE},eq=brightness=-0.08[{tag}bgb];[{tag}fg]{pic}[{tag}fgs];"
             f"[{tag}bgb][{tag}fgs]overlay={ox}:{oy}")
 
 
@@ -330,11 +335,41 @@ def pingpong_file(f: Path) -> Path:
     return pp
 
 
+def _source_size(c: dict, info: media.VideoInfo, media_dir: Path | None) -> tuple[int, int]:
+    if c["src"] == "original":
+        return info.width, info.height
+    f = (media_dir / Path(c["src"]).name) if media_dir else Path(c["src"])
+    if f.suffix.lower() == ".png":
+        from PIL import Image
+
+        with Image.open(f) as im:
+            return im.size
+    i = media.probe(f)
+    return i.width, i.height
+
+
+def work_size(clips: list[dict], sizes: list[tuple[int, int]], w: int, h: int) -> tuple[int, int]:
+    """Size at which the background is built before one final upscale to w x h.
+
+    A 1080p clip shown in a 4K frame has no more detail than at 1080p: zooming,
+    blurring, colouring and fading it at its own resolution gives the same
+    picture for a fraction of the work. Sharp sources (a 4K video, a photo)
+    keep the full size."""
+    k = min((min(w / sw, h / sh) * max(0.05, float(c.get("zoom") or 1))
+             # a slow zoom interpolates between pixels: twice the density keeps it as sharp
+             / (2 if c.get("motion", "none") != "none" else 1) for c, (sw, sh) in zip(clips, sizes)), default=1)
+    if k < 1.5:  # too little to gain for an extra resampling
+        return w, h
+    return max(2, round(w / k / 2) * 2), max(2, round(h / k / 2) * 2)
+
+
 def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: Path | None,
                       t0: float, t1: float, w: int, h: int, inputs: _Inputs, graph: list[str],
-                      work: Path, progress: Callable[[str, float], None], fmt: str = "9:16") -> str:
-    """Adds the background (w x h, yuv444p, t1 - t0 long) to the graph; returns its label."""
+                      work: Path, progress: Callable[[str, float], None], fmt: str = "9:16",
+                      out_pix: str = "yuv420p") -> str:
+    """Adds the background (w x h in out_pix, t1 - t0 long) to the graph; returns its label."""
     fps, rate = info.fps_str, info.fps
+    W, H = w, h
     spans = []
     for c, s, e in clip_spans(bg["clips"], info.duration):
         s, e = max(s, t0) - t0, min(e, t1) - t0
@@ -342,6 +377,7 @@ def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: P
             spans.append((c, s, e))
     if not spans:
         spans = [(default_background(info.width, info.height, "auto", fmt)["clips"][0], 0.0, t1 - t0)]
+    w, h = work_size([c for c, _, _ in spans], [_source_size(c, info, media_dir) for c, _, _ in spans], W, H)
     # crossfades: centred on each cut, at most half of either neighbour
     d = [0.0] + [min(float(bg.get("transition") or 0), (spans[i - 1][2] - spans[i - 1][1]) / 2,
                      (spans[i][2] - spans[i][1]) / 2) for i in range(1, len(spans))] + [0.0]
@@ -396,24 +432,49 @@ def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: P
         else:
             graph.append(f"[{last}][{labels[i]}]concat=n=2:v=1:a=0[x{i}]")
         last = f"x{i}"
-    dim = float(bg.get("dim") or 0)
-    if dim > 0:
-        graph.append(f"[{last}]drawbox=t=fill:c=black@{min(dim, 0.9):.2f}[bgdim]")
-        last = "bgdim"
-    return last
+    # darkening = blending with black (Y 16, U/V 128), done before the upscale
+    dim = min(float(bg.get("dim") or 0), 0.9)
+    k = 1 - dim
+    darken = f"lutyuv=y='16+(val-16)*{k:.4f}':u='128+(val-128)*{k:.4f}':v='128+(val-128)*{k:.4f}'," if dim > 0 else ""
+    size = f"scale={W}:{H}:{SCALE}," if (w, h) != (W, H) else ""
+    graph.append(f"[{last}]{darken}{size}format={out_pix}[bgout]")
+    return "bgout"
 
 
-def _encode_args(info: media.VideoInfo, opt: RenderOptions) -> tuple[list[str], str]:
+def _hardware() -> bool:
+    """Apple's media engine (VideoToolbox) is there: every Apple Silicon Mac."""
+    return sys.platform == "darwin" and "h264_videotoolbox" in media.encoders()
+
+
+def _encode_args(info: media.VideoInfo, opt: RenderOptions, hardware: bool | None = None) -> tuple[list[str], str, str]:
+    """Encoder arguments, file extension, and the pixel format the encoder takes.
+
+    Quality levels were chosen by VMAF against a lossless render of a real
+    project (20 s, 1080p; x264 near-lossless = 95.7): "max" hardware H.264 q88
+    = 95.55 at ~8x the speed of x264 slower CRF 12 (95.48); without hardware,
+    x264 faster CRF 12 = 95.35 at ~3.4x."""
     enc = media.encoders()
+    hw = _hardware() if hardware is None else hardware
     tags = ["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-color_range", "tv"]
     if opt.quality == "prores":
-        return ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le", "-vendor", "apl0", *tags], ".mov"
-    if opt.quality == "hevc" and "libx265" in enc:
-        return ["-c:v", "libx265", "-preset", "slow", "-crf", "14", "-pix_fmt", "yuv420p10le", "-tag:v", "hvc1",
-                "-x265-params", "aq-mode=3:no-sao=1:deblock=-1,-1:log-level=error", *tags], ".mp4"
+        if hw and "prores_videotoolbox" in enc:
+            return ["-c:v", "prores_videotoolbox", "-profile:v", "hq", *tags], ".mov", "p210le"
+        return ["-c:v", "prores_ks", "-profile:v", "3", "-vendor", "apl0", *tags], ".mov", "yuv422p10le"
+    if opt.quality == "hevc":
+        if hw and "hevc_videotoolbox" in enc:
+            return ["-c:v", "hevc_videotoolbox", "-profile:v", "main10", "-q:v", "80", "-tag:v", "hvc1", *tags], ".mp4", "p010le"
+        if "libx265" in enc:
+            return ["-c:v", "libx265", "-preset", "medium", "-crf", "14", "-tag:v", "hvc1",
+                    "-x265-params", "aq-mode=3:no-sao=1:log-level=error", *tags], ".mp4", "yuv420p10le"
+    if opt.quality == "studio":  # the slowest, for whoever wants it
+        return ["-c:v", "libx264", "-preset", "slower", "-crf", "12", "-profile:v", "high",
+                "-x264-params", "aq-mode=3:deblock=-1,-1", *tags], ".mp4", "yuv420p"
+    q = "88" if opt.quality == "max" else "80"
+    if hw:
+        return ["-c:v", "h264_videotoolbox", "-q:v", q, "-profile:v", "high", *tags], ".mp4", "nv12"
     crf = "12" if opt.quality == "max" else "16"
-    return ["-c:v", "libx264", "-preset", "slower", "-crf", crf, "-pix_fmt", "yuv420p", "-profile:v", "high",
-            "-x264-params", "aq-mode=3:deblock=-1,-1", *tags], ".mp4"
+    return ["-c:v", "libx264", "-preset", "faster", "-crf", crf, "-profile:v", "high",
+            "-x264-params", "aq-mode=3", *tags], ".mp4", "yuv420p"
 
 
 def _audio_args(info: media.VideoInfo, trimmed: bool) -> list[str]:
@@ -475,7 +536,15 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     # the loop filter (cheap), faded, and placed at its time and height.
     fps = info.fps_str
     total = t1 - t0
-    to_yuv = "format=rgba,scale=out_color_matrix=bt709:out_range=tv,format=yuva444p"
+    if still_image:
+        vargs, ext, enc_pix = [], ".png", "yuv444p"
+    else:
+        vargs, ext, enc_pix = _encode_args(info, opt)
+    # compose in the encoder's chroma layout: 4:2:0 for H.264/HEVC (as the
+    # file will be anyway, and ~4x cheaper per 4K frame), 4:4:4 for ProRes / stills
+    full = enc_pix in ("yuv444p", "yuv422p10le", "p210le")
+    pix, ov = ("yuv444p", "yuv444") if full else ("yuv420p", "yuv420")
+    to_yuv = f"format=rgba,scale=out_color_matrix=bt709:out_range=tv,format=yuva{pix[3:]}"
 
     def still(k: int, dur: float) -> str:
         n = math.ceil(dur * info.fps) + 1
@@ -485,10 +554,10 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     audio = inputs.add("-ss", f"{t0:.3f}", "-to", f"{t1:.3f}", "-i", str(video))
     graph: list[str] = []
     base = _background_graph(background or default_background(info.width, info.height, opt.fit, fmt),
-                             info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress, fmt)
+                             info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress, fmt, pix)
     hdr = inputs.add("-i", str(header[0]))
     graph.append(f"{still(hdr, total)}[hdr]")
-    graph.append(f"[{base}][hdr]overlay=x=0:y={header[1]}:format=yuv444:eof_action=pass[v0]")
+    graph.append(f"[{base}][hdr]overlay=x=0:y={header[1]}:format={ov}:eof_action=pass[v0]")
     last = "v0"
     for i, (b, (png, y)) in enumerate(zip(shown, pngs)):
         s, e = max(b.start, t0) - t0, min(b.end, t1) - t0
@@ -500,7 +569,7 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         fade_in = f"fade=t=in:st=0:d={fi:.3f}:alpha=1," if b.start > t0 + 0.01 and fi > 0 else ""
         fade_out = f"fade=t=out:st={dur - fo:.3f}:d={fo:.3f}:alpha=1," if fo > 0 else ""
         graph.append(f"{still(k, dur)},{fade_in}{fade_out}trim=duration={dur:.3f},setpts=PTS+{s:.3f}/TB[o{i}]")
-        graph.append(f"[{last}][o{i}]overlay=x=0:y={y}:format=yuv444:eof_action=pass[v{i + 1}]")
+        graph.append(f"[{last}][o{i}]overlay=x=0:y={y}:format={ov}:eof_action=pass[v{i + 1}]")
         last = f"v{i + 1}"
     script = work / "graph.txt"
     common = [media.tools()[0], "-y", "-hide_banner", "-loglevel", "error", "-stats_period", "0.5", "-progress", "pipe:1"]
@@ -512,9 +581,8 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         cmd = [*common, *inputs.args, *_graph_arg(script), "-map", "[vout]", "-frames:v", "1", "-c:v", "png", str(out)]
         total = 1 / info.fps
     else:
-        vargs, ext = _encode_args(info, opt)
         out = out.with_suffix(ext)
-        graph.append(f"[{last}]format={'yuv422p10le' if opt.quality == 'prores' else 'yuv420p10le' if opt.quality == 'hevc' else 'yuv420p'}[vout]")
+        graph.append(f"[{last}]format={enc_pix}[vout]")
         afi, afo = min(opt.audio_fade_in, total / 2), min(opt.audio_fade_out, total / 2)
         afilters = []
         if info.acodec is not None and opt.loudnorm:
@@ -530,10 +598,24 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         else:
             amap = ["-map", f"{audio}:a?"]
         script.write_text(";\n".join(graph))
-        cmd = [*common, *inputs.args, *_graph_arg(script), "-map", "[vout]", *amap,
-               "-fps_mode", "cfr", "-r", fps, *vargs,
-               *_audio_args(info, t0 > 0 or t1 < info.duration or bool(afilters)),
-               "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
+        head = [*common, *inputs.args, *_graph_arg(script), "-map", "[vout]", *amap, "-fps_mode", "cfr", "-r", fps]
+        tail = [*_audio_args(info, t0 > 0 or t1 < info.duration or bool(afilters)),
+                "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
+        cmd = [*head, *vargs, *tail]
+    code, err = _run(cmd, work, total, progress)
+    if code > 0 and any("videotoolbox" in a for a in vargs):
+        # the media engine refused the job: same video with the software encoder
+        progress("encoding", 0.0)
+        code, err = _run([*head, *_encode_args(info, opt, hardware=False)[0], *tail], work, total, progress)
+    if code != 0:
+        raise RuntimeError(f"ffmpeg failed:\n{err[-3000:]}")
+    progress("encoding", 1.0)
+    return out
+
+
+def _run(cmd: list[str], work: Path, total: float, progress: Callable[[str, float], None]) -> tuple[int, str]:
+    """Runs ffmpeg, reporting its progress; returns its exit code (negative
+    when it was stopped) and the end of its error output."""
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=work)
     RUNNING.add(proc)
     try:
@@ -542,10 +624,6 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
             if m:
                 progress("encoding", min(1.0, int(m.group(1)) / 1e6 / total))
         err = proc.stderr.read()
-        code = proc.wait()
+        return proc.wait(), err
     finally:
         RUNNING.discard(proc)
-    if code != 0:
-        raise RuntimeError(f"ffmpeg failed:\n{err[-3000:]}")
-    progress("encoding", 1.0)
-    return out

@@ -89,10 +89,11 @@ Shortcuts: `Space` play/pause, `←` `→` previous/next subtitle, `⌘Z` / `Ctr
 | Setting | Advice |
 |---|---|
 | *Native* resolution | keeps the original resolution when the video already has the right shape (otherwise Full HD) |
-| *4K* resolution | 2160 × 3840 vertical, 3840 × 2160 horizontal; the text is drawn in 4K. YouTube usually keeps its best encodings (VP9/AV1, higher bitrate) for high-resolution uploads: often sharper once published. ~5× longer to render |
-| *Maximum* quality | H.264 CRF 12, *slower* preset: visually identical to the source, plays everywhere |
+| *4K* resolution | 2160 × 3840 vertical, 3840 × 2160 horizontal; the text is drawn in 4K. YouTube usually keeps its best encodings (VP9/AV1, higher bitrate) for high-resolution uploads: often sharper once published. ~3× longer to render |
+| *Maximum* quality | H.264, visually identical to the source, plays everywhere. On a Mac it uses the Apple chip's video engine: a 2-minute video takes about 20 s in Full HD and 1 min in 4K (M4) |
 | *10-bit (H.265)* quality | even more faithful (gradients), smaller files, less compatible with old devices |
 | *ProRes master* | to keep editing in CapCut / Premiere / Final Cut without loss |
+| *Studio* quality | the same picture in a file about ⅓ smaller, with the slow software encoder (x264 *slower*): ~8× longer |
 | Horizontal source video | *Background* tab: *Whole picture* (blurred or black behind) or *Fill the screen*, or any zoom |
 
 HDR videos (iPhone) are converted automatically so the text keeps the right brightness.
@@ -125,8 +126,12 @@ uv run tilawa make "https://youtube.com/shorts/..." --size 4k
 4. **Rendering** (`tilawa/render.py`) — the text is drawn by Chromium (perfect Arabic shaping,
    outlines, gradients, emoji) directly at the final resolution, then ffmpeg lays those pictures
    over the background with the fades and encodes once. For the background, only the visible part
-   of each picture is cropped then resized (a single resampling), and the slow zoom is computed
-   with sub-pixel precision (no jitter). Photos are imported without loss: iPhone rotation applied,
+   of each picture is cropped, and it is coloured, darkened and crossfaded at the source's own resolution
+   before a single enlargement to the final size: a 1080p video shown in 4K has no more detail, so this
+   gives the same picture for a fraction of the work. The slow zoom is computed with sub-pixel precision
+   (no jitter). Encoding uses the computer's video engine when there is one (Apple VideoToolbox, the way
+   phone editing apps export fast), with settings chosen by VMAF measurements to match the quality of
+   x264 at CRF 12; otherwise x264, and the software encoder takes over if the engine ever refuses a job. Photos are imported without loss: iPhone rotation applied,
    Display P3 colours converted to sRGB.
 
 Tests: `uv run python -m pytest -q`

@@ -89,10 +89,11 @@ Raccourcis : `Espace` lecture/pause, `←` `→` sous-titre précédent/suivant,
 | Réglage | Conseil |
 |---|---|
 | Résolution *Native* | garde la résolution d'origine si la vidéo a déjà la bonne forme (sinon Full HD) |
-| Résolution *4K* | 2160 × 3840 en vertical, 3840 × 2160 en horizontal ; le texte est dessiné en 4K. YouTube réserve en général ses meilleurs encodages (VP9/AV1, débit plus élevé) aux mises en ligne en haute résolution : rendu souvent plus net après publication. Rendu ~5× plus long |
-| Qualité *Maximale* | H.264 CRF 12, preset *slower* : visuellement identique à la source, lisible partout |
+| Résolution *4K* | 2160 × 3840 en vertical, 3840 × 2160 en horizontal ; le texte est dessiné en 4K. YouTube réserve en général ses meilleurs encodages (VP9/AV1, débit plus élevé) aux mises en ligne en haute résolution : rendu souvent plus net après publication. Rendu ~3× plus long |
+| Qualité *Maximale* | H.264, visuellement identique à la source, lisible partout. Sur Mac, elle utilise le moteur vidéo de la puce Apple : une vidéo de 2 minutes prend environ 20 s en Full HD et 1 min en 4K (M4) |
 | Qualité *10-bit (H.265)* | encore plus fidèle (dégradés), fichiers plus légers, moins compatible avec les vieux appareils |
 | *Master ProRes* | pour retravailler la vidéo dans CapCut / Premiere / Final Cut sans perte |
+| Qualité *Studio* | la même image dans un fichier environ ⅓ plus léger, avec l'encodeur logiciel lent (x264 *slower*) : ~8× plus long |
 | Vidéo horizontale | onglet *Arrière-plan* : *Image entière* (fond flouté ou noir) ou *Remplir l'écran*, ou n'importe quel zoom |
 
 Les vidéos HDR (iPhone) sont converties automatiquement pour que le texte garde la bonne luminosité.
@@ -125,8 +126,13 @@ uv run tilawa make "https://youtube.com/shorts/..." --size 4k
 4. **Rendu** (`tilawa/render.py`) — le texte est dessiné par Chromium (mise en forme arabe
    parfaite, contours, dégradés, émojis) directement à la résolution finale, puis ffmpeg pose
    ces images sur l'arrière-plan avec les fondus et encode une seule fois. Pour l'arrière-plan,
-   seule la partie visible de chaque image est recadrée puis redimensionnée (un seul
-   rééchantillonnage), et le zoom lent est calculé au sous-pixel près (pas de tremblement).
+   seule la partie visible de chaque image est recadrée, puis colorée, assombrie et fondue à la
+   résolution de la source, avant un seul agrandissement à la taille finale : une vidéo 1080p affichée
+   en 4K n'a pas plus de détails, l'image est donc la même pour une fraction du travail. Le zoom lent
+   est calculé au sous-pixel près (pas de tremblement). L'encodage utilise le moteur vidéo de
+   l'ordinateur quand il y en a un (Apple VideoToolbox, comme les applis de montage sur téléphone),
+   avec des réglages choisis par mesures VMAF pour égaler la qualité de x264 en CRF 12 ; sinon x264,
+   et l'encodeur logiciel prend le relais si le moteur refuse un travail.
    Les photos sont importées sans perte : rotation de l'iPhone appliquée, couleurs Display P3
    converties en sRGB.
 

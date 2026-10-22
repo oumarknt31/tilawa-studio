@@ -69,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--lang", default="fr", help="translation: fr, en, es, de, it, pt, nl, sv, tr, id, ms, bs, sq, ru, ur, none")
     m.add_argument("--style", help="style preset id (pieux, mushaf, moderne, doux, elegant, calligraphie)")
     m.add_argument("--size", choices=["auto", "hd", "2k", "4k"])
-    m.add_argument("--quality", choices=["max", "high", "hevc", "prores"])
+    m.add_argument("--quality", choices=["max", "high", "hevc", "prores", "studio"])
     m.add_argument("--fit", choices=["auto", "crop", "blur", "pad"])
     m.add_argument("--out", help=f"output folder (default: {HOME})")
     args = ap.parse_args(argv)
