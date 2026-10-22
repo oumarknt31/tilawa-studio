@@ -79,3 +79,14 @@ def test_imported_font_names_cannot_inject_css(tmp_path):
         {"family": "Good Font", "files": [["good.ttf", "400"]], "script": "latin"},
         {"family": "Bad File", "files": [['x"); }', "400"]], "script": "latin"}]))
     assert [f["family"] for f in lib.user_fonts()] == ["Good Font"]
+
+
+def test_user_errors_speak_both_languages():
+    from tilawa.i18n import MESSAGES, UserError
+
+    for key, (fr, en) in MESSAGES.items():
+        assert fr and en and fr != en, key
+    try:
+        quran.verse(1, 99)
+    except UserError as e:
+        assert e.text("fr") == "Le verset 1:99 n'existe pas." and e.text("en") == "Verse 1:99 does not exist."

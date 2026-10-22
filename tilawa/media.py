@@ -12,6 +12,8 @@ from pathlib import Path
 
 import numpy as np
 
+from .i18n import UserError
+
 
 def _capabilities(ff: str) -> set[str]:
     out = subprocess.run([ff, "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
@@ -78,11 +80,11 @@ def probe(path: str | Path) -> VideoInfo:
     d = json.loads(out)
     # playlist-like formats (hls, concat...) can pull in other files from the disk: real video containers only
     if not set(d.get("format", {}).get("format_name", "").split(",")) & VIDEO_FORMATS:
-        raise ValueError(f"{path}: format vidéo non pris en charge")
+        raise UserError("unsupported_video")
     v = next((s for s in d["streams"] if s["codec_type"] == "video"), None)
     a = next((s for s in d["streams"] if s["codec_type"] == "audio"), None)
     if v is None:
-        raise ValueError(f"{path} has no video stream")
+        raise UserError("no_video_stream")
     w, h = int(v["width"]), int(v["height"])
     rot = 0
     for sd in v.get("side_data_list", []):

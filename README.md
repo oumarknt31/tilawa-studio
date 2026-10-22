@@ -1,145 +1,147 @@
 # Tilawa Studio
 
-Transforme une récitation du Coran (vidéo, lien ou simple fichier audio) en vidéo sous-titrée :
-**nom de la sourate et du récitateur en haut, numéro du verset, traduction, texte arabe et phonétique**,
-chaque morceau apparaissant exactement quand le récitateur le prononce. Le logiciel **reconnaît tout seul
-la sourate et les versets** récités. Pas besoin de lire l'arabe.
+[Français](README.fr.md) · **English**
 
-Formats : vertical 9:16 (Shorts, Reels, TikTok), horizontal 16:9 (YouTube), carré 1:1 et portrait 4:5,
-de la Full HD à la 4K. Traductions : français, anglais, espagnol, allemand, italien, portugais,
-néerlandais, suédois, turc, indonésien, malais, bosnien, albanais, russe, ourdou, ou arabe seul.
+Turns a Quran recitation (a video, a link or just an audio file) into a subtitled video:
+**surah and reciter names at the top, verse number, translation, Arabic text and transliteration**,
+each part appearing exactly when the reciter says it. The app **recognises the surah and verses
+on its own**. No need to read Arabic.
 
-## Installation (une seule fois)
+Formats: vertical 9:16 (Shorts, Reels, TikTok), horizontal 16:9 (YouTube), square 1:1 and portrait 4:5,
+from Full HD to 4K. Translations: French, English, Spanish, German, Italian, Portuguese, Dutch,
+Swedish, Turkish, Indonesian, Malay, Bosnian, Albanian, Russian, Urdu, or Arabic only.
+The interface is in English or French (**FR | EN** switch at the top right).
 
-Il faut un **Mac Apple Silicon (M1 ou plus récent)** ou un **PC Windows 10/11**, environ
-**5 Go d'espace libre** et une connexion internet pour l'installation.
+## Installation (once)
 
-- **Mac** : ouvre l'application *Terminal*, colle cette ligne et appuie sur Entrée :
+You need an **Apple Silicon Mac (M1 or newer)** or a **Windows 10/11 PC**, about
+**5 GB of free space** and an internet connection for the installation.
+
+- **Mac**: open the *Terminal* app, paste this line and press Enter:
 
   ```bash
   curl -LsSf https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.sh | bash
   ```
 
-  Le logiciel s'installe dans `Tilawa Studio/Application` (dans ton dossier personnel) et le dossier
-  s'ouvre à la fin. La même ligne sert aussi à **mettre à jour** (tes projets et vidéos sont conservés).
+  The app is installed in `Tilawa Studio/Application` (in your home folder) and the folder
+  opens at the end. The same line also **updates** the app (your projects and videos are kept).
 
-  Si tu as plutôt téléchargé le ZIP depuis GitHub : double-clic sur `Installer (Mac).command`.
-  Si le Mac refuse de l'ouvrir : *Réglages Système* → *Confidentialité et sécurité* → *Ouvrir quand même*.
-- **Windows** : télécharge le ZIP (bouton vert *Code* → *Download ZIP*), décompresse-le,
-  puis double-clic sur `Installer (Windows).bat`.
-  Si Windows affiche « Windows a protégé votre ordinateur » : *Informations complémentaires* → *Exécuter quand même*.
+  If you downloaded the ZIP from GitHub instead: double-click `Installer (Mac).command`.
+  If the Mac refuses to open it: *System Settings* → *Privacy & Security* → *Open Anyway*.
+- **Windows**: download the ZIP (green *Code* button → *Download ZIP*), unzip it,
+  then double-click `Installer (Windows).bat`.
+  If Windows shows "Windows protected your PC": *More info* → *Run anyway*.
 
-L'installation télécharge les composants, le modèle de reconnaissance de la récitation
-(~1,2 Go) et ffmpeg. Compte 5 à 15 minutes selon la connexion.
+The installation downloads the components, the recitation recognition model
+(~1.2 GB) and ffmpeg. Allow 5 to 15 minutes depending on the connection.
 
-## Utilisation
+## Use
 
-1. Lance `Tilawa Studio.command` (Mac) ou `Tilawa Studio.bat` (Windows).
-   L'application s'ouvre dans le navigateur. **Laisse la fenêtre noire ouverte** pendant l'utilisation :
-   la fermer arrête le logiciel (la page affiche alors « Tilawa Studio est fermé »).
-2. **Dépose une vidéo** (ou colle un lien YouTube / Instagram / TikTok, ou dépose un audio mp3 / m4a…),
-   puis choisis le **format**, la **traduction**, le **style** et le nom du récitateur.
-   La sourate et les versets sont **détectés automatiquement** (tu peux aussi les choisir toi-même).
-3. **Créer ma vidéo** : le logiciel écoute la récitation, reconnaît le passage et retrouve chaque mot (10 à 60 secondes).
-4. **Vérifie et personnalise** dans l'éditeur (les icônes à gauche). L'aperçu montre exactement le résultat final.
-   - **Sous-titres** :
-     - ▶ pour réécouter un passage ; modifie la traduction directement dans la case ;
-     - corrige l'arabe ou la phonétique en cliquant dessus (↺ *Texte d'origine* pour annuler) ;
-     - clique sur un mot phonétique (✂) pour **couper** un sous-titre avant ce mot, *Fusionner* pour en réunir deux ;
-     - −/+ pour décaler un sous-titre de 0,05 s, *⤓ ici* pour le caler sur la lecture ;
-     - ✨ *Mise en valeur* pour les passages en couleurs (automatique pour « Subhana Allah »).
-   - **Arrière-plan** : garde la vidéo d'origine, ou importe **tes photos et vidéos**
-     (jpg, png, heic de l'iPhone, mp4, mov…) ; le son reste celui de la récitation.
-     - **1 média** : il remplit toute la vidéo. **Plusieurs** : un par verset (le 2e arrive avec le 2e verset…),
-       le dernier jusqu'à la fin. *Caler sur les versets* / *Répartir également* pour refaire le minutage.
-     - Une vidéo plus courte que sa place est jouée en **aller-retour** (avant puis à l'envers) : boucle sans saut.
-     - Pour chaque élément : position X/Y et échelle (comme dans Premiere), *Remplir l'écran* / *Image entière*,
-       zoom lent, et **couleur** : exposition, contraste, hautes lumières, ombres, saturation, température, teinte.
-     - Fais glisser l'image sur l'aperçu pour la déplacer ; pince le trackpad (ou Ctrl + molette) pour zoomer.
-   - **Style** :
-     - **Thèmes** prêts à l'emploi (Le Chemin des Pieux, Mushaf doré, Moderne, Douceur, Élégant, Calligraphie) ;
-       *Enregistrer mon style* le garde pour toutes tes vidéos, ★ en fait le style par défaut ;
-     - **polices** du titre, de l'arabe (Amiri Quran, Scheherazade — comme le Coran de Médine —, Noto Naskh,
-       Amiri, coufique, ruqʿa) et de la traduction ; *Importer une police* pour la tienne (.ttf, .otf),
-       par exemple la police officielle du Mushaf du Complexe Roi Fahd ;
-     - **numéro de verset** dans son ornement à la fin du verset (۝١٢ ou ﴿١٢﴾) ;
-     - tailles, couleurs (titre et récitateur en dégradé), positions X/Y au pixel ;
-     - langue de la traduction (change toute la traduction, coupée comme l'arabe).
-   - **Audio** : début et fin de la vidéo (*Couper les silences* en un clic), fondus du son,
-     **volume optimisé pour les réseaux** (−14 LUFS, le niveau de YouTube, TikTok et Instagram).
-   - **Export** : format (ou une copie du projet dans un autre format), résolution, qualité,
-     **image** pleine résolution (pour une miniature YouTube), liste des fichiers déjà exportés.
-   - **Timeline** (en bas) : tire les bords d'un sous-titre pour changer son horaire, le bord d'un
-     élément d'arrière-plan pour changer sa durée ; les **poignées roses** coupent le début et la fin.
-   - **Zones des applis** (sous l'aperçu) : montre où TikTok, Reels et Shorts posent leurs boutons.
-   - ↶ *Annuler* (⌘Z / Ctrl+Z) annule la dernière modification. Tout est enregistré automatiquement.
-5. **Créer la vidéo**. Les vidéos sont enregistrées dans le dossier `Tilawa Studio/Videos`
-   de ton dossier personnel.
+1. Open `Tilawa Studio.command` (Mac) or `Tilawa Studio.bat` (Windows).
+   The app opens in the browser. **Keep the black window open** while you use it:
+   closing it stops the app (the page then says "Tilawa Studio is closed").
+2. **Drop a video** (or paste a YouTube / Instagram / TikTok link, or drop an mp3 / m4a… audio file),
+   then choose the **format**, the **translation**, the **style** and the reciter's name.
+   The surah and verses are **detected automatically** (you can also choose them yourself).
+3. **Create my video**: the app listens to the recitation, recognises the passage and finds every word (10 to 60 seconds).
+4. **Check and customise** in the editor (icons on the left). The preview shows exactly the final result.
+   - **Subtitles**:
+     - ▶ to listen to a passage again; edit the translation right in its box;
+     - correct the Arabic or the transliteration by clicking it (↺ *Original text* to undo);
+     - click a transliterated word (✂) to **split** a subtitle before that word, *Merge* to join two;
+     - −/+ to shift a subtitle by 0.05 s, *⤓ here* to set it at the playhead;
+     - ✨ *Highlight* for passages in colour (automatic for "Subhana Allah").
+   - **Background**: keep the original video, or import **your own photos and videos**
+     (jpg, png, iPhone heic, mp4, mov…); the sound stays the recitation's.
+     - **1 item**: it fills the whole video. **Several**: one per verse (the 2nd comes with the 2nd verse…),
+       the last until the end. *Match the verses* / *Spread evenly* to redo the timing.
+     - A video shorter than its slot plays **back and forth** (forward, then reversed): a loop with no jump.
+     - For each item: X/Y position and scale (like in Premiere), *Fill the screen* / *Whole picture*,
+       slow zoom, and **colour**: exposure, contrast, highlights, shadows, saturation, temperature, tint.
+     - Drag the picture on the preview to move it; pinch the trackpad (or Ctrl + wheel) to zoom.
+   - **Style**:
+     - ready-made **themes** (Le Chemin des Pieux, Golden Mushaf, Modern, Soft, Elegant, Calligraphy);
+       *Save my style* keeps it for all your videos, ★ makes it the default;
+     - **fonts** for the title, the Arabic (Amiri Quran, Scheherazade — like the Medina Quran —, Noto Naskh,
+       Amiri, Kufic, ruqʿa) and the translation; *Import a font* for your own (.ttf, .otf),
+       for example the official King Fahd Complex Mushaf font;
+     - **verse number** in its ornament at the end of the verse (۝١٢ or ﴿١٢﴾);
+     - sizes, colours (title and reciter as gradients), X/Y positions to the pixel;
+     - translation language (replaces the whole translation, split like the Arabic).
+   - **Audio**: start and end of the video (*Cut the silences* in one click), sound fades,
+     **loudness optimised for social media** (−14 LUFS, the level of YouTube, TikTok and Instagram).
+   - **Export**: format (or a copy of the project in another format), resolution, quality,
+     full-resolution **image** (for a YouTube thumbnail), list of files already exported.
+   - **Timeline** (bottom): drag the edges of a subtitle to change its timing, the edge of a
+     background item to change its length; the **pink handles** cut the start and the end.
+   - **App safe zones** (below the preview): shows where TikTok, Reels and Shorts put their buttons.
+   - ↶ *Undo* (⌘Z / Ctrl+Z) undoes the last change. Everything is saved automatically.
+5. **Create the video**. Videos are saved in the `Tilawa Studio/Videos` folder
+   of your home folder.
 
-Raccourcis : `Espace` lecture/pause, `←` `→` sous-titre précédent/suivant, `⌘Z` / `Ctrl+Z` annuler, `?` aide.
+Shortcuts: `Space` play/pause, `←` `→` previous/next subtitle, `⌘Z` / `Ctrl+Z` undo, `?` help.
 
-### Réglages de la vidéo
+### Video settings
 
-| Réglage | Conseil |
+| Setting | Advice |
 |---|---|
-| Résolution *Native* | garde la résolution d'origine si la vidéo a déjà la bonne forme (sinon Full HD) |
-| Résolution *4K* | 2160 × 3840 en vertical, 3840 × 2160 en horizontal ; le texte est dessiné en 4K. YouTube réserve en général ses meilleurs encodages (VP9/AV1, débit plus élevé) aux mises en ligne en haute résolution : rendu souvent plus net après publication. Rendu ~5× plus long |
-| Qualité *Maximale* | H.264 CRF 12, preset *slower* : visuellement identique à la source, lisible partout |
-| Qualité *10-bit (H.265)* | encore plus fidèle (dégradés), fichiers plus légers, moins compatible avec les vieux appareils |
-| *Master ProRes* | pour retravailler la vidéo dans CapCut / Premiere / Final Cut sans perte |
-| Vidéo horizontale | onglet *Arrière-plan* : *Image entière* (fond flouté ou noir) ou *Remplir l'écran*, ou n'importe quel zoom |
+| *Native* resolution | keeps the original resolution when the video already has the right shape (otherwise Full HD) |
+| *4K* resolution | 2160 × 3840 vertical, 3840 × 2160 horizontal; the text is drawn in 4K. YouTube usually keeps its best encodings (VP9/AV1, higher bitrate) for high-resolution uploads: often sharper once published. ~5× longer to render |
+| *Maximum* quality | H.264 CRF 12, *slower* preset: visually identical to the source, plays everywhere |
+| *10-bit (H.265)* quality | even more faithful (gradients), smaller files, less compatible with old devices |
+| *ProRes master* | to keep editing in CapCut / Premiere / Final Cut without loss |
+| Horizontal source video | *Background* tab: *Whole picture* (blurred or black behind) or *Fill the screen*, or any zoom |
 
-Les vidéos HDR (iPhone) sont converties automatiquement pour que le texte garde la bonne luminosité.
+HDR videos (iPhone) are converted automatically so the text keeps the right brightness.
 
-## En ligne de commande
+## Command line
 
 ```bash
-uv run tilawa make video.mp4 --reciter "Muhammad Dibirov"            # sourate et versets détectés
+uv run tilawa make video.mp4 --reciter "Muhammad Dibirov"            # surah and verses detected
 uv run tilawa make video.mp4 --surah 23 --from 84 --format 16:9 --lang en --style mushaf
 uv run tilawa make "https://youtube.com/shorts/..." --size 4k
 ```
 
-## Comment ça marche
+## How it works
 
-1. **Écoute** — un modèle wav2vec2 entraîné sur la récitation du Coran
+1. **Listening** — a wav2vec2 model trained on Quran recitation
    ([rabah2026/wav2vec2-large-xlsr-53-arabic-quran-v_final](https://huggingface.co/rabah2026/wav2vec2-large-xlsr-53-arabic-quran-v_final))
-   donne, toutes les 20 ms, la probabilité de chaque lettre arabe.
-   **Identification** (`tilawa/identify.py`) : les lettres les plus probables forment une transcription
-   approximative, retrouvée dans tout le Coran (6236 versets) par vote de groupes de lettres, puis
-   comparée lettre à lettre aux meilleurs candidats.
-2. **Alignement forcé** — comme le texte est connu, on cherche le meilleur chemin du texte
-   à travers ces probabilités (`tilawa/align.py`). Le chemin accepte l'isti'adha et la basmala,
-   les silences et paroles avant/après, une vidéo coupée au milieu d'un verset, un verset de départ
-   approximatif, et les **répétitions** du récitateur.
-3. **Découpage** (`tilawa/segment.py`) — un sous-titre par verset ; un nouveau à chaque
-   **respiration** du récitateur (mesurée sur le son, pas sur les lettres, car les madd et
-   ghunna laissent de longs blancs sans pause) ; les versets trop longs sont coupés au meilleur
-   endroit (signes de pause, creux du son, ponctuation). La traduction est coupée à l'endroit
-   qui correspond à l'arabe, à l'aide de mots repères (قل → « Dis » / « Say » / « Di »…, سبحان → « Gloire »…).
-4. **Rendu** (`tilawa/render.py`) — le texte est dessiné par Chromium (mise en forme arabe
-   parfaite, contours, dégradés, émojis) directement à la résolution finale, puis ffmpeg pose
-   ces images sur l'arrière-plan avec les fondus et encode une seule fois. Pour l'arrière-plan,
-   seule la partie visible de chaque image est recadrée puis redimensionnée (un seul
-   rééchantillonnage), et le zoom lent est calculé au sous-pixel près (pas de tremblement).
-   Les photos sont importées sans perte : rotation de l'iPhone appliquée, couleurs Display P3
-   converties en sRGB.
+   gives, every 20 ms, the probability of each Arabic letter.
+   **Identification** (`tilawa/identify.py`): the most likely letters form a rough transcript,
+   found in the whole Quran (6236 verses) by a vote of letter groups, then compared letter by letter
+   with the best candidates.
+2. **Forced alignment** — since the text is known, the best path of the text through those
+   probabilities is searched (`tilawa/align.py`). The path allows the isti'adha and the basmala,
+   silence and speech before/after, a video cut in the middle of a verse, an approximate starting
+   verse, and the reciter's **repeats**.
+3. **Splitting** (`tilawa/segment.py`) — one subtitle per verse; a new one at every **breath**
+   of the reciter (measured on the sound, not on the letters, because madd and ghunna leave long
+   gaps without a pause); verses that are too long are cut at the best place (pause marks, dips in the
+   sound, punctuation). The translation is cut where it matches the Arabic, with the help of
+   anchor words (قل → "Say" / "Dis" / "Di"…, سبحان → "Exalted"…).
+4. **Rendering** (`tilawa/render.py`) — the text is drawn by Chromium (perfect Arabic shaping,
+   outlines, gradients, emoji) directly at the final resolution, then ffmpeg lays those pictures
+   over the background with the fades and encodes once. For the background, only the visible part
+   of each picture is cropped then resized (a single resampling), and the slow zoom is computed
+   with sub-pixel precision (no jitter). Photos are imported without loss: iPhone rotation applied,
+   Display P3 colours converted to sRGB.
 
-Tests : `uv run python -m pytest -q`
+Tests: `uv run python -m pytest -q`
 
-## Sources et licences
+## Sources and licences
 
-- Texte coranique : **Tanzil Project** (texte Uthmani, CC BY 3.0, copie à l'identique) — https://tanzil.net
-- Traductions, via Tanzil (`tilawa/data/trans/`, usage non commercial selon les conditions de Tanzil) :
+- Quran text: **Tanzil Project** (Uthmani text, CC BY 3.0, verbatim copy) — https://tanzil.net
+- Translations, via Tanzil (`tilawa/data/trans/`, non-commercial use under Tanzil's terms):
   Muhammad Hamidullah (fr), Saheeh International (en), Julio Cortés (es), Bubenheim & Elyas (de),
   Hamza Roberto Piccardo (it), Samir El-Hayek (pt), Sofian S. Siregar (nl), Knut Bernström (sv),
   Diyanet İşleri (tr), Kementerian Agama RI (id), Abdullah Muhammad Basmeih (ms), Besim Korkut (bs),
   Sherif Ahmeti (sq), Elmir Kuliev (ru), Fateh Muhammad Jalandhry (ur).
-- Phonétique : **Tanzil** (`en.transliteration`).
-- Noms des sourates : quran.com.
-- Polices (SIL Open Font License, voir `tilawa/fonts/`) : Amiri Quran, Amiri, Scheherazade New,
+- Transliteration: **Tanzil** (`en.transliteration`).
+- Surah names: quran.com.
+- Fonts (SIL Open Font License, see `tilawa/fonts/`): Amiri Quran, Amiri, Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Montserrat, Nunito, Baloo 2,
   Playfair Display, Lora, Cinzel.
-- Modèle de reconnaissance : Apache 2.0.
+- Recognition model: Apache 2.0.
 
-Les fichiers de `tilawa/data/` sont fournis tels quels, avec leurs mentions de droits.
-Vérifie que tu as le droit de republier les vidéos de récitation que tu utilises.
+The files in `tilawa/data/` are provided as is, with their copyright notices.
+Make sure you have the right to republish the recitation videos you use.

@@ -19,12 +19,15 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
+from contextvars import ContextVar
+
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import media, project, quran, render, segment
 from .cli import HOME
+from .i18n import UI_LANGS, UserError
 from .library import Library
 
 PKG = Path(__file__).parent
@@ -41,6 +44,16 @@ _pool = ThreadPoolExecutor(max_workers=1)
 _jobs: dict[str, dict] = {}
 _lock = threading.Lock()
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".3gp"}
+LANG: ContextVar[str] = ContextVar("lang", default="fr")  # language of the interface making the request
+
+
+def _msg(e: Exception) -> str:
+    return e.text(LANG.get()) if isinstance(e, UserError) else str(e)
+
+
+@app.exception_handler(UserError)
+async def user_error(request: Request, e: UserError):
+    return JSONResponse({"detail": e.text(LANG.get())}, status_code=400)
 
 
 @app.middleware("http")
@@ -49,6 +62,8 @@ async def local_only(request: Request, call_next):
     local = ("127.0.0.1", "localhost")
     if (request.headers.get("host") or "").rsplit(":", 1)[0] not in local:
         return PlainTextResponse("Forbidden", 403)
+    lang = request.headers.get("x-lang", "")
+    LANG.set(lang if lang in UI_LANGS else "fr")
     origin = request.headers.get("origin")
     if request.method not in ("GET", "HEAD") and origin and origin.split("://", 1)[-1].rsplit(":", 1)[0] not in local:
         return PlainTextResponse("Forbidden", 403)
@@ -59,6 +74,7 @@ async def local_only(request: Request, call_next):
 
 def _job(kind: str, project_id: str, fn) -> str:
     jid = uuid.uuid4().hex[:10]
+    lang = LANG.get()
     job = {"id": jid, "kind": kind, "project": project_id, "stage": "queued", "progress": 0.0,
            "status": "running", "error": None, "result": None, "started": time.time()}
     with _lock:
@@ -73,7 +89,7 @@ def _job(kind: str, project_id: str, fn) -> str:
             job["status"] = "done"
         except Exception as e:  # report to the UI
             traceback.print_exc()
-            job["status"], job["error"] = "error", str(e) or e.__class__.__name__
+            job["status"], job["error"] = "error", (e.text(lang) if isinstance(e, UserError) else str(e)) or e.__class__.__name__
 
     _pool.submit(run)
     return jid
@@ -152,16 +168,15 @@ async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_ver
         if surah:
             quran.verse(surah, first_verse)
         if format not in render.FORMATS or lang not in quran.LANGS:
-            raise ValueError("Format ou langue inconnus")
+            raise UserError("bad_format_lang")
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, _msg(e))
     if not url and not file:
-        raise HTTPException(400, "Choisis un fichier vidéo ou colle un lien.")
+        raise UserError("need_source")
     if url and not file and not url.strip().startswith(("http://", "https://")):
-        raise HTTPException(400, "Le lien doit commencer par https://")
+        raise UserError("need_https")
     if file and Path(file.filename or "").suffix.lower() not in VIDEO_EXTS | media.AUDIO_EXTS:
-        raise HTTPException(400, "Format non reconnu : choisis une vidéo ou un fichier audio ("
-                            + ", ".join(sorted(VIDEO_EXTS | media.AUDIO_EXTS)) + ").")
+        raise UserError("bad_source", exts=", ".join(sorted(VIDEO_EXTS | media.AUDIO_EXTS)))
     name = f"{quran.surah(surah)['name']}-{first_verse}" if surah else "recitation"
     slug = re.sub(r"[^\w-]+", "-", f"{name}-{time.strftime('%Y%m%d-%H%M%S')}")
     folder = PROJECTS / slug
@@ -233,7 +248,7 @@ def split(pid: str, body: dict):
     try:
         segment.split_block(blocks, int(body["index"]), int(body["word"]), p.lang)
     except (ValueError, IndexError) as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, _msg(e))
     p.blocks = [b.to_dict() for b in blocks]
     p.save()
     return _public(p)
@@ -246,7 +261,7 @@ def merge(pid: str, body: dict):
     try:
         segment.merge_blocks(blocks, int(body["index"]))
     except (ValueError, IndexError) as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, _msg(e))
     p.blocks = [b.to_dict() for b in blocks]
     p.save()
     return _public(p)
@@ -281,7 +296,7 @@ def set_language(pid: str, body: dict):
     try:
         project.set_language(p, body["lang"])
     except (ValueError, KeyError) as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, _msg(e))
     p.save()
     return _public(p)
 
@@ -292,7 +307,7 @@ def set_format(pid: str, body: dict):
     folder = _folder(pid)
     fmt = body.get("format")
     if fmt not in render.FORMATS:
-        raise HTTPException(400, "Format inconnu")
+        raise UserError("bad_format")
     if body.get("copy"):
         slug = re.sub(r"[^\w-]+", "-", f"{pid.rsplit('-', 2)[0]}-{fmt.replace(':', 'x')}-{time.strftime('%Y%m%d-%H%M%S')}")
         shutil.copytree(folder, PROJECTS / slug)
@@ -326,7 +341,7 @@ def thumb(pid: str):
 def start_render(pid: str):
     p = project.Project.load(_folder(pid))
     if not p.blocks:
-        raise HTTPException(400, "Rien à rendre")
+        raise UserError("nothing_to_render")
     return {"job": _job("render", pid, lambda progress: project.make_video(p, VIDEOS, progress).name)}
 
 
@@ -342,7 +357,7 @@ def add_media(pid: str, file: UploadFile = File(...)):
     folder = _folder(pid)
     ext = Path(file.filename or "").suffix.lower()
     if ext not in VIDEO_EXTS | media.IMAGE_EXTS:
-        raise HTTPException(400, "Format non reconnu : choisis une photo (jpg, png, heic…) ou une vidéo.")
+        raise UserError("bad_media")
     tmp = folder / f"import{ext}"
     with tmp.open("wb") as f:
         shutil.copyfileobj(file.file, f, length=8 << 20)
@@ -351,7 +366,7 @@ def add_media(pid: str, file: UploadFile = File(...)):
         return project.add_media(p, tmp, Path(file.filename).name)
     except Exception:
         traceback.print_exc()
-        raise HTTPException(400, "Impossible de lire ce fichier (photo ou vidéo abîmée, ou format non pris en charge).")
+        raise UserError("unreadable_media")
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -431,7 +446,7 @@ def get_settings():
 
 @app.put("/api/settings")
 def put_settings(body: dict):
-    return LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour")})
+    return LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour", "ui")})
 
 
 @app.get("/api/styles")
@@ -459,7 +474,7 @@ def fonts():
 def add_font(file: UploadFile = File(...)):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in (".ttf", ".otf"):
-        raise HTTPException(400, "Choisis un fichier de police .ttf ou .otf")
+        raise UserError("bad_font")
     LIB.fonts_dir.mkdir(parents=True, exist_ok=True)
     tmp = LIB.fonts_dir / f".import{ext}"
     with tmp.open("wb") as f:
@@ -468,7 +483,7 @@ def add_font(file: UploadFile = File(...)):
         return LIB.add_font(tmp, Path(file.filename).name)
     except Exception:
         traceback.print_exc()
-        raise HTTPException(400, "Impossible de lire cette police.")
+        raise UserError("unreadable_font")
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -497,11 +512,12 @@ def run(port: int = 8765, open_browser: bool = True):
     url = f"http://127.0.0.1:{port}"
     if _already_running(url):
         # launched twice: reuse the running app instead of failing on the busy port
-        print(f"\n  Tilawa Studio est déjà ouvert : {url}\n")
+        print(f"\n  Tilawa Studio est déjà ouvert / is already open: {url}\n")
         if open_browser:
             webbrowser.open(url)
         return
-    print(f"\n  Tilawa Studio : {url}\n  Vidéos : {VIDEOS}\n  (laisse cette fenêtre ouverte, ferme-la pour quitter)\n")
+    print(f"\n  Tilawa Studio : {url}\n  Vidéos / Videos : {VIDEOS}\n"
+          "  Laisse cette fenêtre ouverte, ferme-la pour quitter.\n  Keep this window open; close it to quit.\n")
     if open_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     # warm the model up in the job queue so the first analysis is quick

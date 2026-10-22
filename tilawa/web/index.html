@@ -66,7 +66,10 @@
   .logo { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: .2px; cursor: pointer; font-size: 15.5px; }
   .logo .mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), #2a8f84); color: var(--accent-ink); font: 700 17px "Amiri Quran", serif; }
   .logo span { color: var(--accent); }
-  #ed-head { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  #ed-head { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; order: 1; }
+  #ui-lang { order: 2; padding: 2px; } #home-head { order: 3; }
+  #ui-lang button { padding: 3px 9px; font-size: 12px; font-weight: 700; letter-spacing: .4px; }
+  body:not(.editing) #ui-lang { margin-left: auto; }
   #ed-title { max-width: 340px; background: transparent; border-color: transparent; font-weight: 650; font-size: 15px; padding: 6px 9px; }
   #ed-title:hover { border-color: var(--line-2); }
   #saved { font-size: 12.5px; color: var(--faint); }
@@ -341,7 +344,8 @@
     <button class="ghost icon" onclick="$('help').showModal()" title="Aide et raccourcis (?)"><svg class="i"><use href="#i-help"/></svg></button>
     <button class="primary" onclick="setTab('export')"><svg class="i"><use href="#i-download"/></svg>Exporter</button>
   </div>
-  <div id="home-head" class="row" style="margin-left:auto">
+  <div id="ui-lang" class="seg-ctl" title="Langue / Language"><button data-ui="fr" onclick="switchUi('fr')">FR</button><button data-ui="en" onclick="switchUi('en')">EN</button></div>
+  <div id="home-head" class="row">
     <button class="ghost icon" onclick="$('help').showModal()" title="Aide"><svg class="i"><use href="#i-help"/></svg></button>
   </div>
 </header>
@@ -707,12 +711,231 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+// English for every French text of the interface (French is written in the code)
+const EN = {
+  // header, home
+  "Mes projets": "My projects", "Titre affiché en haut de la vidéo": "Title shown at the top of the video",
+  "Annuler (⌘Z / Ctrl+Z)": "Undo (⌘Z / Ctrl+Z)", "Rétablir (⇧⌘Z / Ctrl+Y)": "Redo (⇧⌘Z / Ctrl+Y)",
+  "Aide et raccourcis (?)": "Help and shortcuts (?)", "Exporter": "Export", "Aide": "Help",
+  "Sous-titres automatiques du Coran": "Automatic Quran subtitles",
+  "De la récitation à la vidéo": "From recitation to a video", "prête à publier": "ready to post",
+  "Arabe, traduction et phonétique, chacun synchronisé au mot près. Le logiciel reconnaît tout seul la sourate et les versets récités.":
+    "Arabic, translation and transliteration, each synced to the word. The app recognises the surah and verses on its own.",
+  "Dépose une vidéo": "Drop a video", "ou colle un lien YouTube, Instagram, TikTok": "or paste a YouTube, Instagram or TikTok link",
+  "Vérifie et personnalise": "Check and customise", "styles, polices, arrière-plans, couleurs": "styles, fonts, backgrounds, colours",
+  "Exporte": "Export", "en vertical, horizontal ou carré, jusqu'en 4K": "vertical, horizontal or square, up to 4K",
+  "Glisse ta vidéo de récitation ici": "Drop your recitation video here",
+  "ou clique pour choisir un fichier · un audio seul (mp3, m4a…) marche aussi, avec tes propres images":
+    "or click to choose a file · an audio file alone (mp3, m4a…) works too, with your own pictures",
+  "… ou colle un lien YouTube, Instagram, TikTok": "… or paste a YouTube, Instagram or TikTok link",
+  "changer de vidéo": "change video", "Format": "Format", "Sourate et versets": "Surah and verses",
+  "Détection automatique": "Automatic detection", "Choisir moi-même": "Choose myself",
+  "premier verset (environ)": "first verse (roughly)", "fin auto": "auto end", "dernier verset (optionnel)": "last verse (optional)",
+  "Récitateur": "Reciter", "ex. Muhammad Dibirov": "e.g. Muhammad Dibirov", "Traduction": "Translation", "Style": "Style",
+  "Créer ma vidéo": "Create my video", "Préparation…": "Preparing…", "Import": "Import", "Écoute": "Listening",
+  "Identification": "Identification", "Synchronisation": "Sync", "Recommencer": "Start again",
+  "Choisir la sourate moi-même": "Choose the surah myself", "Rechercher…": "Search…",
+  "Création de ta vidéo…": "Creating your video…", "Envoi de la vidéo…": "Uploading the video…",
+  "Un problème est survenu": "Something went wrong", "à terminer": "to finish", "Récitation": "Recitation",
+  "Aucun projet ne correspond.": "No project matches.",
+  "Tes projets apparaîtront ici. Commence en déposant une vidéo de récitation ci-dessus.":
+    "Your projects will appear here. Start by dropping a recitation video above.",
+  "Supprimer ce projet ? (les vidéos déjà créées sont conservées)": "Delete this project? (videos already made are kept)",
+  "supprimer": "delete", "Colle un lien qui commence par https://": "Paste a link that starts with https://",
+  "Tilawa Studio est fermé. Relance « Tilawa Studio » (et laisse sa fenêtre ouverte), puis réessaie.":
+    "Tilawa Studio is closed. Start « Tilawa Studio » again (and keep its window open), then retry.",
+  // progress
+  "En attente…": "Waiting…", "Téléchargement de la vidéo…": "Downloading the video…", "Préparation de l'aperçu…": "Preparing the preview…",
+  "Lecture de l'audio…": "Reading the audio…", "Chargement du modèle de récitation…": "Loading the recitation model…",
+  "Écoute de la récitation…": "Listening to the recitation…", "Identification de la sourate et des versets…": "Identifying the surah and verses…",
+  "Synchronisation de chaque mot…": "Syncing every word…", "Terminé": "Done", "Dessin des sous-titres…": "Drawing the subtitles…",
+  "Encodage de la vidéo…": "Encoding the video…", "Mesure du volume…": "Measuring the loudness…",
+  "Préparation des vidéos en aller-retour…": "Preparing back-and-forth videos…", "encore ~{t}": "~{t} left",
+  // formats
+  "Vertical": "Vertical", "Shorts · Reels · TikTok": "Shorts · Reels · TikTok", "Horizontal": "Horizontal", "YouTube": "YouTube",
+  "Carré": "Square", "Instagram, Facebook": "Instagram, Facebook", "Portrait": "Portrait", "Instagram (fil)": "Instagram (feed)",
+  // editor rail and panels
+  "Sous-titres": "Subtitles", "Arrière-plan": "Background", "Audio": "Audio", "Export": "Export",
+  "{n} sous-titre": "{n} subtitle", "{n} sous-titres": "{n} subtitles", "✓ Enregistré": "✓ Saved", "Enregistrement…": "Saving…",
+  "Récitation sans image : ajoute tes photos ou vidéos dans « Arrière-plan ».": "Recitation without picture: add your photos or videos in « Background ».",
+  "Aucun verset trouvé. Choisis la sourate et le premier verset ci-dessous, puis « Analyser ».":
+    "No verse found. Choose the surah and first verse below, then « Analyse ».",
+  "Reconnu automatiquement :": "Recognised automatically:", "Sourate {name}": "Surah {name}", "versets {range}": "verses {range}",
+  "J'entends plutôt la sourate {name} (versets {range}).": "I rather hear surah {name} (verses {range}).",
+  "Utiliser la détection": "Use the detection", "Choisir la sourate": "Choose the surah", "Analyser": "Analyse",
+  "écouter": "listen", "apparition (s)": "appears at (s)", "disparition (s)": "disappears at (s)",
+  "faire apparaître à la position de lecture": "make it appear at the playhead", "⤓ ici": "⤓ here", "corrigé": "corrected",
+  "clique pour corriger l'arabe": "click to correct the Arabic", "clique pour corriger la phonétique": "click to correct the transliteration",
+  "Couper avant": "Split before", "couper avant « {w} » ({t})": "split before « {w} » ({t})", "(pas de traduction)": "(no translation)",
+  "✨ Mise en valeur": "✨ Highlight", "annuler tes corrections de l'arabe et de la phonétique": "undo your corrections of the Arabic and transliteration",
+  "↺ Texte d'origine": "↺ Original text", "réunir avec le sous-titre suivant": "merge with the next subtitle", "Fusionner ↓": "Merge ↓",
+  "supprimer ce sous-titre": "delete this subtitle", "Supprimer ce sous-titre ?": "Delete this subtitle?",
+  "Tes corrections de l'arabe / de la phonétique de ce sous-titre seront remplacées par le texte d'origine. Continuer ?":
+    "Your corrections of this subtitle's Arabic / transliteration will be replaced by the original text. Continue?",
+  "Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)":
+    "Recompute all timings automatically? (your timing changes will be lost)",
+  "Réanalyser la récitation ? Les sous-titres seront recréés (tes modifications de sous-titres seront remplacées).":
+    "Analyse the recitation again? The subtitles will be recreated (your subtitle changes will be replaced).",
+  "Analyse en cours…": "Analysing…", "Sous-titres recréés": "Subtitles recreated",
+  // background
+  "🎥 Vidéo d'origine": "🎥 Original video", "🖼️ Mes photos et vidéos": "🖼️ My photos and videos",
+  "Le son reste toujours celui de la récitation. 1 média remplit toute la vidéo ; plusieurs : un par verset.":
+    "The sound always stays the recitation's. 1 item fills the whole video; several: one per verse.",
+  "Mes médias": "My media", "Dépose des photos ou des vidéos": "Drop photos or videos",
+  "jpg, png, heic (iPhone), mp4, mov… ou clique": "jpg, png, heic (iPhone), mp4, mov… or click",
+  "Séquence": "Sequence", "Vidéo d'origine": "Original video", "un élément par verset, le dernier jusqu'à la fin": "one item per verse, the last until the end",
+  "Caler sur les versets": "Match the verses", "même durée pour chaque élément": "same length for each item", "Répartir également": "Spread evenly",
+  "Ensemble": "Overall", "Assombrir": "Darken", "Derrière l'image": "Behind the picture", "Image floutée": "Blurred picture", "Noir": "Black",
+  "Transition": "Transition", "Coupe directe": "Straight cut", "Fondu rapide": "Quick fade", "Fondu": "Fade", "Fondu lent": "Slow fade",
+  "+ Ajouter": "+ Add", "retirer ce média": "remove this media", "après la fin (non visible)": "after the end (not visible)",
+  " · jusqu'à la fin": " · until the end", " · mouvement": " · motion", " · couleur": " · colour",
+  "monter": "up", "descendre": "down", "gauche": "left", "droite": "right", "retirer de la séquence": "remove from the sequence",
+  "Position et échelle": "Position and scale", "— ou glisse l'image sur l'aperçu": "— or drag the picture on the preview",
+  "Remplir l'écran": "Fill the screen", "Image entière": "Whole picture", "Centrer": "Centre", "Mouvement": "Motion", "Aucun": "None",
+  "Zoom avant lent": "Slow zoom in", "Zoom arrière lent": "Slow zoom out", "Durée (s)": "Length (s)", "jusqu'à la fin": "until the end",
+  "Si la vidéo est plus courte": "If the video is shorter", "Aller-retour (boucle parfaite)": "Back and forth (perfect loop)",
+  "Recommencer au début": "Restart from the beginning", "Commencer la vidéo à (s)": "Start the video at (s)", "Couleur": "Colour",
+  "— clic sur un nom = remise à zéro": "— click a name to reset", "Réinitialiser la couleur": "Reset the colour",
+  "Appliquer à tous les éléments": "Apply to all items", "Exposition": "Exposure", "Contraste": "Contrast",
+  "Hautes lumières": "Highlights", "Ombres": "Shadows", "Saturation": "Saturation", "Température": "Temperature", "Teinte": "Tint",
+  "Échelle": "Scale", "100 % = image entière visible": "100 % = whole picture visible",
+  "Revenir à la vidéo d'origine seule ? (tes médias restent dans la bibliothèque)": "Go back to the original video alone? (your media stay in the library)",
+  "Recréer la séquence avec tous tes médias, un par verset ? (tes durées réglées à la main seront remplacées)":
+    "Rebuild the sequence with all your media, one per verse? (lengths you set by hand will be replaced)",
+  "Import de « {name} » ({k}/{n})…": "Importing « {name} » ({k}/{n})…", "Ton média remplit toute la vidéo.": "Your media fills the whole video.",
+  "{n} médias, un par verset (le dernier jusqu'à la fin).": "{n} media, one per verse (the last until the end).",
+  "{n} média(s) importé(s) : « + Ajouter » pour les placer.": "{n} media imported: « + Add » to place them.",
+  "Retirer ce média du projet ?": "Remove this media from the project?",
+  // style
+  "réutiliser ce style dans d'autres vidéos": "reuse this style in other videos", "Enregistrer mon style": "Save my style",
+  "Thèmes": "Themes", "clic = appliquer · ★ = par défaut": "click = apply · ★ = default", "Titre et récitateur": "Title and reciter",
+  "Afficher": "Show", "Titre": "Title", "Police": "Font", "Position": "Position", "Arabe": "Arabic",
+  "Importer une police (.ttf, .otf)": "Import a font (.ttf, .otf)", "ex. la police du Mushaf du Complexe Roi Fahd": "e.g. the King Fahd Complex Mushaf font",
+  "Numéro de verset à la fin du verset": "Verse number at the end of the verse", "Taille": "Size", "Langue": "Language",
+  "Police (traduction, numéro et phonétique)": "Font (translation, number and transliteration)", "Numéro": "Number", "Phonétique": "Transliteration",
+  "Numéro au-dessus (« 12. »)": "Number above (« 12. »)", "Bloc des sous-titres": "Subtitle block", "Fondu d'apparition (s)": "Fade in (s)",
+  "Contour": "Outline", "Tout remettre par défaut": "Reset everything", "appliquer « {name} »": "apply « {name} »",
+  "style par défaut des nouvelles vidéos": "default style of new videos", "SOURATE AL-FATIHA": "SURAH AL-FATIHA",
+  "Sourate Al-Fatiha": "Surah Al-Fatiha", "Au nom d'Allah, le Tout Miséricordieux": "In the name of Allah, the Most Merciful",
+  "retirer": "remove", "Police « {name} » importée ({script})": "Font « {name} » imported ({script})", "arabe": "Arabic", "latine": "Latin",
+  "Retirer la police « {name} » ?": "Remove the font « {name} »?", "Style « {name} » appliqué": "Style « {name} » applied",
+  "Nom de ton style :": "Name of your style:", "Mon style": "My style", "Style « {name} » enregistré": "Style « {name} » saved",
+  "Supprimer ce style ?": "Delete this style?", "Style par défaut des nouvelles vidéos : {name}": "Default style of new videos: {name}",
+  "Remplacer la traduction de tous les sous-titres ? (tes modifications de la traduction seront perdues)":
+    "Replace the translation of every subtitle? (your changes to the translation will be lost)",
+  "Traduction : {name}": "Translation: {name}", "dégradé": "gradient", "début du dégradé": "gradient start", "fin du dégradé": "gradient end",
+  "couleur": "colour", "couleur d'origine": "original colour",
+  "Remettre les positions, tailles, polices et couleurs par défaut ?": "Reset positions, sizes, fonts and colours?",
+  "Le Chemin des Pieux": "Le Chemin des Pieux", "Mushaf doré": "Golden Mushaf", "Moderne": "Modern", "Douceur": "Soft",
+  "Élégant": "Elegant", "Calligraphie": "Calligraphy",
+  "Amiri Quran — style mushaf": "Amiri Quran — mushaf style", "Scheherazade — comme le Coran de Médine": "Scheherazade — like the Medina Quran",
+  "Noto Naskh — net et moderne": "Noto Naskh — clean and modern", "Amiri — naskh classique": "Amiri — classic naskh",
+  "Reem Kufi — coufique": "Reem Kufi — Kufic", "Aref Ruqaa — calligraphie ruqʿa": "Aref Ruqaa — ruqʿa calligraphy",
+  "Comic Neue — arrondi, chaleureux": "Comic Neue — rounded, warm", "Poppins — moderne": "Poppins — modern",
+  "Montserrat — géométrique": "Montserrat — geometric", "Nunito — doux, très lisible": "Nunito — soft, very readable",
+  "Baloo 2 — rond, joyeux": "Baloo 2 — round, cheerful", "Playfair Display — élégant": "Playfair Display — elegant",
+  "Lora — classique": "Lora — classic", "Cinzel — majuscules gravées": "Cinzel — engraved capitals", "(importée)": "(imported)",
+  "Sans traduction (arabe seul)": "No translation (Arabic only)",
+  // audio
+  "Début et fin de la vidéo": "Start and end of the video",
+  "Tire les poignées roses dans la timeline, ou tape les valeurs (en secondes).": "Drag the pink handles in the timeline, or type the values (in seconds).",
+  "Début": "Start", "Fin": "End", "fin": "end", "coupe le silence avant et après la récitation": "cuts the silence before and after the recitation",
+  "Couper les silences": "Cut the silences", "Vidéo entière": "Whole video", "Fondus du son": "Sound fades", "Entrée (s)": "In (s)", "Sortie (s)": "Out (s)",
+  "Volume optimisé pour les réseaux": "Loudness optimised for social media",
+  "Met la récitation au niveau standard de YouTube, TikTok et Instagram (−14 LUFS), d'un seul réglage de volume : les nuances du récitateur restent intactes.":
+    "Brings the recitation to the standard level of YouTube, TikTok and Instagram (−14 LUFS) with a single volume change: the reciter's nuances stay intact.",
+  "Silences coupés : la vidéo commence et finit avec la récitation": "Silences cut: the video starts and ends with the recitation",
+  // export
+  "Changer de format replace les textes. Tu peux aussi garder ce projet et en faire une copie dans un autre format.":
+    "Changing the format moves the texts. You can also keep this project and make a copy in another format.",
+  "Résolution": "Resolution", "Qualité": "Quality", "Native": "Native", "Full HD": "Full HD",
+  "Maximale — H.264, lisible partout (recommandé)": "Maximum — H.264, plays everywhere (recommended)",
+  "Maximale 10-bit — H.265, dégradés parfaits": "Maximum 10-bit — H.265, perfect gradients", "Haute — fichier plus léger": "High — smaller file",
+  "Master ProRes — pour retravailler au montage": "ProRes master — for further editing", "Créer la vidéo": "Create the video", "Image": "Image",
+  "L'image affichée dans l'aperçu, en pleine résolution (PNG) : idéale pour une miniature YouTube.":
+    "The picture shown in the preview, at full resolution (PNG): ideal for a YouTube thumbnail.",
+  "Exporter l'image à": "Export the image at", "Déjà exporté": "Already exported", "Analyse de la récitation": "Recitation analysis",
+  "✨ Détection automatique": "✨ Automatic detection", "Choisir": "Choose", "premier verset": "first verse", "dernier verset": "last verse",
+  "Réanalyser": "Analyse again", "annule les modifications d'horaires": "undoes timing changes", "Horaires automatiques": "Automatic timings",
+  "Rien pour l'instant.": "Nothing yet.", "voir": "view", "télécharger": "download", "afficher dans le dossier": "show in folder",
+  "Voir": "View", "Télécharger": "Download", "Afficher dans le dossier": "Show in folder", "Mo": "MB",
+  "Ta vidéo est prête": "Your video is ready", "Image à {t} en cours…": "Image at {t} in progress…", "Image prête :": "Image ready:",
+  "Copie créée en {f}": "Copy created in {f}", "Format {f}": "Format {f}", "Passer en": "Switch to",
+  "Les textes reprennent les places prévues pour ce format ; les couleurs, polices et arrière-plans sont gardés.":
+    "Texts move to the places planned for this format; colours, fonts and backgrounds are kept.",
+  "Annuler": "Cancel", "Modifier ce projet": "Change this project", "Créer une copie": "Make a copy",
+  // preview, timeline, help
+  "aperçu": "preview", "Fais glisser un texte ou l'image · pince ou Ctrl + molette pour zoomer": "Drag a text or the picture · pinch or Ctrl + wheel to zoom",
+  "sous-titre précédent (←)": "previous subtitle (←)", "lecture (espace)": "play (space)", "sous-titre suivant (→)": "next subtitle (→)",
+  "zones cachées par les boutons de TikTok, Reels et Shorts": "areas hidden by the TikTok, Reels and Shorts buttons", "Zones des applis": "App safe zones",
+  "exporter cette image en pleine résolution": "export this picture at full resolution", "Timeline": "Timeline",
+  "clic = se placer · tirer les bords = changer les durées · poignées roses = début / fin": "click = jump · drag edges = change lengths · pink handles = start / end",
+  "dézoomer": "zoom out", "tout voir": "see all", "Tout": "All", "zoomer (ou Ctrl + molette)": "zoom in (or Ctrl + wheel)",
+  "début de la vidéo": "start of the video", "fin de la vidéo": "end of the video",
+  "barre du haut": "top bar", "légende et nom du compte": "caption and account name", "boutons": "buttons",
+  "Tout est enregistré automatiquement. ↶ annule la dernière modification.": "Everything is saved automatically. ↶ undoes the last change.",
+  "Espace": "Space", "Lecture / pause": "Play / pause", "Sous-titre précédent / suivant": "Previous / next subtitle",
+  "Annuler (⇧⌘Z ou Ctrl+Y : rétablir)": "Undo (⇧⌘Z or Ctrl+Y: redo)", "Glisser": "Drag", "Sur l'aperçu : déplacer un texte ou l'image": "On the preview: move a text or the picture",
+  "Pincer": "Pinch", "Sur l'aperçu (ou Ctrl + molette) : taille d'un texte ou zoom de l'image": "On the preview (or Ctrl + wheel): text size or picture zoom",
+  "Maj + flèches": "Shift + arrows", "Dans les réglages de position : déplacer de 10 px": "In the position settings: move by 10 px", "Cette aide": "This help",
+  "Astuces": "Tips", "Clique sur un mot phonétique (✂) pour couper un sous-titre à cet endroit.": "Click a transliterated word (✂) to split a subtitle there.",
+  "Clique sur l'arabe ou la phonétique d'un sous-titre pour corriger une erreur.": "Click a subtitle's Arabic or transliteration to correct a mistake.",
+  "Dans la timeline, tire le bord d'une image pour la faire changer au début d'un verset (elle s'y aimante).": "In the timeline, drag the edge of a picture to change it at the start of a verse (it snaps there).",
+  "« Zones des applis » montre où TikTok, Reels et Shorts posent leurs boutons : garde tes textes en dehors.": "« App safe zones » shows where TikTok, Reels and Shorts put their buttons: keep your texts out of them.",
+  "« Enregistrer mon style » le rend disponible pour toutes tes vidéos (et ★ en fait le style par défaut).": "« Save my style » makes it available for all your videos (and ★ makes it the default).",
+  "Compris": "Got it",
+};
+
+// interface language: French (as written) or English
+let UI = localStorage.getItem("ui") || (navigator.language.startsWith("fr") ? "fr" : "en");
+function t(s, vars) {
+  let r = UI === "en" ? (EN[s] ?? s) : s;
+  if (vars) r = r.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+  return r;
+}
+// the fixed texts of the page; parts filled by the code are rendered with t()
+const DYN = ["ed-badges", "saved", "new-formats", "surah", "a-surah", "lang", "e-lang", "new-style", "job-title", "job-stage", "job-error",
+  "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes",
+  "font-title", "font-arabic", "font-text", "colors-title", "colors-ar", "colors-text", "colors-outline", "res", "r-done", "r-stage",
+  "r-pct", "r-error", "exports", "ed-formats", "still-t", "time", "safe", "tl-ruler", "tl-bg", "tl-subs", "fmt-name", "toasts", "src-name", "ui-lang"];
+const original = new WeakMap();
+function translateDom() {
+  document.documentElement.lang = UI;
+  const dyn = new Set(DYN.map(id => $(id)));
+  const skip = (el) => { for (; el; el = el.parentElement) if (dyn.has(el) || /^(SCRIPT|STYLE|TEXTAREA)$/.test(el.tagName)) return true; return false; };
+  const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    if (!n.nodeValue.trim() || skip(n.parentElement)) continue;
+    if (!original.has(n)) original.set(n, n.nodeValue);
+    const fr = original.get(n), core = fr.trim();
+    n.nodeValue = fr.replace(core, t(core));
+  }
+  document.querySelectorAll("[title], [placeholder]").forEach(el => {
+    if (skip(el)) return;
+    for (const a of ["title", "placeholder"]) {
+      if (!el.hasAttribute(a)) continue;
+      const key = "fr" + a;
+      if (!(key in el.dataset)) el.dataset[key] = el.getAttribute(a);
+      el.setAttribute(a, t(el.dataset[key]));
+    }
+  });
+  document.querySelectorAll("#ui-lang button").forEach(b => b.classList.toggle("on", b.dataset.ui === UI));
+}
+async function switchUi(lang) {
+  if (lang === UI) return;
+  UI = lang;
+  localStorage.setItem("ui", UI);
+  api("/api/settings", json({ ui: UI }, "PUT")).catch(() => {});
+  translateDom(); fillSelects(); renderFormatTiles(); renderStyleSelect();
+  if (P && !$("editor").classList.contains("hidden")) refreshAll(); else renderProjects();
+}
 const icon = (name, size = 16) => `<svg class="i" style="width:${size}px;height:${size}px"><use href="#i-${name}"/></svg>`;
-const STAGES = { queued: "En attente…", download: "Téléchargement de la vidéo…", preview: "Préparation de l'aperçu…",
+const STAGES_FR = { queued: "En attente…", download: "Téléchargement de la vidéo…", preview: "Préparation de l'aperçu…",
   audio: "Lecture de l'audio…", model: "Chargement du modèle de récitation…", listening: "Écoute de la récitation…",
   identify: "Identification de la sourate et des versets…", aligning: "Synchronisation de chaque mot…", done: "Terminé",
   overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…", loudness: "Mesure du volume…",
   prepare: "Préparation des vidéos en aller-retour…" };
+const STAGES = new Proxy(STAGES_FR, { get: (o, k) => o[k] && t(o[k]) });
 const STEP_OF = { queued: 0, download: 0, preview: 0, audio: 1, model: 1, listening: 1, identify: 2, aligning: 3, done: 4 };
 // same values as render.py / overlay.html
 const FORMATS = { "9:16": [1080, 1920], "16:9": [1920, 1080], "1:1": [1080, 1080], "4:5": [1080, 1350] };
@@ -727,8 +950,9 @@ let P = null, saveTimer = null, overlayReady = false, tab = "subs", selClip = 0,
 
 async function api(path, opts = {}) {
   let r;
+  opts.headers = { ...(opts.headers || {}), "X-Lang": UI };  // server messages in the same language
   try { r = await fetch(path, opts); }
-  catch { throw new Error("Tilawa Studio est fermé. Relance « Tilawa Studio » (et laisse sa fenêtre ouverte), puis réessaie."); }
+  catch { throw new Error(t("Tilawa Studio est fermé. Relance « Tilawa Studio » (et laisse sa fenêtre ouverte), puis réessaie.")); }
   if (!r.ok) {
     let msg = r.statusText;
     try { msg = (await r.json()).detail || msg; } catch {}
@@ -746,7 +970,7 @@ function toast(msg, kind = "") {
 }
 function fmt(t) { const m = Math.floor(t / 60), s = (t % 60).toFixed(1).padStart(4, "0"); return `${m}:${s}`; }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-function surahLabel(n) { const s = surahs[n - 1]; return s ? `${s.n}. ${s.name} — ${s.fr}` : ""; }
+function surahLabel(n) { const s = surahs[n - 1]; return s ? `${s.n}. ${s.name} — ${UI === "en" ? s.en : s.fr}` : ""; }
 
 // ---------------------------------------------------------------- routing
 function go(hash) { location.hash = hash; }
@@ -780,11 +1004,10 @@ async function init() {
   [surahs, langs, styles, fonts, settings] = await Promise.all(
     ["/api/surahs", "/api/languages", "/api/styles", "/api/fonts", "/api/settings"].map(u => api(u)));
   loadFaces();
-  const opts = surahs.map(s => `<option value="${s.n}">${esc(surahLabel(s.n))}</option>`).join("");
-  $("surah").innerHTML = opts; $("a-surah").innerHTML = opts;
-  const langOpts = langs.map(l => `<option value="${l.code}">${esc(l.name)}${l.translator ? " — " + esc(l.translator) : ""}</option>`).join("");
-  $("lang").innerHTML = langOpts; $("e-lang").innerHTML = langOpts;
-  $("lang").value = settings.lang || "fr";
+  if (!localStorage.getItem("ui") && settings.ui) UI = settings.ui;
+  translateDom();
+  fillSelects();
+  $("lang").value = settings.lang || (UI === "fr" ? "fr" : "en");
   renderStyleSelect();
   newFormat = settings.format || "9:16";
   renderFormatTiles();
@@ -795,6 +1018,14 @@ async function init() {
   new ResizeObserver(() => { layoutStage(); tlRender(); }).observe($("stage-box"));
   new ResizeObserver(() => tlRender()).observe($("tl-scroll"));
   route();
+}
+function fillSelects() {
+  const keep = [$("surah").value, $("a-surah").value, $("lang").value, $("e-lang").value];
+  const opts = surahs.map(s => `<option value="${s.n}">${esc(surahLabel(s.n))}</option>`).join("");
+  $("surah").innerHTML = opts; $("a-surah").innerHTML = opts;
+  const langOpts = langs.map(l => `<option value="${l.code}">${esc(t(l.name))}${l.translator ? " — " + esc(l.translator) : ""}</option>`).join("");
+  $("lang").innerHTML = langOpts; $("e-lang").innerHTML = langOpts;
+  [$("surah").value, $("a-surah").value, $("lang").value, $("e-lang").value] = keep.map((v, i) => v || [1, 1, "fr", "fr"][i]);
 }
 function loadFaces() {
   // the fonts of the pickers (the preview loads its own, in the overlay)
@@ -813,7 +1044,7 @@ function dropZone(zone, input, onfiles) {
 let newSource = null, newFormat = "9:16", newMode = "auto";
 function useLink() {
   const url = $("url").value.trim();
-  if (!/^https?:\/\//.test(url)) return toast("Colle un lien qui commence par https://", "err");
+  if (!/^https?:\/\//.test(url)) return toast(t("Colle un lien qui commence par https://"), "err");
   newSource = { url }; showNewForm(url);
 }
 function showNewForm(name) {
@@ -832,12 +1063,12 @@ function setMode(m) {
 }
 function formatTiles(current, onclick) {
   return Object.entries(FORMAT_INFO).map(([f, [name, sub, [w, h]]]) => `<div class="fmt ${f === current ? "on" : ""}" onclick="${onclick}('${f}')">
-    <div class="shape" style="width:${w}px;height:${h}px"></div><b>${name} ${f}</b><small>${sub}</small></div>`).join("");
+    <div class="shape" style="width:${w}px;height:${h}px"></div><b>${t(name)} ${f}</b><small>${t(sub)}</small></div>`).join("");
 }
 function renderFormatTiles() { $("new-formats").innerHTML = formatTiles(newFormat, "pickNewFormat"); }
 function pickNewFormat(f) { newFormat = f; renderFormatTiles(); }
 function renderStyleSelect() {
-  $("new-style").innerHTML = styles.map(s => `<option value="${s.id}">${esc(s.name)}${s.id === settings.style ? " ★" : ""}</option>`).join("");
+  $("new-style").innerHTML = styles.map(s => `<option value="${s.id}">${esc(t(s.name))}${s.id === settings.style ? " ★" : ""}</option>`).join("");
   $("new-style").value = settings.style || "pieux";
 }
 async function createProject() {
@@ -856,15 +1087,15 @@ async function createProject() {
   }
   $("new-form").classList.add("hidden"); $("job-box").classList.remove("hidden");
   $("job-error").textContent = ""; $("job-actions").classList.add("hidden");
-  $("job-title").textContent = "Création de ta vidéo…";
-  $("job-stage").textContent = newSource.file ? "Envoi de la vidéo…" : STAGES.queued;
+  $("job-title").textContent = t("Création de ta vidéo…");
+  $("job-stage").textContent = newSource.file ? t("Envoi de la vidéo…") : STAGES.queued;
   try {
     const { id, job } = await api("/api/projects", { method: "POST", body: fd });
     await follow(job, $("job-stage"), $("job-bar"), true);
     resetNew();
     go("p/" + encodeURIComponent(id));
   } catch (e) {
-    $("job-title").textContent = "Un problème est survenu";
+    $("job-title").textContent = t("Un problème est survenu");
     $("job-error").textContent = e.message; $("job-actions").classList.remove("hidden");
   }
 }
@@ -876,7 +1107,7 @@ async function follow(job, stageEl, barEl, steps = false, pctEl = null) {
     if (barEl) barEl.style.width = (j.progress * 100) + "%";
     if (pctEl) {
       const el = (Date.now() - t0) / 1000, left = j.stage === "encoding" && j.progress > 0.04 ? el / j.progress - el : null;
-      pctEl.textContent = Math.round(j.progress * 100) + " %" + (left ? ` · encore ~${left > 90 ? Math.round(left / 60) + " min" : Math.round(left) + " s"}` : "");
+      pctEl.textContent = Math.round(j.progress * 100) + " %" + (left ? " · " + t("encore ~{t}", { t: left > 90 ? Math.round(left / 60) + " min" : Math.round(left) + " s" }) : "");
     }
     if (steps) [...$("stepper").children].forEach((d, k) => {
       const at = STEP_OF[j.stage] ?? 0;
@@ -894,18 +1125,18 @@ function renderProjects() {
   const q = $("search").value.trim().toLowerCase();
   const list = projects.filter(p => !q || [p.title, p.reciter, p.surah_name].join(" ").toLowerCase().includes(q));
   $("projects").innerHTML = list.length ? list.map(p => {
-    const vs = p.verses ? `v. ${p.verses[0]}${p.verses[1] !== p.verses[0] ? "–" + p.verses[1] : ""}` : "à terminer";
+    const vs = p.verses ? `v. ${p.verses[0]}${p.verses[1] !== p.verses[0] ? "–" + p.verses[1] : ""}` : t("à terminer");
     return `<div class="proj" onclick="go('p/${encodeURIComponent(p.id)}')">
       <div class="th" style="${p.thumb ? `background-image:url('/api/projects/${encodeURIComponent(p.id)}/thumb')` : ""}">
         <div class="tags"><span class="badge">${p.format}</span><span class="badge">${(p.lang || "fr").toUpperCase()}</span>${p.duration ? `<span class="badge">${fmt(p.duration).replace(/\.\d$/, "")}</span>` : ""}</div></div>
-      <div class="info"><b>${esc(p.title || "Récitation")}</b><small>${esc(p.surah_name)} · ${vs}${p.reciter ? " · " + esc(p.reciter) : ""}</small>
-        <small>${new Date(p.modified * 1000).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</small></div>
-      <button class="del icon small" onclick="event.stopPropagation(); delProject('${p.id}')" title="supprimer">${icon("trash", 15)}</button>
+      <div class="info"><b>${esc(p.title || t("Récitation"))}</b><small>${esc(p.surah_name)} · ${vs}${p.reciter ? " · " + esc(p.reciter) : ""}</small>
+        <small>${new Date(p.modified * 1000).toLocaleString(UI === "fr" ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" })}</small></div>
+      <button class="del icon small" onclick="event.stopPropagation(); delProject('${p.id}')" title="${t("supprimer")}">${icon("trash", 15)}</button>
     </div>`;
-  }).join("") : `<div class="empty">${projects.length ? "Aucun projet ne correspond." : "Tes projets apparaîtront ici. Commence en déposant une vidéo de récitation ci-dessus."}</div>`;
+  }).join("") : `<div class="empty">${projects.length ? t("Aucun projet ne correspond.") : t("Tes projets apparaîtront ici. Commence en déposant une vidéo de récitation ci-dessus.")}</div>`;
 }
 async function delProject(id) {
-  if (!confirm("Supprimer ce projet ? (les vidéos déjà créées sont conservées)")) return;
+  if (!confirm(t("Supprimer ce projet ? (les vidéos déjà créées sont conservées)"))) return;
   await api(`/api/projects/${id}`, { method: "DELETE" }); loadProjects();
 }
 
@@ -920,7 +1151,7 @@ async function openProject(id) {
     wave = null; tlPps = 0;
     api(`/api/projects/${pid()}/waveform`).then(w => { wave = w; tlRender(); });
     if (P.audio_only && P.background.clips.every(c => c.src === "original")) {
-      tab = "bg"; toast("Récitation sans image : ajoute tes photos ou vidéos dans « Arrière-plan ».");
+      tab = "bg"; toast(t("Récitation sans image : ajoute tes photos ou vidéos dans « Arrière-plan »."));
     }
     if (!settings.tour) { setTimeout(() => $("help").showModal(), 600); settings.tour = 1; api("/api/settings", json({ tour: 1 }, "PUT")).catch(() => {}); }
   }
@@ -941,7 +1172,7 @@ function loadState(p) {
 function refreshAll() {
   $("ed-title").value = P.title; $("e-title").value = P.title; $("e-reciter").value = P.reciter;
   const lang = langs.find(l => l.code === P.lang);
-  $("ed-badges").innerHTML = `<span class="badge">${P.format}</span><span class="badge">${esc(lang ? lang.name : P.lang)}</span>`
+  $("ed-badges").innerHTML = `<span class="badge">${P.format}</span><span class="badge">${esc(lang ? t(lang.name) : P.lang)}</span>`
     + (P.surah_info ? `<span class="badge gold">${esc(P.surah_info.name)}</span>` : "");
   const r = P.render;
   $("r-quality").value = r.quality === "png" ? "max" : r.quality;
@@ -1009,7 +1240,7 @@ function changed(what = {}) {
   redraw(); remember(what.group); scheduleSave();
 }
 function scheduleSave() {
-  $("saved").textContent = "Enregistrement…";
+  $("saved").textContent = t("Enregistrement…");
   clearTimeout(saveTimer);
   saveTimer = setTimeout(save, 500);
 }
@@ -1019,7 +1250,7 @@ async function save() {
   try {
     await api(`/api/projects/${pid()}`, json({ title: P.title, reciter: P.reciter, blocks: P.blocks, render: P.render,
       style: P.style, background: P.background }, "PUT"));
-    $("saved").textContent = "✓ Enregistré";
+    $("saved").textContent = t("✓ Enregistré");
   } catch (e) { $("saved").textContent = "⚠ " + e.message; }
 }
 // a server-side edit (split, merge, language...) replaces the project
@@ -1117,7 +1348,7 @@ function renderSafe() {
   if (!(safeOn && vertical)) return;
   const k = $("stage").clientWidth / 1080, H = canvasH();
   const zones = [[0, 0, 1080, 130, "barre du haut"], [0, H - 420, 1080, 420, "légende et nom du compte"], [930, H - 1050, 150, 640, "boutons"]];
-  $("safe").innerHTML = zones.map(([x, y, w, h, n]) => `<div style="left:${x * k}px;top:${Math.max(0, y) * k}px;width:${w * k}px;height:${h * k}px"><span>${n}</span></div>`).join("");
+  $("safe").innerHTML = zones.map(([x, y, w, h, n]) => `<div style="left:${x * k}px;top:${Math.max(0, y) * k}px;width:${w * k}px;height:${h * k}px"><span>${t(n)}</span></div>`).join("");
 }
 
 // ---------------------------------------------------------------- background preview
@@ -1455,13 +1686,13 @@ document.addEventListener("pointerdown", (e) => {
 });
 // markup of a position control (texts and backgrounds)
 function xformHTML(p) {
-  return `<div class="pad"><button data-nudge="${p}.y:-1" class="up" title="monter">▲</button><button data-nudge="${p}.x:-1" class="left" title="gauche">◀</button>
-    <button data-nudge="${p}.x:1" class="right" title="droite">▶</button><button data-nudge="${p}.y:1" class="down" title="descendre">▼</button></div>
+  return `<div class="pad"><button data-nudge="${p}.y:-1" class="up" title="${t("monter")}">▲</button><button data-nudge="${p}.x:-1" class="left" title="${t("gauche")}">◀</button>
+    <button data-nudge="${p}.x:1" class="right" title="${t("droite")}">▶</button><button data-nudge="${p}.y:1" class="down" title="${t("descendre")}">▼</button></div>
     <div class="fields">
       <div class="nf"><span class="scrub" data-scrub="${p}.x">X</span><input type="number" step="1" data-ctl="${p}.x"><span class="unit">px</span></div>
       <div class="nf"><span class="scrub" data-scrub="${p}.y">Y</span><input type="number" step="1" data-ctl="${p}.y"><span class="unit">px</span></div>
-      <div class="nf"><span class="scrub" data-scrub="${p}.s" ${p === "clip" ? 'title="100 % = image entière visible"' : ""}>Échelle</span><input type="number" step="1" data-ctl="${p}.s"><span class="unit">%</span></div>
-      ${p !== "clip" ? `<button class="small ghost" onclick="setVar('--${p === "hdr" ? "header" : "block"}-x', 0)">Centrer</button>` : ""}
+      <div class="nf"><span class="scrub" data-scrub="${p}.s" ${p === "clip" ? `title="${t("100 % = image entière visible")}"` : ""}>${t("Échelle")}</span><input type="number" step="1" data-ctl="${p}.s"><span class="unit">%</span></div>
+      ${p !== "clip" ? `<button class="small ghost" onclick="setVar('--${p === "hdr" ? "header" : "block"}-x', 0)">${t("Centrer")}</button>` : ""}
     </div>`;
 }
 function sizeHTML(k, label) {
@@ -1482,26 +1713,26 @@ function renderNotice() {
   const m = P.detected?.matches || [], name = (n) => surahs[n - 1]?.name || n;
   let html = "";
   if (!P.surah || !ayahs.length) {
-    html = `<div class="notice warn">Aucun verset trouvé. Choisis la sourate et le premier verset ci-dessous, puis « Analyser ».</div>`;
+    html = `<div class="notice warn">${t("Aucun verset trouvé. Choisis la sourate et le premier verset ci-dessous, puis « Analyser ».")}</div>`;
   } else {
     const range = `${Math.min(...ayahs)}${Math.max(...ayahs) !== Math.min(...ayahs) ? "–" + Math.max(...ayahs) : ""}`;
     const auto = m.length && m[0].surah === P.surah;
-    html = `<div class="notice ${auto ? "teal" : "gold"}">${auto ? icon("spark", 14) + " Reconnu automatiquement : " : ""}<b>Sourate ${esc(name(P.surah))}</b>, versets ${range}.</div>`;
+    html = `<div class="notice ${auto ? "teal" : "gold"}">${auto ? icon("spark", 14) + " " + t("Reconnu automatiquement :") + " " : ""}<b>${t("Sourate {name}", { name: esc(name(P.surah)) })}</b>, ${t("versets {range}", { range })}.</div>`;
     if (m.length && m[0].surah !== P.surah && m[0].coverage > 0.7)
-      html += `<div class="notice warn">J'entends plutôt la sourate <b>${esc(name(m[0].surah))}</b> (versets ${m[0].first}–${m[0].last}).
-        <button class="small" style="margin-left:6px" onclick="useDetected()">Utiliser la détection</button></div>`;
+      html += `<div class="notice warn">${t("J'entends plutôt la sourate {name} (versets {range}).", { name: `<b>${esc(name(m[0].surah))}</b>`, range: `${m[0].first}–${m[0].last}` })}
+        <button class="small" style="margin-left:6px" onclick="useDetected()">${t("Utiliser la détection")}</button></div>`;
   }
   $("notice").innerHTML = html;
   const pick = $("pick-surah");
   pick.classList.toggle("hidden", !!(P.surah && ayahs.length));
   if (!P.surah || !ayahs.length) {
-    pick.innerHTML = `<div class="sh"><h3>Choisir la sourate</h3></div>
+    pick.innerHTML = `<div class="sh"><h3>${t("Choisir la sourate")}</h3></div>
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px"><select id="ps-surah">${$("surah").innerHTML}</select>
       <input id="ps-first" type="number" min="1" value="1"></div>
-      <button class="primary" style="margin-top:10px" onclick="reanalyze({ surah: $('ps-surah').value, first_verse: $('ps-first').value, last_verse: null }, true)">Analyser</button>`;
+      <button class="primary" style="margin-top:10px" onclick="reanalyze({ surah: $('ps-surah').value, first_verse: $('ps-first').value, last_verse: null }, true)">${t("Analyser")}</button>`;
     if (P.surah) $("ps-surah").value = P.surah;
   }
-  $("subs-count").textContent = `${P.blocks.length} sous-titre${P.blocks.length > 1 ? "s" : ""}`;
+  $("subs-count").textContent = t(P.blocks.length > 1 ? "{n} sous-titres" : "{n} sous-titre", { n: P.blocks.length });
 }
 function renderBlocks() {
   $("blocks").innerHTML = P.blocks.map((b, i) => {
@@ -1512,33 +1743,33 @@ function renderBlocks() {
     const canMerge = next && next.kind === b.kind && next.ayah === b.ayah && next.a0 === b.a1;
     return `<div class="block" id="b${i}">
       <div class="top">
-        <span class="num" onclick="playBlock(${i})" title="écouter">${icon("play", 13)}${label}</span>
+        <span class="num" onclick="playBlock(${i})" title="${t("écouter")}">${icon("play", 13)}${label}</span>
         <div class="times">
           <button class="small ghost" onclick="nudge(${i},'start',-0.05)">−</button>
-          <input value="${b.start.toFixed(2)}" onchange="setTime(${i},'start',this.value)" title="apparition (s)">
+          <input value="${b.start.toFixed(2)}" onchange="setTime(${i},'start',this.value)" title="${t("apparition (s)")}">
           <button class="small ghost" onclick="nudge(${i},'start',0.05)">+</button>
           <span class="faint">→</span>
           <button class="small ghost" onclick="nudge(${i},'end',-0.05)">−</button>
-          <input value="${b.end.toFixed(2)}" onchange="setTime(${i},'end',this.value)" title="disparition (s)">
+          <input value="${b.end.toFixed(2)}" onchange="setTime(${i},'end',this.value)" title="${t("disparition (s)")}">
           <button class="small ghost" onclick="nudge(${i},'end',0.05)">+</button>
-          <button class="small ghost" onclick="toPlayhead(${i})" title="faire apparaître à la position de lecture">⤓ ici</button>
+          <button class="small ghost" onclick="toPlayhead(${i})" title="${t("faire apparaître à la position de lecture")}">${t("⤓ ici")}</button>
         </div>
         <span class="grow"></span>
-        ${b.edited ? `<span class="badge gold">corrigé</span>` : ""}
+        ${b.edited ? `<span class="badge gold">${t("corrigé")}</span>` : ""}
       </div>
-      <textarea class="ar-edit" dir="rtl" lang="ar" rows="1" spellcheck="false" title="clique pour corriger l'arabe"
+      <textarea class="ar-edit" dir="rtl" lang="ar" rows="1" spellcheck="false" title="${t("clique pour corriger l'arabe")}"
         oninput="setText(${i}, 'ar', this.value)">${esc(b.ar)}</textarea>
-      <input class="tr-edit" value="${esc(b.tr)}" spellcheck="false" title="clique pour corriger la phonétique"
+      <input class="tr-edit" value="${esc(b.tr)}" spellcheck="false" title="${t("clique pour corriger la phonétique")}"
         oninput="setText(${i}, 'tr', this.value)">
-      ${canSplit ? `<div class="words"><em>Couper avant</em>${words.map((w, k) => k === 0 ? "" : `<span
-          onclick="splitAt(${i},${k})" title="couper avant « ${esc(w)} » (${fmt(b.words[k].t0)})">${esc(w)}</span>`).join("")}</div>` : ""}
-      <textarea class="fr" dir="auto" oninput="setFr(${i}, this.value)" placeholder="(pas de traduction)">${esc(b.fr)}</textarea>
+      ${canSplit ? `<div class="words"><em>${t("Couper avant")}</em>${words.map((w, k) => k === 0 ? "" : `<span
+          onclick="splitAt(${i},${k})" title="${t("couper avant « {w} » ({t})", { w: esc(w), t: fmt(b.words[k].t0) })}">${esc(w)}</span>`).join("")}</div>` : ""}
+      <textarea class="fr" dir="auto" oninput="setFr(${i}, this.value)" placeholder="${t("(pas de traduction)")}">${esc(b.fr)}</textarea>
       <div class="tools">
-        <label class="toggle"><input type="checkbox" ${b.highlight ? "checked" : ""} onchange="setHl(${i}, this.checked)"> ✨ Mise en valeur</label>
+        <label class="toggle"><input type="checkbox" ${b.highlight ? "checked" : ""} onchange="setHl(${i}, this.checked)"> ${t("✨ Mise en valeur")}</label>
         <span class="grow"></span>
-        ${b.edited && b.kind === "verse" ? `<button class="small ghost" onclick="restoreText(${i})" title="annuler tes corrections de l'arabe et de la phonétique">↺ Texte d'origine</button>` : ""}
-        ${canMerge ? `<button class="small ghost" onclick="mergeNext(${i})" title="réunir avec le sous-titre suivant">Fusionner ↓</button>` : ""}
-        <button class="small ghost icon danger" onclick="removeBlock(${i})" title="supprimer ce sous-titre">${icon("trash", 14)}</button>
+        ${b.edited && b.kind === "verse" ? `<button class="small ghost" onclick="restoreText(${i})" title="${t("annuler tes corrections de l'arabe et de la phonétique")}">${t("↺ Texte d'origine")}</button>` : ""}
+        ${canMerge ? `<button class="small ghost" onclick="mergeNext(${i})" title="${t("réunir avec le sous-titre suivant")}">${t("Fusionner ↓")}</button>` : ""}
+        <button class="small ghost icon danger" onclick="removeBlock(${i})" title="${t("supprimer ce sous-titre")}">${icon("trash", 14)}</button>
       </div>
     </div>`;
   }).join("");
@@ -1547,7 +1778,7 @@ function setText(i, key, v) {
   const b = P.blocks[i], first = !b.edited;
   b[key] = v; b.edited = true;
   changed({ group: key + i });
-  if (first) $("b" + i).querySelector(".top").insertAdjacentHTML("beforeend", `<span class="badge gold">corrigé</span>`);
+  if (first) $("b" + i).querySelector(".top").insertAdjacentHTML("beforeend", `<span class="badge gold">${t("corrigé")}</span>`);
 }
 async function restoreText(i) { await serverEdit("restore", { index: i }); }
 function setFr(i, v) { P.blocks[i].fr = v; changed({ group: "fr" + i }); }
@@ -1572,19 +1803,19 @@ function setTime(i, key, v) {
 function nudge(i, key, d) { setTime(i, key, P.blocks[i][key] + d); }
 function toPlayhead(i) { setTime(i, "start", $("video").currentTime); }
 function removeBlock(i) {
-  if (!confirm("Supprimer ce sous-titre ?")) return;
+  if (!confirm(t("Supprimer ce sous-titre ?"))) return;
   const b = P.blocks[i], prev = P.blocks[i - 1];
   if (prev && Math.abs(prev.end - b.start) < 0.01) prev.end = b.end;
   P.blocks.splice(i, 1); changed({ cards: true });
 }
 function warnEdited(...idx) {
   return !idx.some(i => P.blocks[i]?.edited) ||
-    confirm("Tes corrections de l'arabe / de la phonétique de ce sous-titre seront remplacées par le texte d'origine. Continuer ?");
+    confirm(t("Tes corrections de l'arabe / de la phonétique de ce sous-titre seront remplacées par le texte d'origine. Continuer ?"));
 }
 async function splitAt(i, k) { if (warnEdited(i)) await serverEdit("split", { index: i, word: k }); }
 async function mergeNext(i) { if (warnEdited(i, i + 1)) await serverEdit("merge", { index: i }); }
 async function retimeAll() {
-  if (!confirm("Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)")) return;
+  if (!confirm(t("Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)"))) return;
   await serverEdit("retime");
 }
 function useDetected() { const m = P.detected.matches[0]; reanalyze({ surah: m.surah, first_verse: m.first, last_verse: null }, true); }
@@ -1601,18 +1832,18 @@ function renderAnalysis() {
 }
 async function reanalyze(body, quiet) {
   body = body || (raAuto ? { auto: true } : { surah: $("a-surah").value, first_verse: $("a-first").value, last_verse: $("a-last").value || null });
-  if (!quiet && !confirm("Réanalyser la récitation ? Les sous-titres seront recréés (tes modifications de sous-titres seront remplacées).")) return;
+  if (!quiet && !confirm(t("Réanalyser la récitation ? Les sous-titres seront recréés (tes modifications de sous-titres seront remplacées)."))) return;
   await save();
   setTab("export");
   $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
-  toast("Analyse en cours…");
+  toast(t("Analyse en cours…"));
   try {
     const { job } = await api(`/api/projects/${pid()}/analyze`, json(body));
     await follow(job, $("r-stage"), $("r-bar"));
     const id = P.id; P = null; await openProject(id);
     $("r-box").classList.add("hidden");
     setTab("subs");
-    toast(icon("check") + " Sous-titres recréés", "ok");
+    toast(icon("check") + " " + t("Sous-titres recréés"), "ok");
   } catch (e) { $("r-error").textContent = e.message; toast(esc(e.message), "err"); }
 }
 
@@ -1624,19 +1855,19 @@ function setLook(k, v) {
 function themeCard(s) {
   const st = s.style, f = (k, d) => (st[k] || d).replace(/"/g, "'");
   const title = st["--title-grad"] || "linear-gradient(90deg, #f07ad6, #86dde6)";
-  return `<div class="theme" onclick="applyStyle('${s.id}')" title="appliquer « ${esc(s.name)} »">
+  return `<div class="theme" onclick="applyStyle('${s.id}')" title="${t("appliquer « {name} »", { name: esc(t(s.name)) })}">
     ${settings.style === s.id ? `<span class="star">★</span>` : ""}
-    <div class="acts"><button onclick="event.stopPropagation(); setDefaultStyle('${s.id}')" title="style par défaut des nouvelles vidéos">★</button>
-      ${s.builtin ? "" : `<button onclick="event.stopPropagation(); deleteStyle('${s.id}')" title="supprimer">${icon("trash", 12)}</button>`}</div>
-    <div class="t1" style="background-image:${title};font-family:${f("--title-font", "'Comic Neue'")}">SOURATE AL-FATIHA</div>
+    <div class="acts"><button onclick="event.stopPropagation(); setDefaultStyle('${s.id}')" title="${t("style par défaut des nouvelles vidéos")}">★</button>
+      ${s.builtin ? "" : `<button onclick="event.stopPropagation(); deleteStyle('${s.id}')" title="${t("supprimer")}">${icon("trash", 12)}</button>`}</div>
+    <div class="t1" style="background-image:${title};font-family:${f("--title-font", "'Comic Neue'")}">${t("SOURATE AL-FATIHA")}</div>
     <div class="t2" style="font-family:${f("--arabic", "'Amiri Quran'")};color:${st["--ar-color"] || "#f6f6f8"}">بِسْمِ ٱللَّهِ ${st["--ayah-mark"] === "circle" ? "۝١" : st["--ayah-mark"] === "brackets" ? "﴿١﴾" : ""}</div>
     <div class="t3" style="font-family:${f("--text-font", "'Comic Neue'")};color:${st["--tr-color"] || "#f3df8f"}">Bismi Allahi</div>
-    <div class="nm">${esc(s.name)}</div></div>`;
+    <div class="nm">${esc(t(s.name))}</div></div>`;
 }
 function renderStylePanel() {
   $("themes").innerHTML = styles.map(themeCard).join("");
-  fontPicker("font-title", "--title-font", "latin", "Sourate Al-Fatiha");
-  fontPicker("font-text", "--text-font", "latin", "Au nom d'Allah, le Tout Miséricordieux");
+  fontPicker("font-title", "--title-font", "latin", t("Sourate Al-Fatiha"));
+  fontPicker("font-text", "--text-font", "latin", t("Au nom d'Allah, le Tout Miséricordieux"));
   fontPicker("font-arabic", "--arabic", "arabic", "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ");
   const mark = (P.style["--ayah-mark"] || "none").replace(/"/g, "");
   document.querySelectorAll("#ayah-mark button").forEach(b => b.classList.toggle("on", b.dataset.mark === mark));
@@ -1649,7 +1880,7 @@ function fontPicker(el, v, script, sample) {
     || (v === "--arabic" ? "Amiri Quran" : "Comic Neue");
   $(el).innerHTML = fonts.filter(f => f.script === script).map(f => `<div class="font ${f.family === cur ? "on" : ""}"
       onclick="pickFont('${v}', '${f.family.replace(/'/g, "\\'")}')"><span class="sample ${script === "arabic" ? "ar" : ""}" style="font-family:'${f.family}'">${sample}</span>
-      <small>${esc(f.label)}${f.user ? ` <a href="#" onclick="event.stopPropagation(); event.preventDefault(); deleteFont('${f.family.replace(/'/g, "\\'")}')" style="color:var(--danger)">retirer</a>` : ""}</small></div>`).join("");
+      <small>${esc(f.user ? f.family + " " + t("(importée)") : t(f.label))}${f.user ? ` <a href="#" onclick="event.stopPropagation(); event.preventDefault(); deleteFont('${f.family.replace(/'/g, "\\'")}')" style="color:var(--danger)">${t("retirer")}</a>` : ""}</small></div>`).join("");
 }
 function pickFont(v, family) {
   const def = v === "--arabic" ? "Amiri Quran" : "Comic Neue";
@@ -1663,13 +1894,13 @@ async function importFont(file) {
     const f = await api("/api/fonts", { method: "POST", body: fd });
     fonts = await api("/api/fonts"); loadFaces();
     reloadOverlay();  // the preview loads the new font list
-    toast(`${icon("check")} Police « ${esc(f.family)} » importée (${f.script === "arabic" ? "arabe" : "latine"})`, "ok");
+    toast(`${icon("check")} ${t("Police « {name} » importée ({script})", { name: esc(f.family), script: t(f.script === "arabic" ? "arabe" : "latine") })}`, "ok");
     renderStylePanel();
   } catch (e) { toast(esc(e.message), "err"); }
   $("font-file").value = "";
 }
 async function deleteFont(family) {
-  if (!confirm(`Retirer la police « ${family} » ?`)) return;
+  if (!confirm(t("Retirer la police « {name} » ?", { name: family }))) return;
   await api(`/api/fonts/${encodeURIComponent(family)}`, { method: "DELETE" });
   fonts = await api("/api/fonts"); loadFaces(); reloadOverlay(); renderStylePanel();
 }
@@ -1681,32 +1912,32 @@ function applyStyle(id) {
   const keep = Object.fromEntries(Object.entries(P.style).filter(([k]) => PLACE_KEYS.includes(k)));
   P.style = { ...keep, ...s.style };
   changed({ look: true });
-  toast(`Style « ${esc(s.name)} » appliqué`);
+  toast(t("Style « {name} » appliqué", { name: esc(t(s.name)) }));
 }
 async function saveStyle() {
-  const name = prompt("Nom de ton style :", "Mon style");
+  const name = prompt(t("Nom de ton style :"), t("Mon style"));
   if (!name) return;
   const s = await api("/api/styles", json({ name, style: P.style }));
   styles = await api("/api/styles");
   renderStylePanel(); renderStyleSelect();
-  toast(`${icon("check")} Style « ${esc(s.name)} » enregistré`, "ok");
+  toast(`${icon("check")} ${t("Style « {name} » enregistré", { name: esc(s.name) })}`, "ok");
 }
 async function deleteStyle(id) {
-  if (!confirm("Supprimer ce style ?")) return;
+  if (!confirm(t("Supprimer ce style ?"))) return;
   await api(`/api/styles/${encodeURIComponent(id)}`, { method: "DELETE" });
   styles = await api("/api/styles"); renderStylePanel(); renderStyleSelect();
 }
 async function setDefaultStyle(id) {
   settings = await api("/api/settings", json({ style: id }, "PUT"));
   renderStylePanel(); renderStyleSelect();
-  toast("Style par défaut des nouvelles vidéos : " + esc(styles.find(s => s.id === id)?.name));
+  toast(t("Style par défaut des nouvelles vidéos : {name}", { name: esc(t(styles.find(s => s.id === id)?.name || "")) }));
 }
 async function changeLanguage(lang) {
-  if (P.blocks.some(b => b.kind === "verse") && !confirm("Remplacer la traduction de tous les sous-titres ? (tes modifications de la traduction seront perdues)")) {
+  if (P.blocks.some(b => b.kind === "verse") && !confirm(t("Remplacer la traduction de tous les sous-titres ? (tes modifications de la traduction seront perdues)"))) {
     $("e-lang").value = P.lang; return;
   }
   await serverEdit("language", { lang });
-  toast("Traduction : " + esc(langs.find(l => l.code === lang)?.name));
+  toast(t("Traduction : {name}", { name: esc(t(langs.find(l => l.code === lang)?.name || "")) }));
 }
 
 // text colours: [label, css variable(s), default(s), gradient variable]
@@ -1719,10 +1950,10 @@ const COLORS = {
 };
 function renderColors() {
   for (const [group, rows] of Object.entries(COLORS)) {
-    $("colors-" + group).innerHTML = rows.map(([label, vars, defs], r) => `<div class="crow">${label ? `<span>${label}</span>` : ""}
-      ${vars.map((v, k) => `${k ? `<span class="faint" title="dégradé">→</span>` : ""}<input type="color" value="${P.style[v] || defs[k]}"
-        oninput="setColor('${group}', ${r}, ${k}, this.value)" title="${vars.length > 1 ? (k ? "fin du dégradé" : "début du dégradé") : "couleur"}">`).join("")}
-      <button class="small ghost" onclick="resetColor('${group}', ${r})" title="couleur d'origine">↺</button></div>`).join("");
+    $("colors-" + group).innerHTML = rows.map(([label, vars, defs], r) => `<div class="crow">${label ? `<span>${t(label)}</span>` : ""}
+      ${vars.map((v, k) => `${k ? `<span class="faint" title="${t("dégradé")}">→</span>` : ""}<input type="color" value="${P.style[v] || defs[k]}"
+        oninput="setColor('${group}', ${r}, ${k}, this.value)" title="${t(vars.length > 1 ? (k ? "fin du dégradé" : "début du dégradé") : "couleur")}">`).join("")}
+      <button class="small ghost" onclick="resetColor('${group}', ${r})" title="${t("couleur d'origine")}">↺</button></div>`).join("");
   }
 }
 function setColor(group, r, k, value) {
@@ -1743,7 +1974,7 @@ function resetColor(group, r) {
   changed({ look: true });
 }
 function resetTexts() {
-  if (!confirm("Remettre les positions, tailles, polices et couleurs par défaut ?")) return;
+  if (!confirm(t("Remettre les positions, tailles, polices et couleurs par défaut ?"))) return;
   P.style = {}; refreshCtls(); changed({ look: true });
 }
 
@@ -1754,7 +1985,7 @@ function mediaThumb(src) {
   return m && m.kind === "image" ? `background-image:url('${mediaURL(src)}')` : "";
 }
 function clipName(c) {
-  if (c.src === "original") return "Vidéo d'origine";
+  if (c.src === "original") return t("Vidéo d'origine");
   return P.media.find(x => x.file === c.src)?.name || c.src;
 }
 function renderBgPanel() {
@@ -1766,20 +1997,20 @@ function renderBgPanel() {
         ${m.kind === "video" ? `<video src="${mediaURL(m.file)}#t=0.5" muted preload="metadata"></video>` : ""}
         <span class="kind">${m.kind === "video" ? "🎞 " + fmt(m.dur) : "🖼"}</span></div>
       <div class="nm" title="${esc(m.name)}">${esc(m.name)}</div>
-      <div class="act"><button onclick="addClip('${m.file}')">+ Ajouter</button>
-        <button class="ghost icon" style="flex:0" onclick="deleteMedia('${m.file}')" title="retirer ce média">${icon("trash", 13)}</button></div>
+      <div class="act"><button onclick="addClip('${m.file}')">${t("+ Ajouter")}</button>
+        <button class="ghost icon" style="flex:0" onclick="deleteMedia('${m.file}')" title="${t("retirer ce média")}">${icon("trash", 13)}</button></div>
     </div>`).join("");
   const times = clipTimes();
   $("clip-list").innerHTML = clips.map((c, i) => {
     const x = times.find(y => y.i === i), last = i === clips.length - 1;
-    const when = x ? `${fmt(x.s)} → ${fmt(x.e)}` : "après la fin (non visible)";
+    const when = x ? `${fmt(x.s)} → ${fmt(x.e)}` : t("après la fin (non visible)");
     return `<div class="cliprow ${i === selClip ? "sel" : ""}" onclick="selectClip(${i})">
       <div class="th" style="${mediaThumb(c.src)}">${c.src === "original" ? "🎥" : P.media.find(m => m.file === c.src)?.kind === "video" ? "🎞" : ""}</div>
-      <div class="meta"><b>${esc(clipName(c))}</b><small>${when}${last ? " · jusqu'à la fin" : ""}${c.motion !== "none" ? " · mouvement" : ""}${neutral(c.adjust) ? "" : " · couleur"}</small></div>
+      <div class="meta"><b>${esc(clipName(c))}</b><small>${when}${last ? t(" · jusqu'à la fin") : ""}${c.motion !== "none" ? t(" · mouvement") : ""}${neutral(c.adjust) ? "" : t(" · couleur")}</small></div>
       <div class="row" style="gap:2px" onclick="event.stopPropagation()">
-        <button class="small ghost" onclick="moveClip(${i},-1)" ${i ? "" : "disabled"} title="monter">↑</button>
-        <button class="small ghost" onclick="moveClip(${i},1)" ${last ? "disabled" : ""} title="descendre">↓</button>
-        <button class="small ghost icon" onclick="removeClip(${i})" ${clips.length > 1 ? "" : "disabled"} title="retirer de la séquence">${icon("trash", 13)}</button>
+        <button class="small ghost" onclick="moveClip(${i},-1)" ${i ? "" : "disabled"} title="${t("monter")}">↑</button>
+        <button class="small ghost" onclick="moveClip(${i},1)" ${last ? "disabled" : ""} title="${t("descendre")}">↓</button>
+        <button class="small ghost icon" onclick="removeClip(${i})" ${clips.length > 1 ? "" : "disabled"} title="${t("retirer de la séquence")}">${icon("trash", 13)}</button>
       </div></div>`;
   }).join("");
   $("bg-dim").value = P.background.dim || 0; $("bg-dim-v").textContent = Math.round((P.background.dim || 0) * 100) + " %";
@@ -1794,34 +2025,34 @@ function renderInspector() {
   const [w, h] = sizeOf(c.src), last = selClip === P.background.clips.length - 1;
   const m = P.media.find(x => x.file === c.src);
   $("inspector").innerHTML = `<b>${esc(clipName(c))}</b>
-    <div class="sec">Position et échelle <span class="faint" style="font-weight:400">— ou glisse l'image sur l'aperçu</span></div>
+    <div class="sec">${t("Position et échelle")} <span class="faint" style="font-weight:400">${t("— ou glisse l'image sur l'aperçu")}</span></div>
     <div class="xform">${xformHTML("clip")}</div>
     <div class="row" style="gap:6px;margin-top:8px">
-      <button class="small" onclick="frameClip(${coverZoom(w, h).toFixed(4)})">Remplir l'écran</button>
-      <button class="small" onclick="frameClip(1)">Image entière</button>
-      <button class="small" onclick="frameClip()">Centrer</button>
+      <button class="small" onclick="frameClip(${coverZoom(w, h).toFixed(4)})">${t("Remplir l'écran")}</button>
+      <button class="small" onclick="frameClip(1)">${t("Image entière")}</button>
+      <button class="small" onclick="frameClip()">${t("Centrer")}</button>
     </div>
     <div class="grid2" style="margin-top:12px">
-      <div class="field"><label>Mouvement</label><select onchange="setClip('motion', this.value)">
-        <option value="none" ${c.motion === "none" ? "selected" : ""}>Aucun</option>
-        <option value="in" ${c.motion === "in" ? "selected" : ""}>Zoom avant lent</option>
-        <option value="out" ${c.motion === "out" ? "selected" : ""}>Zoom arrière lent</option></select></div>
-      <div class="field"><label>Durée (s)</label>${last ? `<input disabled value="jusqu'à la fin">`
+      <div class="field"><label>${t("Mouvement")}</label><select onchange="setClip('motion', this.value)">
+        <option value="none" ${c.motion === "none" ? "selected" : ""}>${t("Aucun")}</option>
+        <option value="in" ${c.motion === "in" ? "selected" : ""}>${t("Zoom avant lent")}</option>
+        <option value="out" ${c.motion === "out" ? "selected" : ""}>${t("Zoom arrière lent")}</option></select></div>
+      <div class="field"><label>${t("Durée (s)")}</label>${last ? `<input disabled value="${t("jusqu'à la fin")}">`
         : `<input type="number" min="0.3" step="0.1" value="${(+c.dur).toFixed(2)}" onchange="setDur(+this.value)">`}</div>
       ${m?.kind === "video" ? `
-      <div class="field"><label>Si la vidéo est plus courte</label><select onchange="setClip('loop', this.value)">
-        <option value="pingpong" ${(c.loop || "pingpong") === "pingpong" ? "selected" : ""}>Aller-retour (boucle parfaite)</option>
-        <option value="loop" ${c.loop === "loop" ? "selected" : ""}>Recommencer au début</option></select></div>
-      <div class="field"><label>Commencer la vidéo à (s)</label>
+      <div class="field"><label>${t("Si la vidéo est plus courte")}</label><select onchange="setClip('loop', this.value)">
+        <option value="pingpong" ${(c.loop || "pingpong") === "pingpong" ? "selected" : ""}>${t("Aller-retour (boucle parfaite)")}</option>
+        <option value="loop" ${c.loop === "loop" ? "selected" : ""}>${t("Recommencer au début")}</option></select></div>
+      <div class="field"><label>${t("Commencer la vidéo à (s)")}</label>
         <input type="number" min="0" step="0.1" value="${(+c.offset || 0).toFixed(1)}" onchange="setClip('offset', Math.max(0, +this.value))"></div>` : ""}
     </div>
-    <div class="sec">Couleur <span class="faint" style="font-weight:400">— clic sur un nom = remise à zéro</span></div>
-    ${ADJUST.map(([k, label, min, max, step]) => `<div class="adj"><span onclick="ctlSet('adj.${k}', 0)">${label}</span>
+    <div class="sec">${t("Couleur")} <span class="faint" style="font-weight:400">${t("— clic sur un nom = remise à zéro")}</span></div>
+    ${ADJUST.map(([k, label, min, max, step]) => `<div class="adj"><span onclick="ctlSet('adj.${k}', 0)">${t(label)}</span>
       <input type="range" min="${min}" max="${max}" step="${step}" data-ctl="adj.${k}">
       <input type="number" min="${min}" max="${max}" step="${step}" data-ctl="adj.${k}"></div>`).join("")}
     <div class="row" style="gap:6px;margin-top:8px">
-      <button class="small" onclick="setClip('adjust', {})">Réinitialiser la couleur</button>
-      <button class="small" onclick="adjustAll()">Appliquer à tous les éléments</button>
+      <button class="small" onclick="setClip('adjust', {})">${t("Réinitialiser la couleur")}</button>
+      <button class="small" onclick="adjustAll()">${t("Appliquer à tous les éléments")}</button>
     </div>`;
   refreshCtls();
 }
@@ -1919,7 +2150,7 @@ function buildOwnSequence() {
 function useOriginal() {
   const clips = P.background.clips;
   if (clips.length === 1 && clips[0].src === "original") return;
-  if (!confirm("Revenir à la vidéo d'origine seule ? (tes médias restent dans la bibliothèque)")) return;
+  if (!confirm(t("Revenir à la vidéo d'origine seule ? (tes médias restent dans la bibliothèque)"))) return;
   const orig = clips.find(c => c.src === "original");
   P.background.clips = [orig ? { ...orig, motion: "none" } : newClip("original")];
   P.background.auto = false;
@@ -1929,7 +2160,7 @@ let wantOwn = false;
 function useOwnMedia() {
   if (!P.media.length) { wantOwn = true; $("media-file").click(); return; }
   const custom = !P.background.auto && P.background.clips.some(c => c.src !== "original");
-  if (custom && !confirm("Recréer la séquence avec tous tes médias, un par verset ? (tes durées réglées à la main seront remplacées)")) return;
+  if (custom && !confirm(t("Recréer la séquence avec tous tes médias, un par verset ? (tes durées réglées à la main seront remplacées)"))) return;
   buildOwnSequence(); changed({ bg: true });
 }
 async function importMedia(files) {
@@ -1937,7 +2168,7 @@ async function importMedia(files) {
   const status = $("media-status");
   let ok = 0;
   for (const [k, f] of files.entries()) {
-    status.textContent = `Import de « ${f.name} » (${k + 1}/${files.length})…`;
+    status.textContent = t("Import de « {name} » ({k}/{n})…", { name: f.name, k: k + 1, n: files.length });
     const fd = new FormData(); fd.append("file", f);
     try { P.media.push(await api(`/api/projects/${pid()}/media`, { method: "POST", body: fd })); ok++; }
     catch (e) { toast(`${esc(f.name)} : ${esc(e.message)}`, "err"); }
@@ -1948,14 +2179,14 @@ async function importMedia(files) {
   // sequence was arranged by hand (then « + Ajouter » places them)
   if (ok && (wantOwn || onlyOrig || P.background.auto)) {
     buildOwnSequence();
-    status.textContent = P.media.length === 1 ? "Ton média remplit toute la vidéo." :
-      `${P.media.length} médias, un par verset (le dernier jusqu'à la fin).`;
-  } else status.textContent = ok ? `${ok} média(s) importé(s) : « + Ajouter » pour les placer.` : "";
+    status.textContent = P.media.length === 1 ? t("Ton média remplit toute la vidéo.") :
+      t("{n} médias, un par verset (le dernier jusqu'à la fin).", { n: P.media.length });
+  } else status.textContent = ok ? t("{n} média(s) importé(s) : « + Ajouter » pour les placer.", { n: ok }) : "";
   wantOwn = false;
   changed({ bg: true });
 }
 async function deleteMedia(file) {
-  if (!confirm("Retirer ce média du projet ?")) return;
+  if (!confirm(t("Retirer ce média du projet ?"))) return;
   await save();
   const p = await api(`/api/projects/${pid()}/media/${encodeURIComponent(file)}`, { method: "DELETE" });
   for (const k of [file, file + "#pp"]) { layers.get(k)?.root.remove(); layers.delete(k); }
@@ -1971,7 +2202,7 @@ function trimToVoice() {
   const end = (last.voice_end ?? last.end) + 1.2;
   P.render.trim_end = end >= P.duration - 0.05 ? null : Math.round(end * 10) / 10;
   refreshAll(); changed({ tl: true });
-  toast("Silences coupés : la vidéo commence et finit avec la récitation");
+  toast(t("Silences coupés : la vidéo commence et finit avec la récitation"));
 }
 
 // ---------------------------------------------------------------- export
@@ -1997,24 +2228,24 @@ function renderResolutions() {
   const cur = { "1080x1920": "hd", "1440x2560": "2k", "2160x3840": "4k" }[P.render.size] || P.render.size || "auto";
   $("res").innerHTML = [["auto", "Native"], ["hd", "Full HD"], ["2k", "2K"], ["4k", "4K"]].map(([k, n]) => {
     const [w, h] = outSize(k);
-    return `<button class="${k === cur ? "on" : ""}" onclick="P.render.size='${k}'; renderResolutions(); changed()"><b>${n}</b><small>${w} × ${h}</small></button>`;
+    return `<button class="${k === cur ? "on" : ""}" onclick="P.render.size='${k}'; renderResolutions(); changed()"><b>${t(n)}</b><small>${w} × ${h}</small></button>`;
   }).join("");
 }
 let pendingFormat = null;
 function askFormat(f) {
   if (f === P.format) return;
   pendingFormat = f;
-  $("fmt-name").textContent = `${FORMAT_INFO[f][0].toLowerCase()} ${f}`;
+  $("fmt-name").textContent = `${t(FORMAT_INFO[f][0]).toLowerCase()} ${f}`;
   $("fmt-dialog").showModal();
 }
 async function applyFormat(copy) {
   $("fmt-dialog").close();
   await save();
   const p = await api(`/api/projects/${pid()}/format`, json({ format: pendingFormat, copy }));
-  if (copy) { toast(`${icon("check")} Copie créée en ${pendingFormat}`, "ok"); P = null; go("p/" + encodeURIComponent(p.id)); return; }
+  if (copy) { toast(`${icon("check")} ${t("Copie créée en {f}", { f: pendingFormat })}`, "ok"); P = null; go("p/" + encodeURIComponent(p.id)); return; }
   undoStack.length = 0; redoStack.length = 0;
   loadState(p); lastState = state(); lastCanvas = ""; refreshAll();
-  toast(`Format ${pendingFormat}`);
+  toast(t("Format {f}", { f: pendingFormat }));
 }
 function notifyDone(title, body) {
   try {
@@ -2034,41 +2265,41 @@ async function renderVideo() {
     const name = await follow(job, $("r-stage"), $("r-bar"), false, $("r-pct"));
     $("r-box").classList.add("hidden");
     showDone(name);
-    notifyDone("Ta vidéo est prête", name);
+    notifyDone(t("Ta vidéo est prête"), name);
     refreshExports();
   } catch (e) { $("r-error").textContent = e.message; }
   finally { $("render").disabled = false; }
 }
 async function exportStill() {
   await save();
-  const t = $("video").currentTime;
-  toast(`Image à ${fmt(t)} en cours…`);
+  const at = $("video").currentTime;
+  toast(t("Image à {t} en cours…", { t: fmt(at) }));
   try {
-    const { job } = await api(`/api/projects/${pid()}/still`, json({ t }));
+    const { job } = await api(`/api/projects/${pid()}/still`, json({ t: at }));
     const name = await follow(job, null, null);
-    toast(`${icon("check")} Image prête : <a href="/api/output/${encodeURIComponent(name)}" target="_blank" style="color:var(--accent)">voir</a>`, "ok");
+    toast(`${icon("check")} ${t("Image prête :")} <a href="/api/output/${encodeURIComponent(name)}" target="_blank" style="color:var(--accent)">${t("voir")}</a>`, "ok");
     refreshExports();
   } catch (e) { toast(esc(e.message), "err"); }
 }
 function fileActions(name) {
-  return `<a href="/api/output/${encodeURIComponent(name)}" target="_blank"><button class="small ghost icon" title="voir">${icon("eye", 14)}</button></a>
-    <a href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small ghost icon" title="télécharger">${icon("download", 14)}</button></a>
-    <button class="small ghost icon" onclick="fetch('/api/reveal/${encodeURIComponent(name)}', {method:'POST'})" title="afficher dans le dossier">${icon("folder", 14)}</button>`;
+  return `<a href="/api/output/${encodeURIComponent(name)}" target="_blank"><button class="small ghost icon" title="${t("voir")}">${icon("eye", 14)}</button></a>
+    <a href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small ghost icon" title="${t("télécharger")}">${icon("download", 14)}</button></a>
+    <button class="small ghost icon" onclick="fetch('/api/reveal/${encodeURIComponent(name)}', {method:'POST'})" title="${t("afficher dans le dossier")}">${icon("folder", 14)}</button>`;
 }
 function showDone(name) {
   const box = $("r-done");
   box.classList.remove("hidden");
   box.innerHTML = `<b>✅ ${esc(name)}</b><div class="row" style="margin-top:8px">
-    <a href="/api/output/${encodeURIComponent(name)}" target="_blank"><button class="small">${icon("eye", 14)}Voir</button></a>
-    <a href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small">${icon("download", 14)}Télécharger</button></a>
-    <button class="small" onclick="fetch('/api/reveal/${encodeURIComponent(name)}', {method:'POST'})">${icon("folder", 14)}Afficher dans le dossier</button></div>`;
+    <a href="/api/output/${encodeURIComponent(name)}" target="_blank"><button class="small">${icon("eye", 14)}${t("Voir")}</button></a>
+    <a href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small">${icon("download", 14)}${t("Télécharger")}</button></a>
+    <button class="small" onclick="fetch('/api/reveal/${encodeURIComponent(name)}', {method:'POST'})">${icon("folder", 14)}${t("Afficher dans le dossier")}</button></div>`;
 }
 async function refreshExports() { const p = await api(`/api/projects/${pid()}`); P.exports = p.exports; renderExports(); }
 function renderExports() {
   const list = P.exports || [];
   $("exports").innerHTML = list.length ? list.map(e => `<div class="exp">${icon(e.name.endsWith(".png") ? "camera" : "film", 15)}
-    <span class="nm" title="${esc(e.name)}">${esc(e.name)}</span><span class="faint">${(e.size / 1e6).toFixed(e.size > 1e8 ? 0 : 1)} Mo</span>${fileActions(e.name)}</div>`).join("")
-    : `<span class="muted small">Rien pour l'instant.</span>`;
+    <span class="nm" title="${esc(e.name)}">${esc(e.name)}</span><span class="faint">${(e.size / 1e6).toFixed(e.size > 1e8 ? 0 : 1)} ${t("Mo")}</span>${fileActions(e.name)}</div>`).join("")
+    : `<span class="muted small">${t("Rien pour l'instant.")}</span>`;
 }
 
 // ---------------------------------------------------------------- timeline
@@ -2194,6 +2425,7 @@ $("tl-content").addEventListener("pointerup", () => {
   changed({ cards: d.kind === "edge", bg: d.kind === "clip", tl: true });
 });
 
+translateDom();
 init();
 </script>
 </body>

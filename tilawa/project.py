@@ -14,6 +14,7 @@ from typing import Callable
 import numpy as np
 
 from . import align, identify, media, quran, render, segment
+from .i18n import UserError
 
 Progress = Callable[[str, float], None]
 
@@ -86,7 +87,7 @@ def create(folder: Path, source: str, surah: int, first_verse: int, last_verse: 
     if surah:
         quran.verse(surah, first_verse)  # validates
     if fmt not in render.FORMATS or lang not in quran.LANGS:
-        raise ValueError("Unknown format or language")
+        raise UserError("bad_format_lang")
     if source.startswith(("http://", "https://")):
         path = media.download(source, folder, lambda f: progress("download", f))
     else:
@@ -146,8 +147,7 @@ def analyze(p: Project, progress: Progress | None = None) -> Project:
     found_range = None
     if not p.surah:
         if not matches:
-            raise ValueError("Je n'ai pas reconnu de passage du Coran dans cette vidéo. "
-                             "Choisis la sourate et le premier verset à la main.")
+            raise UserError("not_recognized")
         best = matches[0]
         p.surah, p.first_verse = best.surah, best.first
         found_range = (best.first, best.last)
@@ -166,7 +166,7 @@ def analyze(p: Project, progress: Progress | None = None) -> Project:
     verses = quran.verses(p.surah, first, last)
     occ = align.align(em, model, verses, hint=p.first_verse - first)
     if not any(o.word.unit == "verse" for o in occ):
-        raise ValueError("No verse of the chosen range was found in this audio. Check the surah and starting verse.")
+        raise UserError("no_verse")
     opt = segment.Options(**{k: v for k, v in p.segment.items() if k in segment.Options.__dataclass_fields__})
     opt.lang = p.lang
     blocks = segment.build_blocks(occ, verses, audio, len(audio) / align.SR, opt)
@@ -215,7 +215,7 @@ def convert_format(p: Project, fmt: str) -> None:
     """Switch the project to another format: texts go back to that format's
     places, backgrounds that filled the frame fill the new one."""
     if fmt not in render.FORMATS:
-        raise ValueError("Unknown format")
+        raise UserError("bad_format")
     old = p.format
     p.format = fmt
     p.style = {k: v for k, v in p.style.items() if k not in POSITION_KEYS}
@@ -236,7 +236,7 @@ def convert_format(p: Project, fmt: str) -> None:
 def set_language(p: Project, lang: str) -> None:
     """Translation in another language, cut like the Arabic."""
     if lang not in quran.LANGS:
-        raise ValueError("Unknown language")
+        raise UserError("bad_format_lang")
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     segment.retranslate(blocks, lang)
     if p.surah and p.title == render.surah_title(p.surah, p.lang):

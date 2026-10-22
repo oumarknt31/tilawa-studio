@@ -23,6 +23,7 @@ from dataclasses import asdict, dataclass, field
 import numpy as np
 
 from . import quran
+from .i18n import UserError
 from .align import WordTiming
 
 ISTIADHA_TR = "AAoothu biAllahi mina alshshaytani alrrajeemi"
@@ -495,7 +496,7 @@ def split_block(blocks: list[Block], i: int, k: int, lang: str = "fr") -> None:
     """Split block i before its k-th word (1 <= k < number of words)."""
     b = blocks[i]
     if b.kind != "verse" or not 0 < k < len(b.words):
-        raise ValueError("Cannot split here")
+        raise UserError("cannot_split")
     v = quran.verse(b.surah, b.ayah)
     first, second = Block.from_dict(b.to_dict()), Block.from_dict(b.to_dict())
     first.a1 = second.a0 = b.a0 + k
@@ -519,7 +520,7 @@ def merge_blocks(blocks: list[Block], i: int) -> None:
     """Merge block i with block i+1 (same verse, consecutive words)."""
     a, b = blocks[i], blocks[i + 1]
     if a.kind != b.kind or (a.surah, a.ayah) != (b.surah, b.ayah) or a.a1 != b.a0:
-        raise ValueError("Only consecutive parts of the same verse can be merged")
+        raise UserError("cannot_merge")
     a.a1, a.end, a.voice_end = b.a1, b.end, b.voice_end
     a.words = a.words + b.words
     a.fr = (a.fr + " " + b.fr).strip()

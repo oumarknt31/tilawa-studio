@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
+from .i18n import UserError
+
 DATA = Path(__file__).parent / "data"
 
 # Pause marks (waqf) that appear as standalone tokens in the Uthmani text.
@@ -126,7 +128,7 @@ def surahs() -> list[dict]:
 
 def surah(n: int) -> dict:
     if not 1 <= n <= 114:
-        raise ValueError(f"Surah must be between 1 and 114, got {n}")
+        raise UserError("bad_surah")
     return surahs()[n - 1]
 
 
@@ -224,7 +226,7 @@ def _boundary_map(align: list[str], display: list[DisplayWord]) -> list[int]:
 def verse(s: int, a: int) -> Verse:
     uth, ali, trl, fr = _sources()
     if (s, a) not in uth:
-        raise ValueError(f"Verse {s}:{a} does not exist")
+        raise UserError("bad_verse", s=s, a=a)
     display = _split_display(uth[(s, a)], strip_basmala=(a == 1 and s not in (1, 9)))
     align = ali[(s, a)].split()
     v = Verse(s, a, display, align, _clean_translit(trl[(s, a)]), fr[(s, a)])
@@ -236,5 +238,5 @@ def verses(s: int, first: int, last: int | None = None) -> list[Verse]:
     total = surah(s)["verses"]
     last = total if last is None else min(last, total)
     if not 1 <= first <= last:
-        raise ValueError(f"Invalid verse range {first}-{last} for surah {s} ({total} verses)")
+        raise UserError("bad_range", first=first, last=last, total=total)
     return [verse(s, a) for a in range(first, last + 1)]
