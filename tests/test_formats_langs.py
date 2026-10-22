@@ -66,3 +66,16 @@ def test_identify_finds_surah_and_verses():
     heard = " ".join(align[(18, 10)].split()[3:] + [align[(18, 11)], align[(18, 12)]])
     best = identify.identify(_emissions_of(heard, model), model)[0]
     assert (best.surah, best.first, best.last) == (18, 10, 12)
+
+
+def test_imported_font_names_cannot_inject_css(tmp_path):
+    import json
+    from tilawa.library import Library
+
+    lib = Library(tmp_path)
+    lib.fonts_dir.mkdir()
+    (lib.fonts_dir / "fonts.json").write_text(json.dumps([
+        {"family": 'Evil"; } body { background: url(x)', "files": [["a.ttf", "400"]], "script": "latin"},
+        {"family": "Good Font", "files": [["good.ttf", "400"]], "script": "latin"},
+        {"family": "Bad File", "files": [['x"); }', "400"]], "script": "latin"}]))
+    assert [f["family"] for f in lib.user_fonts()] == ["Good Font"]

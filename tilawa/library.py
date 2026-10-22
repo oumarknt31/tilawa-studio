@@ -12,6 +12,10 @@ from pathlib import Path
 PKG = Path(__file__).parent
 
 # placement depends on the format: a style preset never carries it
+# a font's family name comes from inside the imported file and ends up in CSS
+# and in the page: only plain names are accepted
+_SAFE_FAMILY = re.compile(r"^[\w .-]{1,60}$")
+
 POSITION_KEYS = ("--header-top", "--header-x", "--block-top", "--block-x", "--header-zoom", "--block-zoom")
 
 
@@ -103,15 +107,18 @@ class Library:
 
     def user_fonts(self) -> list[dict]:
         try:
-            return json.loads((self.fonts_dir / "fonts.json").read_text(encoding="utf-8"))
+            fonts = json.loads((self.fonts_dir / "fonts.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return []
+        return [f for f in fonts if _SAFE_FAMILY.match(str(f.get("family", "")))
+                and all(re.match(r"^[\w.-]+$", str(file)) for file, _ in f.get("files", []))]
 
     def add_font(self, src: Path, filename: str) -> dict:
         """Import a .ttf / .otf font (e.g. the King Fahd Complex mushaf font)."""
         from PIL import ImageFont
 
         family, _ = ImageFont.truetype(str(src), 20).getname()
+        family = re.sub(r"[^\w .-]+", "", family or "").strip()[:60] or "Police importée"
         self.fonts_dir.mkdir(parents=True, exist_ok=True)
         ext = Path(filename).suffix.lower()
         dst = self.fonts_dir / (re.sub(r"[^\w-]+", "-", Path(filename).stem)[:50] + ext)
