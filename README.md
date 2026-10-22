@@ -23,23 +23,26 @@ You need an **Apple Silicon Mac (M1 or newer)** or a **Windows 10/11 PC**, about
   curl -LsSf https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.sh | bash
   ```
 
-  The app is installed in `Tilawa Studio/Application` (in your home folder) and the folder
-  opens at the end. The same line also **updates** the app (your projects and videos are kept).
+  At the end, **Tilawa Studio** is in your Applications folder (Launchpad, Spotlight, and you can keep
+  it in the Dock) and opens in its own window. Updates are then done **from inside the app**
+  (a ✨ *Update* button appears when a new version is out); your projects and videos are kept.
 
   If you downloaded the ZIP from GitHub instead: double-click `Installer (Mac).command`.
   If the Mac refuses to open it: *System Settings* → *Privacy & Security* → *Open Anyway*.
 - **Windows**: download the ZIP (green *Code* button → *Download ZIP*), unzip it,
   then double-click `Installer (Windows).bat`.
   If Windows shows "Windows protected your PC": *More info* → *Run anyway*.
+  At the end, **Tilawa Studio** is in the Start menu and on the desktop.
 
 The installation downloads the components, the recitation recognition model
 (~1.2 GB) and ffmpeg. Allow 5 to 15 minutes depending on the connection.
 
 ## Use
 
-1. Open `Tilawa Studio.command` (Mac) or `Tilawa Studio.bat` (Windows).
-   The app opens in the browser. **Keep the black window open** while you use it:
-   closing it stops the app (the page then says "Tilawa Studio is closed").
+1. Open **Tilawa Studio** like any app (Launchpad, Spotlight, Dock / Start menu, desktop).
+   It opens in its own window; closing the window quits the app (it asks first if a video is being made).
+   To use it in a browser instead: `Tilawa Studio.command` (Mac) or `Tilawa Studio.bat` (Windows),
+   keeping the black window open.
 2. **Drop a video** (or paste a YouTube / Instagram / TikTok link, or drop an mp3 / m4a… audio file),
    then choose the **format**, the **translation**, the **style** and the reciter's name.
    The surah and verses are **detected automatically** (you can also choose them yourself).

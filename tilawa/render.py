@@ -24,6 +24,7 @@ from .segment import Block
 PKG = Path(__file__).parent
 ORIGIN = "http://tilawa.local"
 USER_FONTS: Path | None = None  # fonts imported by the user (set by the app)
+RUNNING: set = set()  # ffmpeg encodes in progress (stopped if the app quits)
 
 # aspect -> overlay canvas: texts are laid out on this canvas (in CSS pixels)
 # and drawn at the output resolution
@@ -534,12 +535,17 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
                *_audio_args(info, t0 > 0 or t1 < info.duration or bool(afilters)),
                "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=work)
-    for line in proc.stdout:
-        m = re.match(r"out_time_us=(\d+)", line)
-        if m:
-            progress("encoding", min(1.0, int(m.group(1)) / 1e6 / total))
-    err = proc.stderr.read()
-    if proc.wait() != 0:
+    RUNNING.add(proc)
+    try:
+        for line in proc.stdout:
+            m = re.match(r"out_time_us=(\d+)", line)
+            if m:
+                progress("encoding", min(1.0, int(m.group(1)) / 1e6 / total))
+        err = proc.stderr.read()
+        code = proc.wait()
+    finally:
+        RUNNING.discard(proc)
+    if code != 0:
         raise RuntimeError(f"ffmpeg failed:\n{err[-3000:]}")
     progress("encoding", 1.0)
     return out

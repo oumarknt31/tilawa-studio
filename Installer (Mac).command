@@ -20,8 +20,11 @@ echo "-> Moteur de rendu du texte / Text rendering engine..."
 uv run playwright install chromium || exit 1
 echo "-> Modèle de récitation (~1,2 Go) et ffmpeg / Recitation model (~1.2 GB) and ffmpeg..."
 uv run python -c "from tilawa import media, align; media.tools(); align.get_model()" || exit 1
+echo "-> App Tilawa Studio dans Applications / Tilawa Studio app in Applications..."
+uv run --no-dev python -m tilawa.shortcuts || exit 1
+[ -d .git ] || [ -f .version ] || echo unknown > .version
 chmod +x "Tilawa Studio.command"
 echo ""
-echo "Installation terminée. Lance « Tilawa Studio.command »."
-echo "Installation complete. Open « Tilawa Studio.command »."
+echo "Installation terminée. Ouvre « Tilawa Studio » depuis le Launchpad, Spotlight ou le dossier Applications."
+echo "Installation complete. Open « Tilawa Studio » from Launchpad, Spotlight or the Applications folder."
 read -r -p "Entrée pour fermer / Enter to close." || true

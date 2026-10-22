@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tilawa Studio</title>
+<link rel="icon" href="/assets/favicon.png">
 <style id="faces"></style>
 <style>
   :root {
@@ -64,10 +65,11 @@
   header { position: sticky; top: 0; z-index: 30; height: var(--header-h); display: flex; align-items: center; gap: 10px; padding: 0 16px;
            background: rgba(10, 14, 17, .85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
   .logo { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: .2px; cursor: pointer; font-size: 15.5px; }
-  .logo .mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), #2a8f84); color: var(--accent-ink); font: 700 17px "Amiri Quran", serif; }
+  .logo .mark { width: 34px; height: 34px; margin: -2px -2px -2px -4px; }
   .logo span { color: var(--accent); }
   #ed-head { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; order: 1; }
-  #ui-lang { order: 2; padding: 2px; } #home-head { order: 3; }
+  #update-btn { order: 2; } #ui-lang { order: 2; padding: 2px; } #home-head { order: 3; }
+  body:not(.editing) #update-btn { margin-left: auto; } body:not(.editing) #update-btn:not(.hidden) + #ui-lang { margin-left: 0; }
   #ui-lang button { padding: 3px 9px; font-size: 12px; font-weight: 700; letter-spacing: .4px; }
   body:not(.editing) #ui-lang { margin-left: auto; }
   #ed-title { max-width: 340px; background: transparent; border-color: transparent; font-weight: 650; font-size: 15px; padding: 6px 9px; }
@@ -249,6 +251,8 @@
   .exp .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .done-box { background: var(--accent-soft); border: 1px solid rgba(61, 214, 195, .5); border-radius: 12px; padding: 12px; margin-top: 10px; }
   .done-box a, .exp a { color: inherit; text-decoration: none; }
+  body.desktop .web-only { display: none !important; }
+  #update-btn { background: rgba(242, 201, 92, .14); border-color: rgba(242, 201, 92, .5); color: var(--gold); }
 
   /* timeline */
   .tl { grid-column: 1 / -1; grid-row: 2; background: var(--surface); border-top: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
@@ -331,7 +335,7 @@
 </svg>
 
 <header>
-  <div class="logo" onclick="go('')"><div class="mark">ت</div>Tilawa <span>Studio</span></div>
+  <div class="logo" onclick="go('')"><img class="mark" src="/assets/icon.png" alt="">Tilawa <span>Studio</span></div>
   <div id="ed-head" class="hidden">
     <span class="vsep"></span>
     <button class="ghost icon" onclick="go('')" title="Mes projets"><svg class="i"><use href="#i-back"/></svg></button>
@@ -344,6 +348,7 @@
     <button class="ghost icon" onclick="$('help').showModal()" title="Aide et raccourcis (?)"><svg class="i"><use href="#i-help"/></svg></button>
     <button class="primary" onclick="setTab('export')"><svg class="i"><use href="#i-download"/></svg>Exporter</button>
   </div>
+  <button id="update-btn" class="small hidden" onclick="$('update-dialog').showModal()">✨ Mise à jour</button>
   <div id="ui-lang" class="seg-ctl" title="Langue / Language"><button data-ui="fr" onclick="switchUi('fr')">FR</button><button data-ui="en" onclick="switchUi('en')">EN</button></div>
   <div id="home-head" class="row">
     <button class="ghost icon" onclick="$('help').showModal()" title="Aide"><svg class="i"><use href="#i-help"/></svg></button>
@@ -707,6 +712,23 @@
   </div>
 </dialog>
 
+<dialog id="ask" style="max-width:440px">
+  <p id="ask-msg" style="margin:0 0 14px;line-height:1.5"></p>
+  <input id="ask-input" class="hidden" style="margin-bottom:14px">
+  <div class="row" style="justify-content:flex-end"><button id="ask-cancel" class="ghost"></button><button id="ask-ok" class="primary"></button></div>
+</dialog>
+
+<dialog id="update-dialog" style="max-width:480px">
+  <h2>Mise à jour disponible</h2>
+  <p class="muted" id="update-text" style="margin-top:0"></p>
+  <div id="update-progress" class="hidden"><div class="progress"><div id="update-bar"></div></div><p id="update-stage" class="muted small"></p></div>
+  <p id="update-error" class="error"></p>
+  <div class="row" style="justify-content:flex-end">
+    <button class="ghost" id="update-later" onclick="$('update-dialog').close()">Plus tard</button>
+    <button class="primary" id="update-go" onclick="runUpdate()">Mettre à jour</button>
+  </div>
+</dialog>
+
 <div id="toasts"></div>
 
 <script>
@@ -883,7 +905,11 @@ const EN = {
   "Dans la timeline, tire le bord d'une image pour la faire changer au début d'un verset (elle s'y aimante).": "In the timeline, drag the edge of a picture to change it at the start of a verse (it snaps there).",
   "« Zones des applis » montre où TikTok, Reels et Shorts posent leurs boutons : garde tes textes en dehors.": "« App safe zones » shows where TikTok, Reels and Shorts put their buttons: keep your texts out of them.",
   "« Enregistrer mon style » le rend disponible pour toutes tes vidéos (et ★ en fait le style par défaut).": "« Save my style » makes it available for all your videos (and ★ makes it the default).",
-  "Compris": "Got it",
+  "Compris": "Got it", "OK": "OK", "Mise à jour disponible": "Update available", "Plus tard": "Later",
+  "Mettre à jour": "Update", "✨ Mise à jour": "✨ Update", "Redémarrage…": "Restarting…",
+  "Une nouvelle version de Tilawa Studio est prête ({when}) : « {msg} ». Tes projets et vidéos sont conservés.":
+    "A new version of Tilawa Studio is ready ({when}): « {msg} ». Your projects and videos are kept.",
+  "Installation des composants…": "Installing components…", "Téléchargement de la mise à jour…": "Downloading the update…",
 };
 
 // interface language: French (as written) or English
@@ -934,7 +960,8 @@ const STAGES_FR = { queued: "En attente…", download: "Téléchargement de la v
   audio: "Lecture de l'audio…", model: "Chargement du modèle de récitation…", listening: "Écoute de la récitation…",
   identify: "Identification de la sourate et des versets…", aligning: "Synchronisation de chaque mot…", done: "Terminé",
   overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…", loudness: "Mesure du volume…",
-  prepare: "Préparation des vidéos en aller-retour…" };
+  prepare: "Préparation des vidéos en aller-retour…", install: "Installation des composants…",
+  fetch_update: "Téléchargement de la mise à jour…" };
 const STAGES = new Proxy(STAGES_FR, { get: (o, k) => o[k] && t(o[k]) });
 const STEP_OF = { queued: 0, download: 0, preview: 0, audio: 1, model: 1, listening: 1, identify: 2, aligning: 3, done: 4 };
 // same values as render.py / overlay.html
@@ -945,7 +972,7 @@ const FORMAT_INFO = {
 const BASE_DEFAULTS = { "--header-x": 0, "--header-zoom": 1, "--block-x": 0, "--block-zoom": 1, "--title-size": 64, "--reciter-size": 34,
   "--num-size": 34, "--fr-size": 35, "--ar-size": 42, "--tr-size": 29 };
 const MOTION_ZOOM = 1.12;
-let surahs = [], langs = [], styles = [], fonts = [], settings = {}, projects = [];
+let surahs = [], langs = [], styles = [], fonts = [], settings = {}, projects = [], info = {};
 let P = null, saveTimer = null, overlayReady = false, tab = "subs", selClip = 0, wave = null;
 
 async function api(path, opts = {}) {
@@ -959,6 +986,23 @@ async function api(path, opts = {}) {
     throw new Error(msg);
   }
   return r.json();
+}
+// in-page replacement for confirm() / prompt(): looks the same in a browser and in the app window
+function ask(message, { input = null, ok = "OK", cancel = "Annuler" } = {}) {
+  return new Promise(resolve => {
+    const d = $("ask"), field = $("ask-input");
+    $("ask-msg").textContent = message;
+    field.classList.toggle("hidden", input === null); field.value = input ?? "";
+    $("ask-ok").textContent = t(ok); $("ask-cancel").textContent = t(cancel);
+    const done = (v) => { d.onclose = null; d.close(); resolve(v); };
+    $("ask-ok").onclick = () => done(input === null ? true : field.value.trim());
+    $("ask-cancel").onclick = () => done(input === null ? false : null);
+    field.onkeydown = (e) => { if (e.key === "Enter") $("ask-ok").click(); };
+    d.onclose = () => resolve(input === null ? false : null);
+    d.showModal();
+    (input === null ? $("ask-ok") : field).focus();
+    if (input !== null) field.select();
+  });
 }
 const json = (body, method = "POST") => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 const pid = () => encodeURIComponent(P.id);
@@ -1001,8 +1045,10 @@ overlayLoaded();
 
 // ---------------------------------------------------------------- start
 async function init() {
-  [surahs, langs, styles, fonts, settings] = await Promise.all(
-    ["/api/surahs", "/api/languages", "/api/styles", "/api/fonts", "/api/settings"].map(u => api(u)));
+  [surahs, langs, styles, fonts, settings, info] = await Promise.all(
+    ["/api/surahs", "/api/languages", "/api/styles", "/api/fonts", "/api/settings", "/api/info"].map(u => api(u)));
+  document.body.classList.toggle("desktop", !!info.desktop);
+  setTimeout(checkUpdate, 1500);
   loadFaces();
   if (!localStorage.getItem("ui") && settings.ui) UI = settings.ui;
   translateDom();
@@ -1136,7 +1182,7 @@ function renderProjects() {
   }).join("") : `<div class="empty">${projects.length ? t("Aucun projet ne correspond.") : t("Tes projets apparaîtront ici. Commence en déposant une vidéo de récitation ci-dessus.")}</div>`;
 }
 async function delProject(id) {
-  if (!confirm(t("Supprimer ce projet ? (les vidéos déjà créées sont conservées)"))) return;
+  if (!await ask(t("Supprimer ce projet ? (les vidéos déjà créées sont conservées)"))) return;
   await api(`/api/projects/${id}`, { method: "DELETE" }); loadProjects();
 }
 
@@ -1802,20 +1848,20 @@ function setTime(i, key, v) {
 }
 function nudge(i, key, d) { setTime(i, key, P.blocks[i][key] + d); }
 function toPlayhead(i) { setTime(i, "start", $("video").currentTime); }
-function removeBlock(i) {
-  if (!confirm(t("Supprimer ce sous-titre ?"))) return;
+async function removeBlock(i) {
+  if (!await ask(t("Supprimer ce sous-titre ?"))) return;
   const b = P.blocks[i], prev = P.blocks[i - 1];
   if (prev && Math.abs(prev.end - b.start) < 0.01) prev.end = b.end;
   P.blocks.splice(i, 1); changed({ cards: true });
 }
-function warnEdited(...idx) {
+async function warnEdited(...idx) {
   return !idx.some(i => P.blocks[i]?.edited) ||
-    confirm(t("Tes corrections de l'arabe / de la phonétique de ce sous-titre seront remplacées par le texte d'origine. Continuer ?"));
+    await ask(t("Tes corrections de l'arabe / de la phonétique de ce sous-titre seront remplacées par le texte d'origine. Continuer ?"));
 }
-async function splitAt(i, k) { if (warnEdited(i)) await serverEdit("split", { index: i, word: k }); }
-async function mergeNext(i) { if (warnEdited(i, i + 1)) await serverEdit("merge", { index: i }); }
+async function splitAt(i, k) { if (await warnEdited(i)) await serverEdit("split", { index: i, word: k }); }
+async function mergeNext(i) { if (await warnEdited(i, i + 1)) await serverEdit("merge", { index: i }); }
 async function retimeAll() {
-  if (!confirm(t("Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)"))) return;
+  if (!await ask(t("Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)"))) return;
   await serverEdit("retime");
 }
 function useDetected() { const m = P.detected.matches[0]; reanalyze({ surah: m.surah, first_verse: m.first, last_verse: null }, true); }
@@ -1832,7 +1878,7 @@ function renderAnalysis() {
 }
 async function reanalyze(body, quiet) {
   body = body || (raAuto ? { auto: true } : { surah: $("a-surah").value, first_verse: $("a-first").value, last_verse: $("a-last").value || null });
-  if (!quiet && !confirm(t("Réanalyser la récitation ? Les sous-titres seront recréés (tes modifications de sous-titres seront remplacées)."))) return;
+  if (!quiet && !await ask(t("Réanalyser la récitation ? Les sous-titres seront recréés (tes modifications de sous-titres seront remplacées)."))) return;
   await save();
   setTab("export");
   $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
@@ -1900,7 +1946,7 @@ async function importFont(file) {
   $("font-file").value = "";
 }
 async function deleteFont(family) {
-  if (!confirm(t("Retirer la police « {name} » ?", { name: family }))) return;
+  if (!await ask(t("Retirer la police « {name} » ?", { name: family }))) return;
   await api(`/api/fonts/${encodeURIComponent(family)}`, { method: "DELETE" });
   fonts = await api("/api/fonts"); loadFaces(); reloadOverlay(); renderStylePanel();
 }
@@ -1915,7 +1961,7 @@ function applyStyle(id) {
   toast(t("Style « {name} » appliqué", { name: esc(t(s.name)) }));
 }
 async function saveStyle() {
-  const name = prompt(t("Nom de ton style :"), t("Mon style"));
+  const name = await ask(t("Nom de ton style :"), { input: t("Mon style") });
   if (!name) return;
   const s = await api("/api/styles", json({ name, style: P.style }));
   styles = await api("/api/styles");
@@ -1923,7 +1969,7 @@ async function saveStyle() {
   toast(`${icon("check")} ${t("Style « {name} » enregistré", { name: esc(s.name) })}`, "ok");
 }
 async function deleteStyle(id) {
-  if (!confirm(t("Supprimer ce style ?"))) return;
+  if (!await ask(t("Supprimer ce style ?"))) return;
   await api(`/api/styles/${encodeURIComponent(id)}`, { method: "DELETE" });
   styles = await api("/api/styles"); renderStylePanel(); renderStyleSelect();
 }
@@ -1933,7 +1979,7 @@ async function setDefaultStyle(id) {
   toast(t("Style par défaut des nouvelles vidéos : {name}", { name: esc(t(styles.find(s => s.id === id)?.name || "")) }));
 }
 async function changeLanguage(lang) {
-  if (P.blocks.some(b => b.kind === "verse") && !confirm(t("Remplacer la traduction de tous les sous-titres ? (tes modifications de la traduction seront perdues)"))) {
+  if (P.blocks.some(b => b.kind === "verse") && !await ask(t("Remplacer la traduction de tous les sous-titres ? (tes modifications de la traduction seront perdues)"))) {
     $("e-lang").value = P.lang; return;
   }
   await serverEdit("language", { lang });
@@ -1973,8 +2019,8 @@ function resetColor(group, r) {
   if (grad) delete P.style[grad];
   changed({ look: true });
 }
-function resetTexts() {
-  if (!confirm(t("Remettre les positions, tailles, polices et couleurs par défaut ?"))) return;
+async function resetTexts() {
+  if (!await ask(t("Remettre les positions, tailles, polices et couleurs par défaut ?"))) return;
   P.style = {}; refreshCtls(); changed({ look: true });
 }
 
@@ -2147,20 +2193,20 @@ function buildOwnSequence() {
   timeToVerses();
   selClip = 0;
 }
-function useOriginal() {
+async function useOriginal() {
   const clips = P.background.clips;
   if (clips.length === 1 && clips[0].src === "original") return;
-  if (!confirm(t("Revenir à la vidéo d'origine seule ? (tes médias restent dans la bibliothèque)"))) return;
+  if (!await ask(t("Revenir à la vidéo d'origine seule ? (tes médias restent dans la bibliothèque)"))) return;
   const orig = clips.find(c => c.src === "original");
   P.background.clips = [orig ? { ...orig, motion: "none" } : newClip("original")];
   P.background.auto = false;
   selClip = 0; changed({ bg: true });
 }
 let wantOwn = false;
-function useOwnMedia() {
+async function useOwnMedia() {
   if (!P.media.length) { wantOwn = true; $("media-file").click(); return; }
   const custom = !P.background.auto && P.background.clips.some(c => c.src !== "original");
-  if (custom && !confirm(t("Recréer la séquence avec tous tes médias, un par verset ? (tes durées réglées à la main seront remplacées)"))) return;
+  if (custom && !await ask(t("Recréer la séquence avec tous tes médias, un par verset ? (tes durées réglées à la main seront remplacées)"))) return;
   buildOwnSequence(); changed({ bg: true });
 }
 async function importMedia(files) {
@@ -2186,7 +2232,7 @@ async function importMedia(files) {
   changed({ bg: true });
 }
 async function deleteMedia(file) {
-  if (!confirm(t("Retirer ce média du projet ?"))) return;
+  if (!await ask(t("Retirer ce média du projet ?"))) return;
   await save();
   const p = await api(`/api/projects/${pid()}/media/${encodeURIComponent(file)}`, { method: "DELETE" });
   for (const k of [file, file + "#pp"]) { layers.get(k)?.root.remove(); layers.delete(k); }
@@ -2253,10 +2299,11 @@ function notifyDone(title, body) {
     o.frequency.value = 880; g.gain.setValueAtTime(0.08, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
     o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.5);
   } catch {}
-  if (document.hidden && "Notification" in window && Notification.permission === "granted") new Notification(title, { body });
+  if (info.desktop) api("/api/notify", json({ title, text: body })).catch(() => {});
+  else if (document.hidden && "Notification" in window && Notification.permission === "granted") new Notification(title, { body });
 }
 async function renderVideo() {
-  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+  if (!info.desktop && "Notification" in window && Notification.permission === "default") Notification.requestPermission();
   await save();
   $("render").disabled = true; $("r-done").classList.add("hidden");
   $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
@@ -2277,21 +2324,53 @@ async function exportStill() {
   try {
     const { job } = await api(`/api/projects/${pid()}/still`, json({ t: at }));
     const name = await follow(job, null, null);
-    toast(`${icon("check")} ${t("Image prête :")} <a href="/api/output/${encodeURIComponent(name)}" target="_blank" style="color:var(--accent)">${t("voir")}</a>`, "ok");
+    toast(`${icon("check")} ${t("Image prête :")} <a href="#" onclick="event.preventDefault(); openFile('${esc(name)}')" style="color:var(--accent)">${t("voir")}</a>`, "ok");
     refreshExports();
   } catch (e) { toast(esc(e.message), "err"); }
 }
+// ---------------------------------------------------------------- updates
+async function checkUpdate() {
+  try {
+    const u = await api("/api/update");
+    if (!u.available) return;
+    $("update-btn").classList.remove("hidden");
+    const when = new Date(u.date).toLocaleDateString(UI === "fr" ? "fr-FR" : "en-GB", { dateStyle: "long" });
+    $("update-text").textContent = t("Une nouvelle version de Tilawa Studio est prête ({when}) : « {msg} ». Tes projets et vidéos sont conservés.",
+      { when, msg: u.message });
+  } catch {}
+}
+async function runUpdate() {
+  $("update-go").disabled = true; $("update-later").disabled = true;
+  $("update-progress").classList.remove("hidden"); $("update-error").textContent = "";
+  try {
+    const { job } = await api("/api/update", { method: "POST" });
+    await follow(job, $("update-stage"), $("update-bar"));
+    $("update-stage").textContent = t("Redémarrage…");
+    await api("/api/restart", { method: "POST" });
+    // wait for the new version to answer, then reload the page
+    for (let k = 0; k < 120; k++) {
+      await new Promise(r => setTimeout(r, 1000));
+      try { await fetch("/api/info"); location.reload(); return; } catch {}
+    }
+  } catch (e) { $("update-error").textContent = e.message; $("update-go").disabled = false; $("update-later").disabled = false; }
+}
+
+// in the app window, a file opens in the computer's own player; in a browser, in a new tab
+function openFile(name) {
+  if (info.desktop) api(`/api/open/${encodeURIComponent(name)}`, { method: "POST" });
+  else window.open(`/api/output/${encodeURIComponent(name)}`, "_blank");
+}
 function fileActions(name) {
-  return `<a href="/api/output/${encodeURIComponent(name)}" target="_blank"><button class="small ghost icon" title="${t("voir")}">${icon("eye", 14)}</button></a>
-    <a href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small ghost icon" title="${t("télécharger")}">${icon("download", 14)}</button></a>
+  return `<button class="small ghost icon" onclick="openFile('${esc(name)}')" title="${t("voir")}">${icon("eye", 14)}</button>
+    <a class="web-only" href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small ghost icon" title="${t("télécharger")}">${icon("download", 14)}</button></a>
     <button class="small ghost icon" onclick="fetch('/api/reveal/${encodeURIComponent(name)}', {method:'POST'})" title="${t("afficher dans le dossier")}">${icon("folder", 14)}</button>`;
 }
 function showDone(name) {
   const box = $("r-done");
   box.classList.remove("hidden");
   box.innerHTML = `<b>✅ ${esc(name)}</b><div class="row" style="margin-top:8px">
-    <a href="/api/output/${encodeURIComponent(name)}" target="_blank"><button class="small">${icon("eye", 14)}${t("Voir")}</button></a>
-    <a href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small">${icon("download", 14)}${t("Télécharger")}</button></a>
+    <button class="small" onclick="openFile('${esc(name)}')">${icon("eye", 14)}${t("Voir")}</button>
+    <a class="web-only" href="/api/output/${encodeURIComponent(name)}?download=true"><button class="small">${icon("download", 14)}${t("Télécharger")}</button></a>
     <button class="small" onclick="fetch('/api/reveal/${encodeURIComponent(name)}', {method:'POST'})">${icon("folder", 14)}${t("Afficher dans le dossier")}</button></div>`;
 }
 async function refreshExports() { const p = await api(`/api/projects/${pid()}`); P.exports = p.exports; renderExports(); }

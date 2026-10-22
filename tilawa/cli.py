@@ -1,6 +1,7 @@
 """Command line.
 
   tilawa                      open the app in the browser
+  tilawa desktop              open the app in its own window
   tilawa make SOURCE [--surah 23 --from 84] --reciter "Muhammad Dibirov" [--format 16:9 --lang en]
 """
 
@@ -55,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
     app = sub.add_parser("app", help="open the app (default)")
     app.add_argument("--port", type=int, default=8765)
     app.add_argument("--no-browser", action="store_true")
+    d = sub.add_parser("desktop", help="open the app in its own window")
+    d.add_argument("--port", type=int, default=8765)
     m = sub.add_parser("make", help="make a video without the editor")
     m.add_argument("source", help="video file or link (YouTube, Instagram, TikTok...)")
     m.add_argument("--surah", type=int, default=0, help="found in the recitation if omitted")
@@ -72,6 +75,11 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.cmd == "make":
         return make(args)
+    if args.cmd == "desktop":
+        from . import desktop
+
+        desktop.run(port=args.port)
+        return 0
     from . import server
 
     server.run(port=getattr(args, "port", 8765), open_browser=not getattr(args, "no_browser", False))

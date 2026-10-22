@@ -8,7 +8,10 @@ set -e
 DIR="$HOME/Tilawa Studio/Application"
 echo "== Téléchargement de Tilawa Studio dans / Downloading Tilawa Studio to « $DIR » =="
 mkdir -p "$DIR"
-curl -LsSf https://github.com/oumarknt31/tilawa-studio/archive/refs/heads/main.tar.gz | tar xz -C "$DIR" --strip-components 1
+# the exact version installed is remembered, for the updates from inside the app
+SHA=$(curl -fsSL https://api.github.com/repos/oumarknt31/tilawa-studio/commits/main 2>/dev/null | sed -n 's/^  "sha": "\([0-9a-f]*\)",$/\1/p' | head -1)
+curl -LsSf "https://codeload.github.com/oumarknt31/tilawa-studio/tar.gz/${SHA:-main}" | tar xz -C "$DIR" --strip-components 1
 cd "$DIR"
+echo "${SHA:-unknown}" > .version
 bash "Installer (Mac).command" < /dev/null
-open "$DIR"
+open "$HOME/Applications/Tilawa Studio.app"

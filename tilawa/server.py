@@ -6,6 +6,7 @@ Heavy work (analysis, rendering) runs one job at a time in a worker thread.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -40,10 +41,12 @@ LIB.fonts_dir.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="Tilawa Studio")
 app.mount("/fonts", StaticFiles(directory=PKG / "fonts"), name="fonts")
 app.mount("/userfonts", StaticFiles(directory=LIB.fonts_dir), name="userfonts")
+app.mount("/assets", StaticFiles(directory=PKG / "assets"), name="assets")
 _pool = ThreadPoolExecutor(max_workers=1)
 _jobs: dict[str, dict] = {}
 _lock = threading.Lock()
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".3gp"}
+DESKTOP = False  # running in the app's own window (desktop.py), not in a browser
 LANG: ContextVar[str] = ContextVar("lang", default="fr")  # language of the interface making the request
 
 
@@ -419,6 +422,66 @@ def output(name: str, download: bool = False):
     if not f.exists():
         raise HTTPException(404)
     return FileResponse(f, filename=f.name if download else None)
+
+
+@app.get("/api/info")
+def info():
+    from . import update
+
+    return {"desktop": DESKTOP, "version": update.current(), "platform": sys.platform}
+
+
+@app.post("/api/open/{name}")
+def open_file(name: str):
+    """Open an exported video or image in the computer's own player / viewer."""
+    f = VIDEOS / Path(name).name
+    if not f.exists():
+        raise HTTPException(404)
+    if sys.platform == "darwin":
+        subprocess.run(["open", str(f)])
+    elif sys.platform == "win32":
+        os.startfile(str(f))  # noqa: S606 - a file the app made
+    else:
+        subprocess.run(["xdg-open", str(f)])
+    return {"ok": True}
+
+
+@app.post("/api/notify")
+def notify(body: dict):
+    """System notification (the app window has none of its own)."""
+    title, text = str(body.get("title", ""))[:80], str(body.get("text", ""))[:200]
+    if sys.platform == "darwin":
+        esc = lambda x: x.replace("\\", "\\\\").replace('"', '\\"')
+        subprocess.run(["osascript", "-e", f'display notification "{esc(text)}" with title "{esc(title)}" sound name "Glass"'],
+                       capture_output=True)
+    return {"ok": True}
+
+
+@app.get("/api/update")
+def update_check():
+    from . import update
+
+    return update.check()
+
+
+@app.post("/api/update")
+def update_apply():
+    from . import update
+
+    return {"job": _job("update", "", update.apply)}
+
+
+@app.post("/api/restart")
+def restart():
+    from . import update
+
+    threading.Timer(0.3, update.restart).start()
+    return {"ok": True}
+
+
+def busy() -> bool:
+    """An analysis, export or update is running."""
+    return any(j["status"] == "running" for j in _jobs.values())
 
 
 @app.post("/api/reveal/{name}")

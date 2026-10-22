@@ -23,23 +23,26 @@ Il faut un **Mac Apple Silicon (M1 ou plus récent)** ou un **PC Windows 10/11**
   curl -LsSf https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.sh | bash
   ```
 
-  Le logiciel s'installe dans `Tilawa Studio/Application` (dans ton dossier personnel) et le dossier
-  s'ouvre à la fin. La même ligne sert aussi à **mettre à jour** (tes projets et vidéos sont conservés).
+  À la fin, **Tilawa Studio** est dans ton dossier Applications (Launchpad, Spotlight, et tu peux le garder
+  dans le Dock) et s'ouvre dans sa propre fenêtre. Les mises à jour se font ensuite **depuis l'app**
+  (un bouton ✨ *Mise à jour* apparaît quand une nouvelle version sort) ; tes projets et vidéos sont conservés.
 
   Si tu as plutôt téléchargé le ZIP depuis GitHub : double-clic sur `Installer (Mac).command`.
   Si le Mac refuse de l'ouvrir : *Réglages Système* → *Confidentialité et sécurité* → *Ouvrir quand même*.
 - **Windows** : télécharge le ZIP (bouton vert *Code* → *Download ZIP*), décompresse-le,
   puis double-clic sur `Installer (Windows).bat`.
   Si Windows affiche « Windows a protégé votre ordinateur » : *Informations complémentaires* → *Exécuter quand même*.
+  À la fin, **Tilawa Studio** est dans le menu Démarrer et sur le bureau.
 
 L'installation télécharge les composants, le modèle de reconnaissance de la récitation
 (~1,2 Go) et ffmpeg. Compte 5 à 15 minutes selon la connexion.
 
 ## Utilisation
 
-1. Lance `Tilawa Studio.command` (Mac) ou `Tilawa Studio.bat` (Windows).
-   L'application s'ouvre dans le navigateur. **Laisse la fenêtre noire ouverte** pendant l'utilisation :
-   la fermer arrête le logiciel (la page affiche alors « Tilawa Studio est fermé »).
+1. Ouvre **Tilawa Studio** comme n'importe quelle app (Launchpad, Spotlight, Dock / menu Démarrer, bureau).
+   Il s'ouvre dans sa propre fenêtre ; fermer la fenêtre quitte l'app (elle demande d'abord si une vidéo est en cours).
+   Pour l'utiliser plutôt dans un navigateur : `Tilawa Studio.command` (Mac) ou `Tilawa Studio.bat` (Windows),
+   en laissant la fenêtre noire ouverte.
 2. **Dépose une vidéo** (ou colle un lien YouTube / Instagram / TikTok, ou dépose un audio mp3 / m4a…),
    puis choisis le **format**, la **traduction**, le **style** et le nom du récitateur.
    La sourate et les versets sont **détectés automatiquement** (tu peux aussi les choisir toi-même).
