@@ -25,13 +25,18 @@ from fastapi.staticfiles import StaticFiles
 
 from . import media, project, quran, render, segment
 from .cli import HOME
+from .library import Library
 
 PKG = Path(__file__).parent
 PROJECTS = HOME / "projects"
 VIDEOS = HOME / "Videos"
+LIB = Library(HOME)
+render.USER_FONTS = LIB.fonts_dir
+LIB.fonts_dir.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Tilawa Studio")
 app.mount("/fonts", StaticFiles(directory=PKG / "fonts"), name="fonts")
+app.mount("/userfonts", StaticFiles(directory=LIB.fonts_dir), name="userfonts")
 _pool = ThreadPoolExecutor(max_workers=1)
 _jobs: dict[str, dict] = {}
 _lock = threading.Lock()
@@ -96,12 +101,23 @@ def _public(p: project.Project) -> dict:
     d = asdict(p)
     d["folder"] = None
     d["id"] = p.folder.name
-    d["surah_info"] = quran.surah(p.surah)
+    d["surah_info"] = quran.surah(p.surah) if p.surah else None
     d["background"] = p.get_background()
     d["width"], d["height"] = p.width, p.height
-    out = VIDEOS / (project.output_name(p) + (".mov" if p.render.get("quality") == "prores" else ".mp4"))
-    d["output"] = out.name if out.exists() else None
+    for b, raw in zip(d["blocks"], p.blocks):  # for the verse ornament in the preview
+        b["ends_verse"] = render.ends_verse(segment.Block.from_dict(raw))
+    d["exports"] = _exports(p)
     return d
+
+
+def _exports(p: project.Project) -> list[dict]:
+    """Videos and images already made from this project, newest first."""
+    if not p.surah or not VIDEOS.exists():
+        return []
+    stem = project.output_name(p)
+    files = [f for f in VIDEOS.iterdir() if f.name.startswith(stem) and f.suffix in (".mp4", ".mov", ".png")]
+    return [{"name": f.name, "size": f.stat().st_size, "time": f.stat().st_mtime}
+            for f in sorted(files, key=lambda f: -f.stat().st_mtime)]
 
 
 @app.get("/api/surahs")
@@ -115,28 +131,39 @@ def list_projects():
     for f in sorted(PROJECTS.glob("*/project.json"), key=lambda x: x.stat().st_mtime, reverse=True):
         try:
             p = project.Project.load(f.parent)
+            rng = project.found_verses(p)
             out.append({"id": f.parent.name, "title": p.title, "reciter": p.reciter, "surah": p.surah,
-                        "first_verse": p.first_verse, "blocks": len(p.blocks), "modified": f.stat().st_mtime})
+                        "surah_name": quran.surah(p.surah)["name"] if p.surah else "",
+                        "verses": list(rng) if rng else None, "first_verse": p.first_verse, "blocks": len(p.blocks),
+                        "format": p.format, "lang": p.lang, "duration": p.duration,
+                        "thumb": (f.parent / "preview.mp4").exists(), "modified": f.stat().st_mtime})
         except Exception:
             continue
     return out
 
 
 @app.post("/api/projects")
-async def new_project(surah: int = Form(...), first_verse: int = Form(...), last_verse: int | None = Form(None),
+async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_verse: int | None = Form(None),
                       reciter: str = Form(""), title: str = Form(""), url: str = Form(""),
+                      format: str = Form("9:16"), lang: str = Form("fr"), style: str = Form(""),
                       file: UploadFile | None = File(None)):
+    """surah 0: the surah and verses are found in the recitation."""
     try:
-        quran.verse(surah, first_verse)
+        if surah:
+            quran.verse(surah, first_verse)
+        if format not in render.FORMATS or lang not in quran.LANGS:
+            raise ValueError("Format ou langue inconnus")
     except ValueError as e:
         raise HTTPException(400, str(e))
     if not url and not file:
         raise HTTPException(400, "Choisis un fichier vidéo ou colle un lien.")
     if url and not file and not url.strip().startswith(("http://", "https://")):
         raise HTTPException(400, "Le lien doit commencer par https://")
-    if file and Path(file.filename or "").suffix.lower() not in VIDEO_EXTS:
-        raise HTTPException(400, "Format non reconnu : choisis une vidéo (" + ", ".join(sorted(VIDEO_EXTS)) + ").")
-    slug = re.sub(r"[^\w-]+", "-", f"{quran.surah(surah)['name']}-{first_verse}-{time.strftime('%Y%m%d-%H%M%S')}")
+    if file and Path(file.filename or "").suffix.lower() not in VIDEO_EXTS | media.AUDIO_EXTS:
+        raise HTTPException(400, "Format non reconnu : choisis une vidéo ou un fichier audio ("
+                            + ", ".join(sorted(VIDEO_EXTS | media.AUDIO_EXTS)) + ").")
+    name = f"{quran.surah(surah)['name']}-{first_verse}" if surah else "recitation"
+    slug = re.sub(r"[^\w-]+", "-", f"{name}-{time.strftime('%Y%m%d-%H%M%S')}")
     folder = PROJECTS / slug
     folder.mkdir(parents=True, exist_ok=True)
     source = url.strip()
@@ -146,8 +173,11 @@ async def new_project(surah: int = Form(...), first_verse: int = Form(...), last
             shutil.copyfileobj(file.file, f, length=8 << 20)
         source = str(dst)
 
+    LIB.update_settings({"format": format, "lang": lang, "style": style})
+    look = LIB.style(style)
+
     def work(progress):
-        p = project.create(folder, source, surah, first_verse, last_verse, reciter, title, progress)
+        p = project.create(folder, source, surah, first_verse, last_verse, reciter, title, progress, format, lang, look)
         if file:
             Path(source).unlink(missing_ok=True)
         project.analyze(p, progress)
@@ -167,6 +197,8 @@ def save_project(pid: str, body: dict):
     for key in ("title", "reciter", "blocks", "render", "style", "segment"):
         if key in body:
             setattr(p, key, body[key])
+    for b in p.blocks:
+        b.pop("ends_verse", None)
     if "background" in body:
         known = {m["file"] for m in p.media} | {"original"}
         bg = body["background"]
@@ -179,7 +211,11 @@ def save_project(pid: str, body: dict):
 @app.post("/api/projects/{pid}/analyze")
 def reanalyze(pid: str, body: dict):
     p = project.Project.load(_folder(pid))
-    if "first_verse" in body:
+    if body.get("auto"):
+        p.surah, p.first_verse, p.last_verse = 0, 1, None
+    if body.get("surah"):
+        p.surah = int(body["surah"])
+    if "first_verse" in body and p.surah:
         quran.verse(p.surah, int(body["first_verse"]))
         p.first_verse = int(body["first_verse"])
     if "last_verse" in body:
@@ -195,7 +231,7 @@ def split(pid: str, body: dict):
     p = project.Project.load(_folder(pid))
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     try:
-        segment.split_block(blocks, int(body["index"]), int(body["word"]))
+        segment.split_block(blocks, int(body["index"]), int(body["word"]), p.lang)
     except (ValueError, IndexError) as e:
         raise HTTPException(400, str(e))
     p.blocks = [b.to_dict() for b in blocks]
@@ -237,6 +273,53 @@ def retime(pid: str):
     p.blocks = [b.to_dict() for b in blocks]
     p.save()
     return _public(p)
+
+
+@app.post("/api/projects/{pid}/language")
+def set_language(pid: str, body: dict):
+    p = project.Project.load(_folder(pid))
+    try:
+        project.set_language(p, body["lang"])
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    p.save()
+    return _public(p)
+
+
+@app.post("/api/projects/{pid}/format")
+def set_format(pid: str, body: dict):
+    """Change the format, or (copy=true) make a copy of the project in that format."""
+    folder = _folder(pid)
+    fmt = body.get("format")
+    if fmt not in render.FORMATS:
+        raise HTTPException(400, "Format inconnu")
+    if body.get("copy"):
+        slug = re.sub(r"[^\w-]+", "-", f"{pid.rsplit('-', 2)[0]}-{fmt.replace(':', 'x')}-{time.strftime('%Y%m%d-%H%M%S')}")
+        shutil.copytree(folder, PROJECTS / slug)
+        folder = PROJECTS / slug
+    p = project.Project.load(folder)
+    project.convert_format(p, fmt)
+    p.save()
+    return _public(p)
+
+
+@app.post("/api/projects/{pid}/still")
+def make_still(pid: str, body: dict):
+    p = project.Project.load(_folder(pid))
+    t = float(body.get("t", 0))
+    return {"job": _job("still", pid, lambda progress: project.make_still(p, t, VIDEOS, progress).name)}
+
+
+@app.get("/api/projects/{pid}/thumb")
+def thumb(pid: str):
+    folder = _folder(pid)
+    f = folder / "thumb.jpg"
+    if not f.exists():
+        try:
+            project.thumbnail(folder)
+        except Exception:
+            raise HTTPException(404)
+    return FileResponse(f, headers={"Cache-Control": "max-age=60"})
 
 
 @app.post("/api/projects/{pid}/render")
@@ -333,6 +416,66 @@ def reveal(name: str):
         subprocess.run(["explorer", "/select,", str(f)])
     else:
         subprocess.run(["xdg-open", str(f.parent)])
+    return {"ok": True}
+
+
+@app.get("/api/languages")
+def languages():
+    return quran.languages()
+
+
+@app.get("/api/settings")
+def get_settings():
+    return LIB.settings()
+
+
+@app.put("/api/settings")
+def put_settings(body: dict):
+    return LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour")})
+
+
+@app.get("/api/styles")
+def styles():
+    return LIB.styles()
+
+
+@app.post("/api/styles")
+def save_style(body: dict):
+    return LIB.save_style(str(body.get("name", "")), dict(body.get("style") or {}))
+
+
+@app.delete("/api/styles/{sid}")
+def delete_style(sid: str):
+    LIB.delete_style(sid)
+    return {"ok": True}
+
+
+@app.get("/api/fonts")
+def fonts():
+    return LIB.fonts()
+
+
+@app.post("/api/fonts")
+def add_font(file: UploadFile = File(...)):
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in (".ttf", ".otf"):
+        raise HTTPException(400, "Choisis un fichier de police .ttf ou .otf")
+    LIB.fonts_dir.mkdir(parents=True, exist_ok=True)
+    tmp = LIB.fonts_dir / f".import{ext}"
+    with tmp.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    try:
+        return LIB.add_font(tmp, Path(file.filename).name)
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(400, "Impossible de lire cette police.")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+@app.delete("/api/fonts/{family}")
+def delete_font(family: str):
+    LIB.delete_font(family)
     return {"ok": True}
 
 

@@ -8,8 +8,9 @@ Rules (learned from hand-made videos):
     is made on the audio, not on the gaps;
   * a part that is still too long is split again at the best place: pause
     marks (waqf), then the deepest dip in the audio, keeping parts balanced;
-  * the French translation is cut at the punctuation that best matches the
-    Arabic cut;
+  * the translation is cut at the punctuation that best matches the Arabic
+    cut (helped, in French and English, by the words that usually render the
+    Arabic word opening the next part);
   * a block appears ~0.1 s before the reciter starts it and stays until the
     next block replaces it.
 """
@@ -24,7 +25,6 @@ import numpy as np
 from . import quran
 from .align import WordTiming
 
-ISTIADHA_FR = "Je cherche refuge auprès d'Allah contre Satan le lapidé."
 ISTIADHA_TR = "AAoothu biAllahi mina alshshaytani alrrajeemi"
 ISTIADHA_UTHMANI = "أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَـٰنِ ٱلرَّجِيمِ"
 
@@ -41,6 +41,11 @@ class Options:
     max_hold_s: float = 1.5  # keep a block on screen at most this long after its last word
     show_istiadha: bool = True
     show_basmala: bool = True
+    lang: str = "fr"  # translation language (quran.LANGS)
+
+
+def translation(v: quran.Verse, lang: str) -> str:
+    return v.french if lang == "fr" else quran.translation(lang, v.surah, v.ayah)
 
 
 @dataclass
@@ -97,12 +102,29 @@ class Loudness:
 
 # ---------------------------------------------------------------- french
 
-_STRONG = re.compile(r"[.;!?»](?=\s)")
-_WEAK = re.compile(r",(?=\s)")
+_STRONG = re.compile(r"[.;!?»”\"۔؟](?=\s)")
+_WEAK = re.compile(r"[,،](?=\s)")
 _COLON = re.compile(r":(?=\s)")
 _OPEN_PAREN = re.compile(r"\s(?=\()")
-_OPEN_QUOTE = re.compile(r"\s(?=«)")  # also used around Arabic terms («Kursiy»), so weaker
-_CONJ = re.compile(r"\s(?=(et|mais|car|puis|sinon|ou|or|donc|alors|afin|lorsque|quand|tandis)\b)", re.I)
+_OPEN_QUOTE = re.compile(r"\s(?=[«“])")  # also used around Arabic terms («Kursiy»), so weaker
+# words that open a clause, per language
+_CONJ_WORDS = {
+    "fr": "et|mais|car|puis|sinon|ou|or|donc|alors|afin|lorsque|quand|tandis",
+    "en": "and|but|for|then|so|or|when|while|that|which|who|lest|until|indeed",
+    "es": "y|pero|pues|luego|entonces|o|cuando|mientras|que|para",
+    "pt": "e|mas|pois|então|ou|quando|enquanto|que|para",
+    "it": "e|ma|poi|allora|o|quando|mentre|che|perché",
+    "de": "und|aber|denn|dann|oder|wenn|während|dass|damit",
+    "nl": "en|maar|want|dan|of|wanneer|terwijl|dat",
+    "sv": "och|men|för|sedan|eller|när|medan|att",
+    "tr": "ve|ama|fakat|çünkü|sonra|veya",
+    "id": "dan|tetapi|maka|lalu|atau|ketika|bahwa|agar",
+    "ms": "dan|tetapi|maka|lalu|atau|ketika|bahawa|supaya",
+    "bs": "i|ali|pa|ili|kad|da",
+    "sq": "dhe|por|pastaj|ose|kur|që",
+    "ru": "и|но|а|или|когда|чтобы",
+}
+_CONJ = {k: re.compile(r"\s(?=(" + v + r")\b)", re.I) for k, v in _CONJ_WORDS.items()}
 
 # Arabic words that open a clause, and how Hamidullah usually renders them.
 # When an Arabic part starts with one of these, a French cut followed by the
@@ -126,21 +148,51 @@ _ANCHORS = [
 ]
 
 
-def _anchor_pattern(arabic_word: str | None) -> tuple[re.Pattern | None, float]:
+_ANCHORS_EN = [
+    (("قل",), r"say\b"),
+    (("سيقولون", "يقولون", "قالوا", "قال", "وقالوا", "وقال", "فقال", "فقالوا"), r"(they |he )?(will )?(say|said)\b"),
+    (("سبحن", "سبحان", "فسبحن", "فسبحان"), r"exalted|glory|glorified"),
+    (("يايها", "ايها", "يا"), r"o\b"),
+    (("الذين", "والذين", "الذي", "والذي"), r"(those|he|the one) who|who\b|which\b"),
+    (("اذا", "اذن"), r"then\b|when\b|if\b"),
+    (("ان",), r"if\b|indeed"),
+    (("بل",), r"but|rather|nay"),
+    (("ثم",), r"then\b"),
+    (("كلا",), r"no\b|nay"),
+    (("لعلكم", "لعلهم"), r"that (you|they)|so that|perhaps"),
+    (("ولا",), r"and (do |does )?not|nor\b"),
+    (("فمن", "من"), r"whoever|who\b"),
+    (("ربنا",), r"our lord"),
+]
+_AND = {"fr": ("et", "puis|alors|donc|et"), "en": ("and", "then|so|and")}
+
+
+# "Say" (قل, 332 times in the Quran) in the other languages
+_SAY = {"es": r"di\b|decid", "pt": r"diz|dize|diga", "it": r"di['’]?\b|dì|dite", "de": r"sag|sprich", "nl": r"zeg",
+        "sv": r"säg", "tr": r"de ki|de\b", "id": r"katakanlah", "ms": r"katakanlah", "bs": r"reci|kaži", "sq": r"thuaj",
+        "ru": r"скажи", "ur": r"کہو|کہہ"}
+
+
+def _anchor_pattern(arabic_word: str | None, lang: str = "fr") -> tuple[re.Pattern | None, float]:
     if not arabic_word:
         return None, 0.0
     sk = quran.skeleton(arabic_word)
-    for words, pat in _ANCHORS:
+    if lang not in _AND:
+        if sk == "قل" and lang in _SAY:
+            return re.compile(r"[\s«“\"(\[]*(" + _SAY[lang] + ")", re.I), 4.0
+        return None, 0.0
+    for words, pat in (_ANCHORS if lang == "fr" else _ANCHORS_EN):
         if sk in words:
-            return re.compile(r"[\s«(\[]*(" + pat + ")", re.I), 4.0
-    if sk.startswith("و"):  # wa- usually becomes "et"
-        return re.compile(r"[\s«(\[]*(et\b)", re.I), 1.5
+            return re.compile(r"[\s«“\"(\[]*(" + pat + ")", re.I), 4.0
+    wa, fa = _AND[lang]
+    if sk.startswith("و"):  # wa- usually becomes "et" / "and"
+        return re.compile(r"[\s«“\"(\[]*(" + wa + r")\b", re.I), 1.5
     if sk.startswith("ف"):  # fa- : "puis", "alors", "donc"
-        return re.compile(r"[\s«(\[]*(puis|alors|donc|et)\b", re.I), 1.0
+        return re.compile(r"[\s«“\"(\[]*(" + fa + r")\b", re.I), 1.0
     return None, 0.0
 
 
-def _french_cut_points(fr: str) -> list[tuple[int, float]]:
+def _french_cut_points(fr: str, lang: str = "fr") -> list[tuple[int, float]]:
     """(character position, strength) of the places a sentence can be cut.
     Never inside [...] or (...) asides."""
     pts = {}
@@ -152,8 +204,9 @@ def _french_cut_points(fr: str) -> list[tuple[int, float]]:
         pts.setdefault(m.start(), 1.0)
     for m in _WEAK.finditer(fr):
         pts.setdefault(m.end(), 2.0)
-    for m in _CONJ.finditer(fr):
-        pts.setdefault(m.start(), 1.0)
+    if lang in _CONJ:
+        for m in _CONJ[lang].finditer(fr):
+            pts.setdefault(m.start(), 1.0)
     for m in _COLON.finditer(fr):
         pts.setdefault(m.end(), 0.5)
     for m in re.finditer(r"\s", fr):  # any space, as a last resort
@@ -184,12 +237,12 @@ def _effective_positions(fr: str) -> list[float]:
     return out
 
 
-def french_cut_cost(fr: str, fraction: float, next_arabic: str | None) -> float:
+def french_cut_cost(fr: str, fraction: float, next_arabic: str | None, lang: str = "fr") -> float:
     """How well `fr` can be cut near `fraction` (lower is better)."""
     eff = _effective_positions(fr)
-    pat, bonus = _anchor_pattern(next_arabic)
+    pat, bonus = _anchor_pattern(next_arabic, lang)
     best = 1e9
-    for pos, strength in _french_cut_points(fr):
+    for pos, strength in _french_cut_points(fr, lang):
         c = 30 * abs(eff[pos] / max(eff[-1], 1) - fraction) - strength
         if pat and pat.match(fr, pos):
             c -= bonus
@@ -197,19 +250,21 @@ def french_cut_cost(fr: str, fraction: float, next_arabic: str | None) -> float:
     return best
 
 
-def split_french(fr: str, fractions: list[float], next_arabic: list[str | None] | None = None) -> list[str]:
-    """Cut `fr` at len(fractions) places close to the given fractions (0..1)
-    of its length, preferring punctuation and the French equivalent of the
-    Arabic word that starts each next part. Returns len(fractions)+1 parts."""
+def split_french(fr: str, fractions: list[float], next_arabic: list[str | None] | None = None,
+                 lang: str = "fr") -> list[str]:
+    """Cut the translation `fr` at len(fractions) places close to the given
+    fractions (0..1) of its length, preferring punctuation and the usual
+    rendering of the Arabic word that starts each next part. Returns
+    len(fractions)+1 parts."""
     if not fractions:
         return [fr.strip()]
-    cands = _french_cut_points(fr)
+    cands = _french_cut_points(fr, lang)
     if len(cands) < len(fractions):
         return [fr.strip()] + [""] * len(fractions)
     n = len(fractions)
     eff = _effective_positions(fr)
     total = max(eff[-1], 1)
-    anchors = [_anchor_pattern(w) for w in (next_arabic or [None] * n)]
+    anchors = [_anchor_pattern(w, lang) for w in (next_arabic or [None] * n)]
     # dynamic programming over candidates (keeps cuts in order)
     INF = 1e9
     cost = [[INF] * len(cands) for _ in range(n)]
@@ -300,7 +355,7 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
     # 2) length
     def too_long(ws):
         a0, a1 = ws[0].word.index, ws[-1].word.index + 1
-        fr_len = len(v.french) * _arabic_weight(v, a0, a1) / max(1.0, _arabic_weight(v, 0, len(v.align)))
+        fr_len = len(translation(v, opt.lang)) * _arabic_weight(v, a0, a1) / max(1.0, _arabic_weight(v, 0, len(v.align)))
         return (len(ws) > opt.max_words or fr_len > opt.max_french_chars or ws[-1].end - ws[0].start > opt.max_part_s)
 
     changed = True
@@ -316,7 +371,7 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
                     balance = abs(k / len(ws) - 0.5)
                     # prefer cuts the French translation can follow too
                     frac = _arabic_weight(v, 0, ws[k].word.index) / max(1.0, _arabic_weight(v, 0, len(v.align)))
-                    fr_fit = french_cut_cost(v.french, frac, ws[k].word.text)
+                    fr_fit = french_cut_cost(translation(v, opt.lang), frac, ws[k].word.text, opt.lang)
                     score = (2.0 * max(waqf, 0) + (1.5 if waqf >= 0 else 0) + 6 * quiet - dip / 8
                              - 6 * balance - 0.5 * fr_fit)
                     if score > best:
@@ -376,7 +431,7 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
             # cut the whole verse translation, then keep the slices this run covers
             # (a run may start or stop mid-verse, e.g. when the clip is cut)
             inner = [(f, v.align[b]) for f, b in zip(fracs, bounds) if 0 < f < 1]
-            fr_parts = split_french(v.french, [f for f, _ in inner], [w for _, w in inner])
+            fr_parts = split_french(translation(v, opt.lang), [f for f, _ in inner], [w for _, w in inner], opt.lang)
             offset = 1 if fracs[0] > 0 else 0
             for gi, ws in enumerate(group):
                 a0, a1 = bounds[gi], bounds[gi + 1]
@@ -393,10 +448,10 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
         else:
             ws = group[0]
             if p.kind == "istiadha":
-                ar, fr, tr = ISTIADHA_UTHMANI, ISTIADHA_FR, ISTIADHA_TR
+                ar, fr, tr = ISTIADHA_UTHMANI, quran.ISTIADHA_TRANSLATION[opt.lang], ISTIADHA_TR
             else:
                 b = quran.verse(1, 1)
-                ar, fr, tr = quran.BASMALA_UTHMANI, b.french, b.translit_text(0, len(b.align))
+                ar, fr, tr = quran.BASMALA_UTHMANI, translation(b, opt.lang), b.translit_text(0, len(b.align))
             blocks.append(Block(p.kind, 0, 0, 0, len(ws), 0, 0, ar, fr, tr,
                                 voice_start=ws[0].start, voice_end=ws[-1].end,
                                 words=[{"t0": round(o.start, 3), "t1": round(o.end, 3), "w": o.word.text} for o in ws]))
@@ -436,7 +491,7 @@ def verse_texts(b: Block) -> None:
     b.edited = False
 
 
-def split_block(blocks: list[Block], i: int, k: int) -> None:
+def split_block(blocks: list[Block], i: int, k: int, lang: str = "fr") -> None:
     """Split block i before its k-th word (1 <= k < number of words)."""
     b = blocks[i]
     if b.kind != "verse" or not 0 < k < len(b.words):
@@ -453,7 +508,7 @@ def split_block(blocks: list[Block], i: int, k: int) -> None:
     # split this block's own French at the point matching the new Arabic boundary
     lo, hi = _arabic_weight(v, 0, b.a0) / total, _arabic_weight(v, 0, b.a1) / total
     local = (frac - lo) / max(hi - lo, 1e-6)
-    first.fr, second.fr = split_french(b.fr, [local], [v.align[first.a1]])
+    first.fr, second.fr = split_french(b.fr, [local], [v.align[first.a1]], lang)
     for x in (first, second):
         verse_texts(x)
     second.highlight = _is_tasbih(v, second.a0)
@@ -472,3 +527,32 @@ def merge_blocks(blocks: list[Block], i: int) -> None:
     if a.kind == "verse":
         verse_texts(a)
     del blocks[i + 1]
+
+
+def retranslate(blocks: list[Block], lang: str) -> None:
+    """Replace the translation line of every block with another language,
+    cut at the same places as the Arabic."""
+    i = 0
+    while i < len(blocks):
+        b = blocks[i]
+        if b.kind != "verse":
+            v = quran.verse(1, 1)
+            b.fr = quran.ISTIADHA_TRANSLATION[lang] if b.kind == "istiadha" else translation(v, lang)
+            i += 1
+            continue
+        # consecutive parts of the same recitation of a verse
+        j = i + 1
+        while j < len(blocks) and blocks[j].kind == "verse" and (blocks[j].surah, blocks[j].ayah) == (b.surah, b.ayah) \
+                and blocks[j].a0 == blocks[j - 1].a1:
+            j += 1
+        group = blocks[i:j]
+        v = quran.verse(b.surah, b.ayah)
+        total = _arabic_weight(v, 0, len(v.align))
+        bounds = [g.a0 for g in group] + [group[-1].a1]
+        fracs = [_arabic_weight(v, 0, x) / total for x in bounds]
+        inner = [(f, v.align[x]) for f, x in zip(fracs, bounds) if 0 < f < 1]
+        parts = split_french(translation(v, lang), [f for f, _ in inner], [w for _, w in inner], lang)
+        offset = 1 if fracs[0] > 0 else 0
+        for k, g in enumerate(group):
+            g.fr = parts[k + offset] if k + offset < len(parts) else ""
+        i = j

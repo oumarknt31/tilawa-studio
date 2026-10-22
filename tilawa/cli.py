@@ -1,7 +1,7 @@
 """Command line.
 
   tilawa                      open the app in the browser
-  tilawa make SOURCE --surah 23 --from 84 --reciter "Muhammad Dibirov"
+  tilawa make SOURCE [--surah 23 --from 84] --reciter "Muhammad Dibirov" [--format 16:9 --lang en]
 """
 
 from __future__ import annotations
@@ -28,14 +28,19 @@ def _bar(stage: str, f: float, _state={"t": 0.0}):
 
 
 def make(args) -> int:
-    from . import project
+    from . import project, render
+    from .library import Library
 
-    slug = re.sub(r"[^\w-]+", "-", f"{args.surah}-{args.first}-{time.strftime('%Y%m%d-%H%M%S')}")
+    lib = Library(HOME)
+    render.USER_FONTS = lib.fonts_dir
+    slug = re.sub(r"[^\w-]+", "-", f"{args.surah or 'auto'}-{args.first}-{time.strftime('%Y%m%d-%H%M%S')}")
     folder = (Path(args.out) if args.out else HOME) / "projects" / slug
     print(f"Project: {folder}")
-    p = project.create(folder, args.source, args.surah, args.first, args.last, args.reciter, args.title or "", _bar)
+    p = project.create(folder, args.source, args.surah, args.first, args.last, args.reciter, args.title or "", _bar,
+                       args.format, args.lang, lib.style(args.style))
     p.render.update({k: v for k, v in (("size", args.size), ("quality", args.quality), ("fit", args.fit)) if v})
     project.analyze(p, _bar)
+    print(f"Surah {p.surah}, verses {project.found_verses(p)}")
     for b in p.blocks:
         label = f"{b['ayah']:>3}" if b["kind"] == "verse" else b["kind"][:3]
         print(f"  {b['start']:6.2f}-{b['end']:6.2f}  [{label}] {b['fr'][:70]}")
@@ -52,12 +57,15 @@ def main(argv: list[str] | None = None) -> int:
     app.add_argument("--no-browser", action="store_true")
     m = sub.add_parser("make", help="make a video without the editor")
     m.add_argument("source", help="video file or link (YouTube, Instagram, TikTok...)")
-    m.add_argument("--surah", type=int, required=True)
-    m.add_argument("--from", dest="first", type=int, required=True, help="first verse recited")
+    m.add_argument("--surah", type=int, default=0, help="found in the recitation if omitted")
+    m.add_argument("--from", dest="first", type=int, default=1, help="first verse recited")
     m.add_argument("--to", dest="last", type=int, help="last verse (found automatically if omitted)")
     m.add_argument("--reciter", default="")
     m.add_argument("--title", help='defaults to "SOURATE <NAME>"')
-    m.add_argument("--size", choices=["auto", "1080x1920", "1440x2560", "2160x3840"])
+    m.add_argument("--format", default="9:16", choices=["9:16", "16:9", "1:1", "4:5"])
+    m.add_argument("--lang", default="fr", help="translation: fr, en, es, de, it, pt, nl, sv, tr, id, ms, bs, sq, ru, ur, none")
+    m.add_argument("--style", help="style preset id (pieux, mushaf, moderne, doux, elegant, calligraphie)")
+    m.add_argument("--size", choices=["auto", "hd", "2k", "4k"])
     m.add_argument("--quality", choices=["max", "high", "hevc", "prores"])
     m.add_argument("--fit", choices=["auto", "crop", "blur", "pad"])
     m.add_argument("--out", help=f"output folder (default: {HOME})")

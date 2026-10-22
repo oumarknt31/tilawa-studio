@@ -4,7 +4,7 @@ Sources (bundled verbatim in tilawa/data, see README for licences):
   quran-uthmani.txt       Tanzil Uthmani text            -> what is displayed
   quran-align.txt         text the alignment model knows -> what is aligned
   en.transliteration.txt  Tanzil transliteration         -> phonetic line
-  fr.hamidullah.txt       Hamidullah French translation  -> French line
+  trans/*.txt             Tanzil translations            -> translation line (see LANGS)
 
 The aligned text and the displayed text split some words differently
 (e.g. "يَا أَيُّهَا" vs "يَـٰٓأَيُّهَا"), so every verse carries a map from
@@ -46,9 +46,9 @@ def _load(name: str) -> dict[tuple[int, int], str]:
     out = {}
     with open(DATA / name, encoding="utf-8") as f:
         for line in f:
-            parts = line.rstrip("\n").split("|")
+            parts = line.rstrip("\n").split("|", 2)
             if len(parts) == 3 and parts[0].isdigit():
-                out[(int(parts[0]), int(parts[1]))] = parts[2]
+                out[(int(parts[0]), int(parts[1]))] = parts[2].rstrip("|")  # one Tanzil line has a stray "|"
     return out
 
 
@@ -58,8 +58,65 @@ def _sources():
         _load("quran-uthmani.txt"),
         _load("quran-align.txt"),
         _load("en.transliteration.txt"),
-        _load("fr.hamidullah.txt"),
+        translation_table("fr"),
     )
+
+
+# code -> (name, Tanzil file, translator, right-to-left)
+LANGS = {
+    "fr": ("Français", "fr.hamidullah", "Muhammad Hamidullah", False),
+    "en": ("English", "en.sahih", "Saheeh International", False),
+    "es": ("Español", "es.cortes", "Julio Cortés", False),
+    "de": ("Deutsch", "de.bubenheim", "Bubenheim & Elyas", False),
+    "it": ("Italiano", "it.piccardo", "Hamza Roberto Piccardo", False),
+    "pt": ("Português", "pt.elhayek", "Samir El-Hayek", False),
+    "nl": ("Nederlands", "nl.siregar", "Sofian S. Siregar", False),
+    "sv": ("Svenska", "sv.bernstrom", "Knut Bernström", False),
+    "tr": ("Türkçe", "tr.diyanet", "Diyanet İşleri", False),
+    "id": ("Bahasa Indonesia", "id.indonesian", "Kementerian Agama RI", False),
+    "ms": ("Bahasa Melayu", "ms.basmeih", "Abdullah Muhammad Basmeih", False),
+    "bs": ("Bosanski", "bs.korkut", "Besim Korkut", False),
+    "sq": ("Shqip", "sq.ahmeti", "Sherif Ahmeti", False),
+    "ru": ("Русский", "ru.kuliev", "Elmir Kuliev", False),
+    "ur": ("اردو", "ur.jalandhry", "Fateh Muhammad Jalandhry", True),
+    "none": ("Sans traduction (arabe seul)", None, "", False),
+}
+
+# Isti'adha (not a verse, so not in the translations)
+ISTIADHA_TRANSLATION = {
+    "fr": "Je cherche refuge auprès d'Allah contre Satan le lapidé.",
+    "en": "I seek refuge in Allah from Satan, the accursed.",
+    "es": "Me refugio en Alá de Satanás, el maldito.",
+    "de": "Ich suche Zuflucht bei Allah vor dem verfluchten Satan.",
+    "it": "Mi rifugio in Allah contro Satana il lapidato.",
+    "pt": "Busco refúgio em Allah contra Satanás, o maldito.",
+    "nl": "Ik zoek mijn toevlucht bij Allah tegen de vervloekte satan.",
+    "sv": "Jag söker skydd hos Gud mot den förbannade Satan.",
+    "tr": "Kovulmuş şeytandan Allah'a sığınırım.",
+    "id": "Aku berlindung kepada Allah dari godaan setan yang terkutuk.",
+    "ms": "Aku berlindung kepada Allah daripada syaitan yang direjam.",
+    "bs": "Utječem se Allahu od prokletog šejtana.",
+    "sq": "Kërkoj mbrojtje te Allahu nga shejtani i mallkuar.",
+    "ru": "Прибегаю к защите Аллаха от проклятого сатаны.",
+    "ur": "میں شیطان مردود سے اللہ کی پناہ مانگتا ہوں۔",
+    "none": "",
+}
+
+
+@lru_cache(maxsize=None)
+def translation_table(lang: str) -> dict[tuple[int, int], str]:
+    file = LANGS[lang][1]
+    return _load(f"trans/{file}.txt") if file else {}
+
+
+def translation(lang: str, s: int, a: int) -> str:
+    if lang not in LANGS:
+        raise ValueError(f"Unknown language {lang}")
+    return translation_table(lang).get((s, a), "")
+
+
+def languages() -> list[dict]:
+    return [{"code": k, "name": v[0], "translator": v[2], "rtl": v[3]} for k, v in LANGS.items()]
 
 
 @lru_cache(maxsize=None)

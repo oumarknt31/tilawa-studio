@@ -22,15 +22,22 @@ from . import media, quran
 from .segment import Block
 
 PKG = Path(__file__).parent
-CANVAS_W, CANVAS_H = 1080, 1920
 ORIGIN = "http://tilawa.local"
+USER_FONTS: Path | None = None  # fonts imported by the user (set by the app)
+
+# aspect -> overlay canvas: texts are laid out on this canvas (in CSS pixels)
+# and drawn at the output resolution
+FORMATS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
+# output sizes, by the short side of the picture
+SIZES = {"hd": 1080, "2k": 1440, "4k": 2160}
+_OLD_SIZES = {"1080x1920": "hd", "1440x2560": "2k", "2160x3840": "4k"}
 
 
 @dataclass
 class RenderOptions:
-    size: str = "auto"  # "auto" | "1080x1920" | "1440x2560" | "2160x3840"
+    size: str = "auto"  # "auto" (native when the source has the right shape) | "hd" | "2k" | "4k"
     fit: str = "auto"  # framing when the project has no background clips: "auto" | "crop" | "blur" | "pad"
-    quality: str = "max"  # "max" (H.264 CRF 12) | "high" (CRF 16) | "hevc" (10-bit H.265) | "prores" (editing master)
+    quality: str = "max"  # "max" (H.264 CRF 12) | "high" (CRF 16) | "hevc" (10-bit H.265) | "prores" (editing master) | "png" (still)
     fade_in: float = 0.25
     fade_out: float = 0.25
     show_header: bool = True
@@ -38,15 +45,31 @@ class RenderOptions:
     trim_end: float | None = None
     audio_fade_in: float = 0.0
     audio_fade_out: float = 0.0
+    loudnorm: bool = True  # -14 LUFS, the level YouTube, TikTok and Instagram play at
 
 
-def surah_title(n: int) -> str:
-    name = quran.surah(n)["name"].upper()
-    return f"SOURATE {name.replace('-', ' ')}"
+# "Surah X" in each translation language ({} = the surah's name)
+TITLE = {"fr": "SOURATE {}", "en": "SURAH {}", "es": "SURA {}", "de": "SURE {}", "it": "SURA {}", "pt": "SURATA {}",
+         "nl": "SOERA {}", "sv": "SURA {}", "tr": "{} SURESİ", "id": "SURAH {}", "ms": "SURAH {}", "bs": "SURA {}",
+         "sq": "SURJA {}", "ru": "СУРА {}", "ur": "سورة {}"}
 
 
-def block_payload(b: Block) -> dict:
-    return {"num": f"{b.ayah}." if b.kind == "verse" else "", "fr": b.fr, "ar": b.ar, "tr": b.tr, "highlight": b.highlight}
+def surah_title(n: int, lang: str = "fr") -> str:
+    info = quran.surah(n)
+    if lang in ("ur", "none"):
+        return f"سورة {info['ar']}"
+    return TITLE.get(lang, TITLE["fr"]).format(info["name"].upper().replace("-", " "))
+
+
+def ends_verse(b: Block) -> bool:
+    return b.kind == "verse" and b.a1 >= len(quran.verse(b.surah, b.ayah).align)
+
+
+def block_payload(b: Block, lang: str = "fr") -> dict:
+    """What the overlay page draws for a block (same as payload() in index.html)."""
+    return {"num": f"{b.ayah}." if b.kind == "verse" else "", "fr": b.fr, "ar": b.ar, "tr": b.tr,
+            "highlight": b.highlight, "ayah": b.ayah if ends_verse(b) else 0,
+            "rtl": quran.LANGS.get(lang, ("", "", "", False))[3]}
 
 
 def _serve(route):
@@ -54,6 +77,8 @@ def _serve(route):
     path = route.request.url.removeprefix(ORIGIN).split("?")[0]
     if path.startswith("/fonts/"):
         f = PKG / "fonts" / path.removeprefix("/fonts/")
+    elif path.startswith("/userfonts/") and USER_FONTS:
+        f = USER_FONTS / Path(path.removeprefix("/userfonts/")).name
     else:
         f = PKG / "web" / path.lstrip("/")
     if not f.is_file():
@@ -62,31 +87,35 @@ def _serve(route):
 
 
 class OverlayRenderer:
-    def __init__(self, width: int, height: int):
+    def __init__(self, width: int, height: int, fmt: str = "9:16"):
         from playwright.sync_api import sync_playwright
 
         self.width, self.height = width, height
+        self.canvas_w = FORMATS[fmt][0]
         self._pw = sync_playwright().start()
         self._browser = self._pw.chromium.launch(args=["--font-render-hinting=none", "--disable-lcd-text"])
-        scale = width / CANVAS_W
+        scale = width / self.canvas_w
         self.scale = scale
         # CSS pixel step that lands on whole output pixels (1 at 1080p and 4K, 3 at 1440p)
-        self.grid = Fraction(width, CANVAS_W).denominator
+        self.grid = Fraction(width, self.canvas_w).denominator
         self.page = self._browser.new_page(
-            viewport={"width": CANVAS_W, "height": round(height / scale)},
+            viewport={"width": self.canvas_w, "height": round(height / scale)},
             device_scale_factor=scale,
         )
         self.page.route(f"{ORIGIN}/**", _serve)
         self.page.goto(f"{ORIGIN}/overlay.html")
-        # vertical position scales with the frame if its aspect is not exactly 9:16
-        self.page.evaluate("document.body.style.height = window.innerHeight + 'px'")
         self.page.evaluate("window.ready")
+        self.page.evaluate("(f) => setCanvas(f, window.innerHeight)", fmt)
 
     def png(self, header: dict | None, block: dict | None, style: dict | None, out: Path) -> tuple[Path, int]:
         """Draw one overlay; returns the PNG (cropped to the band that holds
         text, full width) and its vertical position in output pixels."""
-        self.page.evaluate("([h, b, s]) => { setStyle(s); setHeader(h); setBlock(b); }", [header, block, style or {}])
-        self.page.evaluate("document.fonts.ready")
+        set_all = "([h, b, s]) => { setStyle(s); setHeader(h); setBlock(b); }"
+        self.page.evaluate(set_all, [header, block, style or {}])
+        self.page.evaluate("settle()")
+        # again, now that the fonts are loaded (line breaks depend on them)
+        self.page.evaluate(set_all, [header, block, style or {}])
+        self.page.evaluate("settle()")
         top, bottom = self.page.evaluate("""() => {
             let t = Infinity, b = -Infinity;
             for (const el of document.querySelectorAll('#header .o, #block .o, #mic')) {
@@ -104,7 +133,7 @@ class OverlayRenderer:
         y0 = max(0, int(top - 24) // q * q)
         y1 = min(int(css_h) // q * q, -(-int(bottom + 24) // q) * q)
         self.page.screenshot(path=str(out), omit_background=True, type="png",
-                             clip={"x": 0, "y": y0, "width": CANVAS_W, "height": max(q, y1 - y0)})
+                             clip={"x": 0, "y": y0, "width": self.canvas_w, "height": max(q, y1 - y0)})
         return out, round(y0 * self.scale)
 
     def close(self):
@@ -114,14 +143,16 @@ class OverlayRenderer:
 
 # ---------------------------------------------------------------- geometry
 
-def output_size(info: media.VideoInfo, opt: RenderOptions) -> tuple[int, int]:
-    if opt.size != "auto":
-        w, h = (int(x) for x in opt.size.split("x"))
-        return w, h
-    # native resolution of a vertical source, never below 1080x1920
-    if info.width * 16 == info.height * 9 and info.width >= CANVAS_W:
-        return info.width - info.width % 2, info.height - info.height % 2
-    return CANVAS_W, CANVAS_H
+def output_size(info: media.VideoInfo, opt: RenderOptions, fmt: str = "9:16") -> tuple[int, int]:
+    cw, ch = FORMATS[fmt]
+    size = _OLD_SIZES.get(opt.size, opt.size)
+    if size == "auto":
+        # native resolution of a source that already has the right shape, never below Full HD
+        if info.width * ch == info.height * cw and min(info.width, info.height) >= 1080:
+            return info.width - info.width % 2, info.height - info.height % 2
+        size = "hd"
+    k = SIZES.get(size, 1080) / min(cw, ch)
+    return round(cw * k / 2) * 2, round(ch * k / 2) * 2
 
 
 # HDR (iPhone HLG, PQ) -> SDR BT.709 before the text goes on, otherwise white
@@ -141,22 +172,29 @@ MOTION_ZOOM = 1.12  # slow zoom on a background clip: from 1 to this factor (or 
 #   x, y  offset of the picture centre, in fractions of the frame width/height
 #   motion "none" | "in" | "out"  slow zoom over the clip
 
-def cover_zoom(sw: int, sh: int) -> float:
-    """Zoom at which a sw x sh picture exactly fills the 9:16 frame."""
-    r = (CANVAS_W / CANVAS_H) * sh / sw
+def aspect(fmt: str) -> float:
+    cw, ch = FORMATS[fmt]
+    return cw / ch
+
+
+def cover_zoom(sw: int, sh: int, fmt: str = "9:16") -> float:
+    """Zoom at which a sw x sh picture exactly fills the frame."""
+    r = aspect(fmt) * sh / sw
     return max(r, 1 / r)
 
 
-def default_background(sw: int, sh: int, fit: str = "auto") -> dict:
-    """The original video alone, framed as the old `fit` setting did."""
+def default_background(sw: int, sh: int, fit: str = "auto", fmt: str = "9:16") -> dict:
+    """The original video alone: filling the frame if its shape is close,
+    else whole over a blurred copy."""
     if fit == "auto":
-        fit = "crop" if sw / sh < 0.8 else "blur"
-    return {"clips": [new_clip("original", sw, sh, fill=fit == "crop")], "transition": 0.5,
+        ratio = (sw / sh) / aspect(fmt)
+        fit = "crop" if 1 / 1.45 < ratio < 1.45 else "blur"
+    return {"clips": [new_clip("original", sw, sh, fill=fit == "crop", fmt=fmt)], "transition": 0.5,
             "fill": "black" if fit == "pad" else "blur", "dim": 0.0}
 
 
-def new_clip(src: str, sw: int, sh: int, dur: float = 5.0, fill: bool = True) -> dict:
-    return {"src": src, "dur": dur, "zoom": round(cover_zoom(sw, sh), 4) if fill else 1.0,
+def new_clip(src: str, sw: int, sh: int, dur: float = 5.0, fill: bool = True, fmt: str = "9:16") -> dict:
+    return {"src": src, "dur": dur, "zoom": round(cover_zoom(sw, sh, fmt), 4) if fill else 1.0,
             "x": 0.0, "y": 0.0, "motion": "none", "offset": 0.0}
 
 
@@ -293,7 +331,7 @@ def pingpong_file(f: Path) -> Path:
 
 def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: Path | None,
                       t0: float, t1: float, w: int, h: int, inputs: _Inputs, graph: list[str],
-                      work: Path, progress: Callable[[str, float], None]) -> str:
+                      work: Path, progress: Callable[[str, float], None], fmt: str = "9:16") -> str:
     """Adds the background (w x h, yuv444p, t1 - t0 long) to the graph; returns its label."""
     fps, rate = info.fps_str, info.fps
     spans = []
@@ -302,7 +340,7 @@ def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: P
         if e - s >= 1 / rate:
             spans.append((c, s, e))
     if not spans:
-        spans = [(new_clip("original", info.width, info.height), 0.0, t1 - t0)]
+        spans = [(default_background(info.width, info.height, "auto", fmt)["clips"][0], 0.0, t1 - t0)]
     # crossfades: centred on each cut, at most half of either neighbour
     d = [0.0] + [min(float(bg.get("transition") or 0), (spans[i - 1][2] - spans[i - 1][1]) / 2,
                      (spans[i][2] - spans[i][1]) / 2) for i in range(1, len(spans))] + [0.0]
@@ -401,27 +439,32 @@ def _graph_arg(script: Path) -> list[str]:
 def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path,
            opt: RenderOptions | None = None, style: dict | None = None,
            progress: Callable[[str, float], None] | None = None,
-           background: dict | None = None, media_dir: Path | None = None) -> Path:
+           background: dict | None = None, media_dir: Path | None = None,
+           fmt: str = "9:16", lang: str = "fr") -> Path:
+    """Make the video (or, with quality "png", a still image of its first frame)."""
     opt = opt or RenderOptions()
     progress = progress or (lambda stage, f: None)
     # absolute paths: ffmpeg runs inside the work folder
     video, out = Path(video).resolve(), Path(out).resolve()
     media_dir = Path(media_dir).resolve() if media_dir else None
     info = media.probe(video)
-    w, h = output_size(info, opt)
+    w, h = output_size(info, opt, fmt)
     t0 = max(0.0, opt.trim_start)
     t1 = min(info.duration, opt.trim_end) if opt.trim_end else info.duration
+    still_image = opt.quality == "png"
+    if still_image:
+        t1 = min(info.duration, t0 + 2 / info.fps)
     work = out.parent / f".{out.stem}-overlays"
     work.mkdir(parents=True, exist_ok=True)
 
     # 1) overlays
     shown = [b for b in blocks if b.end > t0 and b.start < t1]
-    renderer = OverlayRenderer(w, h)
+    renderer = OverlayRenderer(w, h, fmt)
     try:
         header = renderer.png({"title": title, "reciter": reciter, "visible": opt.show_header}, None, style, work / "header.png")
         pngs = []
         for i, b in enumerate(shown):
-            pngs.append(renderer.png(None, block_payload(b), style, work / f"block{i:03d}.png"))
+            pngs.append(renderer.png(None, block_payload(b, lang), style, work / f"block{i:03d}.png"))
             progress("overlays", (i + 1) / max(1, len(shown)))
     finally:
         renderer.close()
@@ -440,8 +483,8 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     inputs = _Inputs()
     audio = inputs.add("-ss", f"{t0:.3f}", "-to", f"{t1:.3f}", "-i", str(video))
     graph: list[str] = []
-    base = _background_graph(background or default_background(info.width, info.height, opt.fit),
-                             info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress)
+    base = _background_graph(background or default_background(info.width, info.height, opt.fit, fmt),
+                             info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress, fmt)
     hdr = inputs.add("-i", str(header[0]))
     graph.append(f"{still(hdr, total)}[hdr]")
     graph.append(f"[{base}][hdr]overlay=x=0:y={header[1]}:format=yuv444:eof_action=pass[v0]")
@@ -450,30 +493,46 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         s, e = max(b.start, t0) - t0, min(b.end, t1) - t0
         dur = max(e - s, 1 / info.fps)
         fi, fo = min(opt.fade_in, dur / 3), min(opt.fade_out, dur / 3)
+        if still_image:
+            fi = fo = 0  # a still shows the subtitle fully
         k = inputs.add("-i", str(png))
         fade_in = f"fade=t=in:st=0:d={fi:.3f}:alpha=1," if b.start > t0 + 0.01 and fi > 0 else ""
         fade_out = f"fade=t=out:st={dur - fo:.3f}:d={fo:.3f}:alpha=1," if fo > 0 else ""
         graph.append(f"{still(k, dur)},{fade_in}{fade_out}trim=duration={dur:.3f},setpts=PTS+{s:.3f}/TB[o{i}]")
         graph.append(f"[{last}][o{i}]overlay=x=0:y={y}:format=yuv444:eof_action=pass[v{i + 1}]")
         last = f"v{i + 1}"
-    vargs, ext = _encode_args(info, opt)
-    out = out.with_suffix(ext)
-    graph.append(f"[{last}]format={'yuv422p10le' if opt.quality == 'prores' else 'yuv420p10le' if opt.quality == 'hevc' else 'yuv420p'}[vout]")
-    afi, afo = min(opt.audio_fade_in, total / 2), min(opt.audio_fade_out, total / 2)
-    if info.acodec is not None and (afi > 0 or afo > 0):
-        fades = ([f"afade=t=in:st=0:d={afi:.3f}"] if afi > 0 else []) + \
-                ([f"afade=t=out:st={total - afo:.3f}:d={afo:.3f}"] if afo > 0 else [])
-        graph.append(f"[{audio}:a]{','.join(fades)}[aout]")
-        amap = ["-map", "[aout]"]
-    else:
-        amap = ["-map", f"{audio}:a?"]
     script = work / "graph.txt"
-    script.write_text(";\n".join(graph))
-    cmd = [media.tools()[0], "-y", "-hide_banner", "-loglevel", "error", "-stats_period", "0.5", "-progress", "pipe:1",
-           *inputs.args, *_graph_arg(script), "-map", "[vout]", *amap,
-           "-fps_mode", "cfr", "-r", fps, *vargs,
-           *_audio_args(info, t0 > 0 or t1 < info.duration or afi > 0 or afo > 0),
-           "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
+    common = [media.tools()[0], "-y", "-hide_banner", "-loglevel", "error", "-stats_period", "0.5", "-progress", "pipe:1"]
+
+    if still_image:
+        out = out.with_suffix(".png")
+        graph.append(f"[{last}]scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgb24[vout]")
+        script.write_text(";\n".join(graph))
+        cmd = [*common, *inputs.args, *_graph_arg(script), "-map", "[vout]", "-frames:v", "1", "-c:v", "png", str(out)]
+        total = 1 / info.fps
+    else:
+        vargs, ext = _encode_args(info, opt)
+        out = out.with_suffix(ext)
+        graph.append(f"[{last}]format={'yuv422p10le' if opt.quality == 'prores' else 'yuv420p10le' if opt.quality == 'hevc' else 'yuv420p'}[vout]")
+        afi, afo = min(opt.audio_fade_in, total / 2), min(opt.audio_fade_out, total / 2)
+        afilters = []
+        if info.acodec is not None and opt.loudnorm:
+            progress("loudness", 0.0)
+            afilters += [media.loudnorm_filter(video, t0, t1), "aresample=48000"]
+        if afi > 0:
+            afilters.append(f"afade=t=in:st=0:d={afi:.3f}")
+        if afo > 0:
+            afilters.append(f"afade=t=out:st={total - afo:.3f}:d={afo:.3f}")
+        if info.acodec is not None and afilters:
+            graph.append(f"[{audio}:a]{','.join(afilters)}[aout]")
+            amap = ["-map", "[aout]"]
+        else:
+            amap = ["-map", f"{audio}:a?"]
+        script.write_text(";\n".join(graph))
+        cmd = [*common, *inputs.args, *_graph_arg(script), "-map", "[vout]", *amap,
+               "-fps_mode", "cfr", "-r", fps, *vargs,
+               *_audio_args(info, t0 > 0 or t1 < info.duration or bool(afilters)),
+               "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=work)
     for line in proc.stdout:
         m = re.match(r"out_time_us=(\d+)", line)

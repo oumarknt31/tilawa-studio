@@ -233,3 +233,38 @@ def pingpong(src: Path, dst: Path, preview: bool = False) -> Path:
     subprocess.run([*ff, "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(dst)], check=True)
     shutil.rmtree(work, ignore_errors=True)
     return dst
+
+
+def loudnorm_filter(src: Path, t0: float, t1: float, target: float = -14.0) -> str:
+    """Two-pass loudness normalisation: measure the passage, then return the
+    filter that brings it to `target` LUFS (true peak -1 dBTP) with one
+    constant gain, so the recitation's dynamics stay untouched."""
+    out = subprocess.run([tools()[0], "-hide_banner", "-nostats", "-ss", f"{t0:.3f}", "-to", f"{t1:.3f}", "-i", str(src),
+                          "-vn", "-af", f"loudnorm=I={target}:TP=-1:LRA=20:print_format=json", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    m = json.loads(out[out.rindex("{"): out.rindex("}") + 1])
+    return (f"loudnorm=I={target}:TP=-1:LRA=20:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+            f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
+
+
+AUDIO_EXTS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".opus"}
+
+
+def has_video(path: str | Path) -> bool:
+    out = subprocess.run([tools()[1], "-v", "error", "-select_streams", "v", "-show_entries", "stream=codec_type",
+                          "-of", "csv=p=0", str(path)], capture_output=True, text=True).stdout
+    return "video" in out
+
+
+def audio_to_video(src: Path, dst: Path, width: int, height: int) -> Path:
+    """A recitation without picture: a plain dark frame carrying the sound,
+    to be covered by the user's own photos and videos."""
+    acodec = subprocess.run([tools()[1], "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name",
+                             "-of", "csv=p=0", str(src)], capture_output=True, text=True).stdout.strip()
+    enc = "aac_at" if "aac_at" in encoders() else "aac"
+    audio = ["-c:a", "copy"] if acodec == "aac" else ["-c:a", enc, "-b:a", "320k"]
+    subprocess.run([tools()[0], "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c=0x0f1418:s={width}x{height}:r=30",
+                    "-i", str(src), "-map", "0:v", "-map", "1:a", "-shortest", "-c:v", "libx264", "-preset", "veryfast",
+                    "-crf", "18", "-tune", "stillimage", "-pix_fmt", "yuv420p", *audio, "-movflags", "+faststart", str(dst)],
+                   check=True)
+    return dst

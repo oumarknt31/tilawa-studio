@@ -1,0 +1,170 @@
+[
+ {
+  "family": "Amiri Quran",
+  "label": "Amiri Quran — style mushaf",
+  "script": "arabic",
+  "ornament": true,
+  "files": [
+   [
+    "AmiriQuran-Regular.ttf",
+    "400"
+   ]
+  ]
+ },
+ {
+  "family": "Scheherazade New",
+  "label": "Scheherazade — comme le Coran de Médine",
+  "script": "arabic",
+  "ornament": true,
+  "files": [
+   [
+    "ScheherazadeNew-Regular.ttf",
+    "400"
+   ]
+  ]
+ },
+ {
+  "family": "Noto Naskh Arabic",
+  "label": "Noto Naskh — net et moderne",
+  "script": "arabic",
+  "ornament": true,
+  "files": [
+   [
+    "NotoNaskhArabic-Variable.ttf",
+    "400 700"
+   ]
+  ]
+ },
+ {
+  "family": "Amiri",
+  "label": "Amiri — naskh classique",
+  "script": "arabic",
+  "ornament": true,
+  "files": [
+   [
+    "Amiri-Regular.ttf",
+    "400"
+   ]
+  ]
+ },
+ {
+  "family": "Reem Kufi",
+  "label": "Reem Kufi — coufique",
+  "script": "arabic",
+  "ornament": false,
+  "files": [
+   [
+    "ReemKufi-Variable.ttf",
+    "400 700"
+   ]
+  ]
+ },
+ {
+  "family": "Aref Ruqaa",
+  "label": "Aref Ruqaa — calligraphie ruqʿa",
+  "script": "arabic",
+  "ornament": false,
+  "files": [
+   [
+    "ArefRuqaa-Regular.ttf",
+    "400"
+   ]
+  ]
+ },
+ {
+  "family": "Comic Neue",
+  "label": "Comic Neue — arrondi, chaleureux",
+  "script": "latin",
+  "files": [
+   [
+    "ComicNeue-Regular.ttf",
+    "400"
+   ],
+   [
+    "ComicNeue-Bold.ttf",
+    "700"
+   ]
+  ]
+ },
+ {
+  "family": "Poppins",
+  "label": "Poppins — moderne",
+  "script": "latin",
+  "files": [
+   [
+    "Poppins-Regular.ttf",
+    "400"
+   ],
+   [
+    "Poppins-Bold.ttf",
+    "700"
+   ]
+  ]
+ },
+ {
+  "family": "Montserrat",
+  "label": "Montserrat — géométrique",
+  "script": "latin",
+  "files": [
+   [
+    "Montserrat-Variable.ttf",
+    "100 900"
+   ]
+  ]
+ },
+ {
+  "family": "Nunito",
+  "label": "Nunito — doux, très lisible",
+  "script": "latin",
+  "files": [
+   [
+    "Nunito-Variable.ttf",
+    "200 1000"
+   ]
+  ]
+ },
+ {
+  "family": "Baloo 2",
+  "label": "Baloo 2 — rond, joyeux",
+  "script": "latin",
+  "files": [
+   [
+    "Baloo2-Variable.ttf",
+    "400 800"
+   ]
+  ]
+ },
+ {
+  "family": "Playfair Display",
+  "label": "Playfair Display — élégant",
+  "script": "latin",
+  "files": [
+   [
+    "PlayfairDisplay-Variable.ttf",
+    "400 900"
+   ]
+  ]
+ },
+ {
+  "family": "Lora",
+  "label": "Lora — classique",
+  "script": "latin",
+  "files": [
+   [
+    "Lora-Variable.ttf",
+    "400 700"
+   ]
+  ]
+ },
+ {
+  "family": "Cinzel",
+  "label": "Cinzel — majuscules gravées",
+  "script": "latin",
+  "files": [
+   [
+    "Cinzel-Variable.ttf",
+    "400 900"
+   ]
+  ]
+ }
+]
