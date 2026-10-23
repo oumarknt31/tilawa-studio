@@ -82,3 +82,12 @@ def test_youtube_styles():
     for s in library.BUILTIN_STYLES:  # a style never moves the texts
         assert not set(s["style"]) & set(library.POSITION_KEYS)
     assert render.header_mode({"--header-mode": "intro"}) == "intro" and render.header_mode(None) == "top"
+
+
+def test_a_dragged_logo_place_stays_with_its_video(tmp_path):
+    from tilawa import library
+
+    lib = library.Library(tmp_path)
+    saved = lib.save_style("Mine", {"--logo-pos": "custom", "--logo-x": "250px", "--logo-y": "690px", "--logo-size": "150px"})
+    assert saved["style"] == {"--logo-size": "150px"}  # other videos get the best corner of their format
+    assert lib.save_style("Corner", {"--logo-pos": "tl"})["style"] == {"--logo-pos": "tl"}

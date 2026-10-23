@@ -37,6 +37,7 @@ VIDEOS = HOME / "Videos"
 LIB = Library(HOME)
 render.USER_FONTS = LIB.fonts_dir
 render.USER_LOGO = LIB.logo_file
+render.LOGO_AUTO = LIB.settings().get("logo_auto", True)
 LIB.fonts_dir.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Tilawa Studio")
@@ -510,7 +511,9 @@ def get_settings():
 
 @app.put("/api/settings")
 def put_settings(body: dict):
-    return LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour", "ui")})
+    s = LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour", "ui", "logo_auto")})
+    render.LOGO_AUTO = s.get("logo_auto", True)
+    return s
 
 
 @app.get("/api/styles")

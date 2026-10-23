@@ -45,8 +45,8 @@
     --emph-colors: #ffffff #a8c8ff #fff0a0 #ffb4cc #ffc888 #a4ecd8;
     --emph-weight: 700;
     --intro-accent: #86dde6;
-    --logo-pos: none;       /* none | tl | tr | bl | br */
-    --logo-size: 160px; --logo-margin: 36px; --logo-opacity: 1; --logo-round: 0;
+    --logo-pos: auto;       /* auto (best corner for the format) | tl | tr | bl | br | custom (--logo-x, --logo-y) | none */
+    --logo-opacity: 1; --logo-round: 0;  /* --logo-size: per format, in LAYOUTS */
   }
   html, body { margin: 0; padding: 0; background: transparent; }
   body { width: 1080px; height: 1920px; overflow: hidden; position: relative; transform-origin: 0 0; }
@@ -127,14 +127,10 @@
   #intro .acc { color: var(--intro-accent); }
   #intro .gap { height: calc(var(--title-size) * .45); }
 
-  /* the logo */
-  #logo { position: absolute; display: none; width: var(--logo-size); opacity: var(--logo-opacity); }
+  /* the logo: fits in a --logo-size square, placed by placeLogo() */
+  #logo { position: absolute; display: none; max-width: var(--logo-size); max-height: var(--logo-size); opacity: var(--logo-opacity); }
   body[data-logo]:not([data-logo=none]) #logo[src] { display: block; }
-  body[data-logo-round] #logo { aspect-ratio: 1; object-fit: cover; border-radius: 50%; }
-  body[data-logo=tl] #logo { top: var(--logo-margin); left: var(--logo-margin); }
-  body[data-logo=tr] #logo { top: var(--logo-margin); right: var(--logo-margin); }
-  body[data-logo=bl] #logo { bottom: var(--logo-margin); left: var(--logo-margin); }
-  body[data-logo=br] #logo { bottom: var(--logo-margin); right: var(--logo-margin); }
+  body[data-logo-round] #logo { width: var(--logo-size); height: var(--logo-size); object-fit: cover; border-radius: 50%; }
   body.noframe #frame { display: none; }
 </style>
 <style id="layout"></style>
@@ -157,6 +153,20 @@
 <script>
   // canvas size and default placement per format; the editor reads these too
   window.FORMATS = { "9:16": [1080, 1920], "16:9": [1920, 1080], "1:1": [1080, 1080], "4:5": [1080, 1350] };
+  // Where a logo goes on each format, and its size (the side of the square it fits in):
+  //   9:16  TikTok, Reels and Shorts cover ~220-290 px at the top (tabs, search, camera),
+  //         the bottom ~500-670 px (caption, account) and a column of buttons on the right;
+  //         Instagram's feed shows only the middle 4:5 (285 px cut at the top). 300 px down
+  //         on the left is clear of all of it (Shorts and Reels have more icons on the right).
+  //   16:9  YouTube puts its own channel watermark and the player controls at the bottom
+  //         right: top right is where channels put theirs.
+  //   1:1, 4:5  feeds: tags icon bottom left, sound icon bottom right; the top is clear.
+  window.LOGO_SPOTS = {
+    "9:16": { best: "tl", alt: ["tr"], size: 140, side: 60, top: 300, bottom: 720 },
+    "16:9": { best: "tr", alt: ["tl"], size: 170, side: 48, top: 40, bottom: 110 },
+    "1:1": { best: "tr", alt: ["tl"], size: 120, side: 40, top: 40, bottom: 110 },
+    "4:5": { best: "tr", alt: ["tl"], size: 130, side: 44, top: 44, bottom: 120 },
+  };
   window.LAYOUTS = {
     "9:16": { "--header-top": 140, "--block-top": 1188 },
     "16:9": { "--header-top": 46, "--block-top": 600, "--block-side": "160px", "--fr-width": "1450px", "--ar-width": "1550px",
@@ -164,6 +174,7 @@
     "1:1": { "--header-top": 56, "--block-top": 560, "--ar-gap": "18px", "--tr-gap": "34px" },
     "4:5": { "--header-top": 80, "--block-top": 760, "--ar-gap": "22px", "--tr-gap": "44px" },
   };
+  for (const [f, spot] of Object.entries(LOGO_SPOTS)) LAYOUTS[f]["--logo-size"] = spot.size + "px";
   // what the other arrangements change (16:9 measured on reference videos; other formats scaled)
   const VARIANTS = {
     cinema: {
@@ -201,12 +212,13 @@
     const b = document.body.dataset;
     b.layout = layout;
     b.header = css("--header-mode") || "top";
-    b.logo = css("--logo-pos") || "none";
+    b.logo = logoPos();
     if (parseFloat(css("--logo-round"))) b.logoRound = ""; else delete b.logoRound;
     $("header").querySelector(".zoom").classList.toggle("ink", b.header === "corner");  // the frame of the label is drawn too
     const band = $("band").querySelector(".zoom > div"), stack = $("block").querySelector(".zoom");
     if (layout === "band") band.append($("ar-box"), $("tr-line"));
     else if ($("ar-box").parentNode !== stack) stack.append($("ar-box"), $("tr-line"));
+    placeLogo();
   }
 
   // fonts: the bundled ones and those imported by the user, loaded when used
@@ -342,6 +354,7 @@
     setText($("title"), h.title);
     setText($("reciter"), h.reciter);
     $("reciter-line").style.display = h.reciter ? "" : "none";
+    placeLogo();
   };
   // block: {num, fr, ar, tr, highlight, ayah (verse number if the block ends the verse), rtl, lang} or null
   window.setBlock = function (b) {
@@ -410,7 +423,51 @@
   };
   // what stays all along (logo, band): shown or not
   window.setFrame = function (on) { document.body.classList.toggle("noframe", !on); };
-  window.setLogo = function (url) { if (url) $("logo").src = url; else $("logo").removeAttribute("src"); };
+  // the user's logo; auto: shown where the style doesn't say otherwise (else only where it says)
+  let logoAuto = true;
+  window.setLogo = function (url, auto = true) {
+    logoAuto = auto;
+    if (url) { if ($("logo").getAttribute("src") !== url) $("logo").src = url; } else $("logo").removeAttribute("src");
+    $("logo").onload = placeLogo;
+    applyLayout();
+  };
+  function logoPos() {
+    const pos = css("--logo-pos") || "auto";
+    if (pos === "auto") return logoAuto ? LOGO_SPOTS[format].best : "none";
+    return pos === "custom" && !css("--logo-x") ? LOGO_SPOTS[format].best : pos;
+  }
+  // canvas box of an element (the editor scales the whole page)
+  function box(el) {
+    const r = el.getBoundingClientRect(), p = document.body.getBoundingClientRect(), k = p.width / document.body.offsetWidth || 1;
+    return { l: (r.left - p.left) / k, t: (r.top - p.top) / k, r: (r.right - p.left) / k, b: (r.bottom - p.top) / k };
+  }
+  // where the logo goes for a position: the format's spot, moved off the title or the band if they are in the way
+  window.logoRect = function (pos) {
+    const img = $("logo"), [W, H] = FORMATS[format], spot = LOGO_SPOTS[format];
+    const size = parseFloat(css("--logo-size")) || spot.size;
+    const nw = img.naturalWidth || 1, nh = img.naturalHeight || 1, round = document.body.dataset.logoRound !== undefined;
+    const w = round ? size : nw >= nh ? size : size * nw / nh, h = round ? size : nh >= nw ? size : size * nh / nw;
+    if (pos === "custom") return { x: parseFloat(css("--logo-x")) || 0, y: parseFloat(css("--logo-y")) || 0, w, h };
+    let x = pos[1] === "l" ? spot.side : W - spot.side - w, y = pos[0] === "t" ? spot.top : H - spot.bottom - h;
+    const obstacles = [];
+    if (getComputedStyle($("header")).display !== "none") {
+      const parts = [...$("header").querySelectorAll(".o, #mic")].filter(e => e.getClientRects().length).map(box);
+      if (document.body.dataset.header === "corner") parts.push(box($("header").querySelector(".zoom")));
+      if (parts.length) obstacles.push({ l: Math.min(...parts.map(q => q.l)), t: Math.min(...parts.map(q => q.t)),
+                                         r: Math.max(...parts.map(q => q.r)), b: Math.max(...parts.map(q => q.b)) });
+    }
+    if (document.body.dataset.layout === "band") obstacles.push(box($("band-bg")));
+    for (const o of obstacles) {
+      if (x < o.r + 16 && x + w > o.l - 16 && y < o.b + 16 && y + h > o.t - 16) y = pos[0] === "t" ? o.b + 20 : o.t - 20 - h;
+    }
+    return { x, y, w, h };
+  };
+  function placeLogo() {
+    const pos = document.body.dataset.logo;
+    if (!$("logo").getAttribute("src") || pos === "none") return;
+    const q = logoRect(pos);
+    Object.assign($("logo").style, { left: q.x + "px", top: q.y + "px" });
+  }
 
   // style overrides: {"--block-top": "1150px", ...}; keys left out go back to the defaults
   window.setStyle = function (vars) {
@@ -427,6 +484,7 @@
     if ($("logo").getAttribute("src") && !$("logo").complete) await new Promise(r => { $("logo").onload = $("logo").onerror = r; });
     await new Promise(r => requestAnimationFrame(() => r()));
     await document.fonts.ready;
+    placeLogo();  // the title's final width
   };
   applyLayout();
 </script>

@@ -80,7 +80,13 @@ L'installation télécharge les composants, le modèle de reconnaissance de la r
        petites capitales ; épaisseur du contour (ou simple ombre douce) ;
      - titre et récitateur en haut, en petite **étiquette dans un coin**, ou en **cartes d'intro** avant la
        récitation (la sourate, « Chapitre 2 du noble Coran », « Récitée par… » ; ▶ *Voir l'intro*) ;
-     - ton **logo** (chaîne, page) dans un coin : importé une fois, gardé pour toutes tes vidéos.
+     - ton **logo** (chaîne, page) : importé une fois, il va sur toutes tes vidéos, dans tous les formats, au
+       meilleur endroit : en haut à gauche en vertical (sous la barre du haut de TikTok, Reels et Shorts, loin
+       de leurs boutons et de la légende, gardé dans l'aperçu 4:5 d'Instagram), en haut à droite en 16:9 (YouTube
+       met son propre filigrane et la barre de lecture en bas à droite) et dans les posts carrés et portrait.
+       Il se décale si le titre est sur son chemin. La section *Logo* montre les suggestions pour le format avec
+       un petit aperçu (survole-en une pour la voir sur la vidéo) ; choisis un autre coin, fais-le glisser sur
+       l'aperçu, pince pour changer sa taille, *Pas de logo* pour une vidéo, ou décoche *Sur toutes mes vidéos*.
    - **Audio** : début et fin de la vidéo (*Couper les silences* en un clic), fondus du son,
      **volume optimisé pour les réseaux** (−14 LUFS, le niveau de YouTube, TikTok et Instagram).
    - **Export** : format (ou une copie du projet dans un autre format), résolution, qualité,

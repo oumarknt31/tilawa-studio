@@ -80,7 +80,13 @@ The installation downloads the components, the recitation recognition model
        outline thickness (or just a soft shadow);
      - title and reciter at the top, as a small **label in a corner**, or as **intro cards** before the
        recitation (the surah, "Chapter 2 of the Noble Quran", "Recited by…"; ▶ *Preview the intro*);
-     - your **logo** (channel, page) in a corner: imported once, kept for all your videos.
+     - your **logo** (channel, page): imported once, it goes on all your videos, in every format, at the
+       best place for it: top left in vertical videos (below the top bar of TikTok, Reels and Shorts, clear
+       of their buttons and caption, kept in Instagram's 4:5 preview), top right in 16:9 (YouTube puts its own
+       watermark and the playback bar at the bottom right) and in square and portrait posts. It moves off the
+       title if they would overlap. The *Logo* section shows the suggestions for the format with a small
+       preview (hover over one to see it on the video); choose another corner, drag it on the preview, pinch
+       to resize it, *No logo* for one video, or untick *On all my videos*.
    - **Audio**: start and end of the video (*Cut the silences* in one click), sound fades,
      **loudness optimised for social media** (−14 LUFS, the level of YouTube, TikTok and Instagram).
    - **Export**: format (or a copy of the project in another format), resolution, quality,

@@ -16,7 +16,8 @@ PKG = Path(__file__).parent
 # and in the page: only plain names are accepted
 _SAFE_FAMILY = re.compile(r"^[\w .-]{1,60}$")
 
-POSITION_KEYS = ("--header-top", "--header-x", "--block-top", "--block-x", "--header-zoom", "--block-zoom", "--band-top")
+POSITION_KEYS = ("--header-top", "--header-x", "--block-top", "--block-x", "--header-zoom", "--block-zoom", "--band-top",
+                 "--logo-x", "--logo-y")
 
 
 def _grad(a: str, b: str) -> str:
@@ -141,8 +142,10 @@ class Library:
         sid = re.sub(r"[^\w-]+", "-", name.lower()).strip("-")[:40] or "style"
         if any(s["id"] == sid for s in BUILTIN_STYLES) or (self.styles_dir / f"{sid}.json").exists():
             sid += "-" + uuid.uuid4().hex[:4]
-        data = {"name": name.strip()[:60] or "Mon style",
-                "style": {k: str(v) for k, v in style.items() if k.startswith("--") and k not in POSITION_KEYS}}
+        style = {k: str(v) for k, v in style.items() if k.startswith("--") and k not in POSITION_KEYS}
+        if style.get("--logo-pos") == "custom":  # a place dragged on one video: other videos get the best corner
+            del style["--logo-pos"]
+        data = {"name": name.strip()[:60] or "Mon style", "style": style}
         (self.styles_dir / f"{sid}.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         return data | {"id": sid, "builtin": False}
 

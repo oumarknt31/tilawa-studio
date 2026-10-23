@@ -26,6 +26,7 @@ PKG = Path(__file__).parent
 ORIGIN = "http://tilawa.local"
 USER_FONTS: Path | None = None  # fonts imported by the user (set by the app)
 USER_LOGO: Path | None = None  # the user's logo, a PNG (set by the app)
+LOGO_AUTO = True  # the logo goes on every video (where its style doesn't place or remove it)
 RUNNING: set = set()  # ffmpeg encodes in progress (stopped if the app quits)
 
 # aspect -> overlay canvas: texts are laid out on this canvas (in CSS pixels)
@@ -113,7 +114,7 @@ class OverlayRenderer:
         self.page.evaluate("window.ready")
         self.page.evaluate("(f) => setCanvas(f, window.innerHeight)", fmt)
         if USER_LOGO and USER_LOGO.is_file():
-            self.page.evaluate("(u) => setLogo(u)", f"{ORIGIN}/userlogo/logo.png?v={USER_LOGO.stat().st_mtime_ns}")
+            self.page.evaluate("([u, a]) => setLogo(u, a)", [f"{ORIGIN}/userlogo/logo.png?v={USER_LOGO.stat().st_mtime_ns}", LOGO_AUTO])
 
     def cards(self, title: str, reciter: str, surah: int, lang: str) -> list[dict]:
         """The title cards shown before the recitation (made by the page)."""

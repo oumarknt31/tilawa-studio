@@ -208,7 +208,7 @@ def make_still(p: Project, t: float, out_dir: Path, progress: Progress | None = 
                          p.get_background(), p.media_dir, p.format, p.lang, p.surah)
 
 
-POSITION_KEYS = ("--header-top", "--header-x", "--block-top", "--block-x", "--band-top")
+POSITION_KEYS = ("--header-top", "--header-x", "--block-top", "--block-x", "--band-top", "--logo-x", "--logo-y")
 
 
 def convert_format(p: Project, fmt: str) -> None:
@@ -219,6 +219,8 @@ def convert_format(p: Project, fmt: str) -> None:
     old = p.format
     p.format = fmt
     p.style = {k: v for k, v in p.style.items() if k not in POSITION_KEYS}
+    if p.style.get("--logo-pos") == "custom":  # dragged by hand: the new format's best corner
+        del p.style["--logo-pos"]
     if p.background:
         for c in p.background["clips"]:
             if c["src"] == "original":
