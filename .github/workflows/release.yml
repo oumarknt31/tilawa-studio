@@ -1,0 +1,118 @@
+name: Release
+
+# Push a version tag (git tag v1.0.0 && git push origin v1.0.0) to build the
+# desktop app for macOS (Apple Silicon) and Windows, check that each build
+# works and installs with the one-line installers, and publish them as a
+# GitHub Release with SHA256SUMS.txt. "Run workflow" builds and tests without
+# publishing.
+#
+# File names carry no version, so the installers can always download
+# https://github.com/oumarknt31/tilawa-studio/releases/latest/download/<file>.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15, name: macOS }
+          - { os: windows-latest, name: Windows }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Build the app
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', github.sha) }}
+        run: uv run --no-project python packaging/build.py --version "${VERSION:0:20}"
+
+      - name: Check the build works (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          APP="dist/Tilawa Studio.app/Contents"
+          PYTHONHOME="$APP/Resources/python" "$APP/MacOS/tilawa-python" -m tilawa.cli smoke
+      - name: Check the build works (Windows)
+        if: runner.os == 'Windows'
+        run: '& "dist\Tilawa Studio\python\python.exe" -m tilawa.cli smoke'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TilawaStudio-${{ matrix.name }}
+          path: dist/TilawaStudio-${{ matrix.name }}.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  # the one-line installers, run as a friend would, against the builds above
+  install:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15, name: macOS }
+          - { os: windows-latest, name: Windows }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: TilawaStudio-${{ matrix.name }}
+          path: release
+      - name: Serve the build like a release
+        shell: bash
+        run: |
+          cd release
+          if command -v sha256sum >/dev/null; then sha256sum TilawaStudio-* > SHA256SUMS.txt; else shasum -a 256 TilawaStudio-* > SHA256SUMS.txt; fi
+          cat SHA256SUMS.txt
+          python3 -m http.server 8000 >/dev/null 2>&1 &
+          sleep 2
+      - name: Install (macOS)
+        if: runner.os == 'macOS'
+        env: { TILAWA_RELEASE_URL: "http://127.0.0.1:8000", TILAWA_NO_OPEN: "1", TILAWA_NO_SETUP: "1" }
+        run: |
+          bash install.sh
+          APP="$HOME/Applications/Tilawa Studio.app/Contents"
+          PYTHONHOME="$APP/Resources/python" "$APP/MacOS/tilawa-python" -m tilawa.cli smoke
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        env: { TILAWA_RELEASE_URL: "http://127.0.0.1:8000", TILAWA_NO_OPEN: "1", TILAWA_NO_SETUP: "1" }
+        run: |
+          Get-Content install.ps1 -Raw | Invoke-Expression
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\Tilawa Studio'
+          & "$app\python\python.exe" -m tilawa.cli smoke
+          if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
+          $lnk = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Tilawa Studio.lnk'
+          if (-not (Test-Path $lnk)) { throw "no Start menu shortcut" }
+
+  release:
+    needs: [build, install]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only this job may create the release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Checksums
+        working-directory: assets
+        run: sha256sum TilawaStudio-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" assets/* --title "Tilawa Studio $TAG" --notes-file packaging/RELEASE_NOTES.md

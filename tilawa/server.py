@@ -716,8 +716,9 @@ def _already_running(url: str) -> bool:
 
 def _warmup():
     try:
-        from . import align
+        from . import align, firstrun
 
+        firstrun.ensure_browser()  # an update may need another version of it
         align.get_model()
     except Exception:
         traceback.print_exc()

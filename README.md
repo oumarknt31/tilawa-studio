@@ -15,35 +15,43 @@ The interface is in English or French (**FR | EN** switch at the top right).
 
 ## Installation (once)
 
-You need an **Apple Silicon Mac (M1 or newer)** or a **Windows 10/11 PC**, about
-**5 GB of free space** and an internet connection for the installation.
+You need an **Apple Silicon Mac (M1 or newer)** or a **Windows 10/11 PC**, about **4 GB of free space**
+and an internet connection. Nothing else to install: the app comes ready to use.
 
-- **Mac**: open the *Terminal* app, paste this line and press Enter:
+**On a Mac**
 
-  ```bash
-  curl -LsSf https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.sh | bash
-  ```
+1. Open the **Terminal** app: press ⌘ (command) + Space, type `Terminal`, press Enter.
+2. Copy this line, paste it in the Terminal window (⌘ + V) and press Enter:
 
-  At the end, **Tilawa Studio** is in your Applications folder (Launchpad, Spotlight, and you can keep
-  it in the Dock) and opens in its own window. Updates are then done **from inside the app**
-  (a ✨ *Update* button appears when a new version is out); your projects and videos are kept.
+   ```bash
+   curl -LsSf https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.sh | bash
+   ```
 
-  If you downloaded the ZIP from GitHub instead: double-click `Installer (Mac).command`.
-  If the Mac refuses to open it: *System Settings* → *Privacy & Security* → *Open Anyway*.
-- **Windows**: download the ZIP (green *Code* button → *Download ZIP*), unzip it,
-  then double-click `Installer (Windows).bat`.
-  If Windows shows "Windows protected your PC": *More info* → *Run anyway*.
-  At the end, **Tilawa Studio** is in the Start menu and on the desktop.
+**On Windows**
 
-The installation downloads the components, the recitation recognition model
-(~1.2 GB) and ffmpeg. Allow 5 to 15 minutes depending on the connection.
+1. Open **PowerShell**: click the Start menu, type `PowerShell`, press Enter.
+2. Copy this line, paste it in the PowerShell window (right-click or Ctrl + V) and press Enter:
+
+   ```powershell
+   irm https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.ps1 | iex
+   ```
+
+The installation downloads the app (~500 MB) and, the first time only, the recitation recognition
+model (~1.2 GB): allow 5 to 15 minutes depending on the connection, and keep the window open until
+"Tilawa Studio is installed". The app then opens by itself.
+
+Afterwards, **Tilawa Studio** is in your Applications folder (Launchpad, Spotlight; you can keep it in the
+Dock) or in the Start menu and on the desktop. **Updates are done from inside the app**: when a new
+version is out, a ✨ *Update* button appears at the top; one click and the app restarts on the new version.
+Your projects and videos are kept. (Running the same line again also installs the latest version.)
+
+No security warning appears: the line downloads the app the way macOS and Windows trust, unlike a file
+downloaded in a browser.
 
 ## Use
 
 1. Open **Tilawa Studio** like any app (Launchpad, Spotlight, Dock / Start menu, desktop).
    It opens in its own window; closing the window quits the app (it asks first if a video is being made).
-   To use it in a browser instead: `Tilawa Studio.command` (Mac) or `Tilawa Studio.bat` (Windows),
-   keeping the black window open.
 2. **Drop a video** (or paste a YouTube / Instagram / TikTok link, or drop an mp3 / m4a… audio file),
    then choose the **format**, the **translation**, the **style** and the reciter's name.
    The surah and verses are **detected automatically** (you can also choose them yourself).
@@ -128,7 +136,14 @@ Shortcuts: `Space` play/pause, `←` `→` previous/next subtitle, `⌘Z` / `Ctr
 
 HDR videos (iPhone) are converted automatically so the text keeps the right brightness.
 
-## Command line
+## For developers
+
+From the source code (needs [uv](https://docs.astral.sh/uv/)): `uv sync`, then `uv run tilawa desktop`
+(or `uv run tilawa` for the browser). A version tag (`git tag v1.2.0 && git push origin v1.2.0`) makes
+GitHub build the app for macOS and Windows, test it with the installers, and publish it as a release
+(`.github/workflows/release.yml`, `packaging/build.py`); the apps already installed then offer the update.
+
+Command line:
 
 ```bash
 uv run tilawa make video.mp4 --reciter "Muhammad Dibirov"            # surah and verses detected

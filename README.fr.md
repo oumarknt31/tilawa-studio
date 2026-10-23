@@ -15,35 +15,43 @@ L'interface est en français ou en anglais (bouton **FR | EN** en haut à droite
 
 ## Installation (une seule fois)
 
-Il faut un **Mac Apple Silicon (M1 ou plus récent)** ou un **PC Windows 10/11**, environ
-**5 Go d'espace libre** et une connexion internet pour l'installation.
+Il faut un **Mac Apple Silicon (M1 ou plus récent)** ou un **PC Windows 10/11**, environ **4 Go d'espace libre**
+et une connexion internet. Rien d'autre à installer : l'app arrive prête à l'emploi.
 
-- **Mac** : ouvre l'application *Terminal*, colle cette ligne et appuie sur Entrée :
+**Sur Mac**
 
-  ```bash
-  curl -LsSf https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.sh | bash
-  ```
+1. Ouvre l'application **Terminal** : appuie sur ⌘ (cmd) + Espace, tape `Terminal`, appuie sur Entrée.
+2. Copie cette ligne, colle-la dans la fenêtre du Terminal (⌘ + V) et appuie sur Entrée :
 
-  À la fin, **Tilawa Studio** est dans ton dossier Applications (Launchpad, Spotlight, et tu peux le garder
-  dans le Dock) et s'ouvre dans sa propre fenêtre. Les mises à jour se font ensuite **depuis l'app**
-  (un bouton ✨ *Mise à jour* apparaît quand une nouvelle version sort) ; tes projets et vidéos sont conservés.
+   ```bash
+   curl -LsSf https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.sh | bash
+   ```
 
-  Si tu as plutôt téléchargé le ZIP depuis GitHub : double-clic sur `Installer (Mac).command`.
-  Si le Mac refuse de l'ouvrir : *Réglages Système* → *Confidentialité et sécurité* → *Ouvrir quand même*.
-- **Windows** : télécharge le ZIP (bouton vert *Code* → *Download ZIP*), décompresse-le,
-  puis double-clic sur `Installer (Windows).bat`.
-  Si Windows affiche « Windows a protégé votre ordinateur » : *Informations complémentaires* → *Exécuter quand même*.
-  À la fin, **Tilawa Studio** est dans le menu Démarrer et sur le bureau.
+**Sur Windows**
 
-L'installation télécharge les composants, le modèle de reconnaissance de la récitation
-(~1,2 Go) et ffmpeg. Compte 5 à 15 minutes selon la connexion.
+1. Ouvre **PowerShell** : clique sur le menu Démarrer, tape `PowerShell`, appuie sur Entrée.
+2. Copie cette ligne, colle-la dans la fenêtre PowerShell (clic droit ou Ctrl + V) et appuie sur Entrée :
+
+   ```powershell
+   irm https://raw.githubusercontent.com/oumarknt31/tilawa-studio/main/install.ps1 | iex
+   ```
+
+L'installation télécharge l'app (~500 Mo) et, la première fois seulement, le modèle de reconnaissance de la
+récitation (~1,2 Go) : compte 5 à 15 minutes selon la connexion, et garde la fenêtre ouverte jusqu'à
+« Tilawa Studio est installé ». L'app s'ouvre ensuite toute seule.
+
+Ensuite, **Tilawa Studio** est dans ton dossier Applications (Launchpad, Spotlight ; tu peux le garder dans le
+Dock) ou dans le menu Démarrer et sur le bureau. **Les mises à jour se font depuis l'app** : quand une nouvelle
+version sort, un bouton ✨ *Mettre à jour* apparaît en haut ; un clic et l'app redémarre sur la nouvelle version.
+Tes projets et vidéos sont conservés. (Relancer la même ligne installe aussi la dernière version.)
+
+Aucun avertissement de sécurité n'apparaît : la ligne télécharge l'app d'une façon à laquelle macOS et Windows
+font confiance, contrairement à un fichier téléchargé dans un navigateur.
 
 ## Utilisation
 
 1. Ouvre **Tilawa Studio** comme n'importe quelle app (Launchpad, Spotlight, Dock / menu Démarrer, bureau).
    Il s'ouvre dans sa propre fenêtre ; fermer la fenêtre quitte l'app (elle demande d'abord si une vidéo est en cours).
-   Pour l'utiliser plutôt dans un navigateur : `Tilawa Studio.command` (Mac) ou `Tilawa Studio.bat` (Windows),
-   en laissant la fenêtre noire ouverte.
 2. **Dépose une vidéo** (ou colle un lien YouTube / Instagram / TikTok, ou dépose un audio mp3 / m4a…),
    puis choisis le **format**, la **traduction**, le **style** et le nom du récitateur.
    La sourate et les versets sont **détectés automatiquement** (tu peux aussi les choisir toi-même).
@@ -128,7 +136,14 @@ Raccourcis : `Espace` lecture/pause, `←` `→` sous-titre précédent/suivant,
 
 Les vidéos HDR (iPhone) sont converties automatiquement pour que le texte garde la bonne luminosité.
 
-## En ligne de commande
+## Pour les développeurs
+
+Depuis le code source (il faut [uv](https://docs.astral.sh/uv/)) : `uv sync`, puis `uv run tilawa desktop`
+(ou `uv run tilawa` pour le navigateur). Une étiquette de version (`git tag v1.2.0 && git push origin v1.2.0`)
+fait construire l'app par GitHub pour macOS et Windows, la teste avec les installateurs et la publie
+(`.github/workflows/release.yml`, `packaging/build.py`) ; les apps déjà installées proposent alors la mise à jour.
+
+En ligne de commande :
 
 ```bash
 uv run tilawa make video.mp4 --reciter "Muhammad Dibirov"            # sourate et versets détectés

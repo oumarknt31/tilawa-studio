@@ -2,6 +2,8 @@
 
   tilawa                      open the app in the browser
   tilawa desktop              open the app in its own window
+  tilawa setup                download what the app needs once (model, text drawing engine)
+  tilawa smoke                check that this copy of the app works
   tilawa make SOURCE [--surah 23 --from 84] --reciter "Muhammad Dibirov" [--format 16:9 --lang en]
 """
 
@@ -62,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
     app.add_argument("--no-browser", action="store_true")
     d = sub.add_parser("desktop", help="open the app in its own window")
     d.add_argument("--port", type=int, default=8765)
+    sub.add_parser("setup", help="download the recitation model and the text drawing engine (once)")
+    sub.add_parser("smoke", help="check that this copy of the app works")
     m = sub.add_parser("make", help="make a video without the editor")
     m.add_argument("source", help="video file or link (YouTube, Instagram, TikTok...)")
     m.add_argument("--surah", type=int, default=0, help="found in the recitation if omitted")
@@ -84,8 +88,16 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.cmd == "make":
         return make(args)
+    if args.cmd in ("setup", "smoke"):
+        from . import firstrun
+
+        return firstrun.setup() if args.cmd == "setup" else firstrun.smoke()
     if args.cmd == "desktop":
         from . import desktop
+
+        if sys.stdout is None:  # pythonw (Windows shortcut): no console, write to a log file
+            (HOME / "logs").mkdir(parents=True, exist_ok=True)
+            sys.stdout = sys.stderr = open(HOME / "logs" / "app.log", "a", encoding="utf-8", buffering=1)
 
         desktop.run(port=args.port)
         return 0

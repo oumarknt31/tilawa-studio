@@ -1,10 +1,11 @@
-.venv/
 __pycache__/
-*.pyc
-/output/
-/work/
 .DS_Store
 .pytest_cache/
 .serena/
-research_notes/
+.venv/
+*.pyc
+/output/
+/work/
+dist/
 reports/
+research_notes/

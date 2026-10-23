@@ -18,8 +18,19 @@ NAME = "Tilawa Studio"
 
 
 def _python() -> Path:
+    from . import update
+
+    if update.kind() == "app":  # the built app: its own Python (pythonw: no console window)
+        exe = Path(sys.executable).resolve()
+        return exe.with_name("pythonw.exe") if os.name == "nt" else exe
     venv = APP_DIR / ".venv"
     return venv / ("Scripts/pythonw.exe" if os.name == "nt" else "bin/python")
+
+
+def _workdir() -> Path:
+    from . import update
+
+    return update.app_path() if update.kind() == "app" else APP_DIR
 
 
 def mac_app(dest: Path | None = None) -> Path:
@@ -69,13 +80,17 @@ def windows_shortcuts() -> list[Path]:
     for lnk in targets:
         ps = (f"$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}'); "
               f"$s.TargetPath = '{_python()}'; $s.Arguments = '-m tilawa.cli desktop'; "
-              f"$s.WorkingDirectory = '{APP_DIR}'; $s.IconLocation = '{ASSETS / 'icon.ico'}'; $s.Save()")
+              f"$s.WorkingDirectory = '{_workdir()}'; $s.IconLocation = '{ASSETS / 'icon.ico'}'; $s.Save()")
         subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True)
     return targets
 
 
 def install() -> list[Path]:
+    from . import update
+
     if sys.platform == "darwin":
+        if update.kind() == "app":  # the built app is already the app
+            return [update.app_path()]
         return [mac_app()]
     if os.name == "nt":
         return windows_shortcuts()
