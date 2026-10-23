@@ -76,8 +76,8 @@ jobs:
         env: { TILAWA_RELEASE_URL: "http://127.0.0.1:8000", TILAWA_NO_OPEN: "1", TILAWA_NO_SETUP: "1" }
         run: |
           (cd release && shasum -a 256 TilawaStudio-* > SHA256SUMS.txt && cat SHA256SUMS.txt)
-          (cd release && python3 -m http.server 8000 >/dev/null 2>&1 &)
-          sleep 2
+          (cd release && python3 -m http.server 8000 --bind 127.0.0.1 >/dev/null 2>&1 &)
+          for _ in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8000/SHA256SUMS.txt && break; sleep 1; done
           bash install.sh
           APP="$HOME/Applications/Tilawa Studio.app/Contents"
           PYTHONHOME="$APP/Resources/python" "$APP/MacOS/tilawa-python" -m tilawa.cli smoke
