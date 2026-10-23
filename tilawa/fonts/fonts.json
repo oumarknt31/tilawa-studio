@@ -92,12 +92,53 @@
   "script": "latin",
   "files": [
    [
+    "Poppins-Light.ttf",
+    "300"
+   ],
+   [
     "Poppins-Regular.ttf",
     "400"
    ],
    [
+    "Poppins-SemiBold.ttf",
+    "600"
+   ],
+   [
     "Poppins-Bold.ttf",
     "700"
+   ]
+  ]
+ },
+ {
+  "family": "Open Sans",
+  "label": "Open Sans — net, lisible",
+  "script": "latin",
+  "files": [
+   [
+    "OpenSans-Variable.ttf",
+    "300 800"
+   ]
+  ]
+ },
+ {
+  "family": "Arimo",
+  "label": "Arimo — comme Arial",
+  "script": "latin",
+  "files": [
+   [
+    "Arimo-Variable.ttf",
+    "400 700"
+   ]
+  ]
+ },
+ {
+  "family": "Oswald",
+  "label": "Oswald — titres serrés",
+  "script": "latin",
+  "files": [
+   [
+    "Oswald-Variable.ttf",
+    "200 700"
    ]
   ]
  },

@@ -36,6 +36,7 @@ PROJECTS = HOME / "projects"
 VIDEOS = HOME / "Videos"
 LIB = Library(HOME)
 render.USER_FONTS = LIB.fonts_dir
+render.USER_LOGO = LIB.logo_file
 LIB.fonts_dir.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Tilawa Studio")
@@ -555,6 +556,36 @@ def add_font(file: UploadFile = File(...)):
 def delete_font(family: str):
     LIB.delete_font(family)
     return {"ok": True}
+
+
+@app.post("/api/logo")
+def set_logo(file: UploadFile = File(...)):
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in media.IMAGE_EXTS:
+        raise UserError("bad_logo")
+    tmp = HOME / f".logo-import{ext}"
+    HOME.mkdir(parents=True, exist_ok=True)
+    with tmp.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    try:
+        return LIB.set_logo(tmp)
+    except Exception:
+        traceback.print_exc()
+        raise UserError("unreadable_media")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+@app.delete("/api/logo")
+def delete_logo():
+    return LIB.delete_logo()
+
+
+@app.get("/userlogo/logo.png")
+def logo():
+    if not LIB.logo_file.is_file():
+        raise HTTPException(404)
+    return FileResponse(LIB.logo_file, media_type="image/png", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/overlay.html")

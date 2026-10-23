@@ -206,6 +206,9 @@
 
   /* style themes and fonts */
   .themes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .themes-head { font-size: 12px; color: var(--muted); margin: 12px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+  .themes-head:first-child { margin-top: 0; }
+  .logo-thumb { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #050708; border: 1px solid var(--line-2); }
   .theme { position: relative; border: 1px solid var(--line-2); border-radius: 12px; padding: 10px; cursor: pointer; background: #050708; text-align: center; overflow: hidden; }
   .theme:hover { border-color: var(--accent); }
   .theme .t1 { font-size: 15px; font-weight: 700; -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap; overflow: hidden; }
@@ -495,7 +498,7 @@
         <button class="small" onclick="saveStyle()" title="réutiliser ce style dans d'autres vidéos"><svg class="i" style="width:14px"><use href="#i-plus"/></svg>Enregistrer mon style</button></div>
       <div class="section">
         <div class="sh"><h3>Thèmes</h3><span class="muted small">clic = appliquer · ★ = par défaut</span></div>
-        <div id="themes" class="themes"></div>
+        <div id="themes"></div>
       </div>
       <div class="section">
         <div class="sh"><h3>Titre et récitateur</h3><label class="toggle"><input id="r-header" type="checkbox" onchange="setRender()"> Afficher</label></div>
@@ -507,6 +510,14 @@
         <div class="fontpick" id="font-title"></div>
         <div class="sizes" style="margin-top:10px">${SIZE:title:Titre}${SIZE:reciter:Récitateur}</div>
         <div id="colors-title" style="margin-top:8px"></div>
+        <label style="margin-top:12px">Affichage</label>
+        <div class="seg-ctl" id="header-mode">
+          <button data-v="top" onclick="setLook('--header-mode', null)">En haut</button>
+          <button data-v="corner" onclick="setLook('--header-mode', 'corner')">Étiquette dans un coin</button>
+          <button data-v="intro" onclick="setLook('--header-mode', 'intro')">Cartes d'intro</button>
+        </div>
+        <div id="intro-row" class="row hidden" style="margin-top:8px"><button class="small" onclick="previewIntro()">▶ Voir l'intro</button>
+          <span class="faint small" id="intro-note"></span></div>
         <label style="margin-top:12px">Position</label>
         <div class="xform">${XFORM:hdr}</div>
       </div>
@@ -535,14 +546,68 @@
           <label class="toggle"><input type="checkbox" id="show-num" onchange="setLook('--num-display', this.checked ? null : 'none')"> Numéro au-dessus (« 12. »)</label>
           <label class="toggle"><input type="checkbox" id="show-tr" onchange="setLook('--tr-display', this.checked ? null : 'none')"> Phonétique</label>
         </div>
+        <label style="margin-top:12px">Mots importants</label>
+        <div class="seg-ctl" id="emph">
+          <button data-v="none" onclick="setLook('--emph', null)">Normal</button>
+          <button data-v="bold" onclick="setLook('--emph', 'bold')">En gras</button>
+          <button data-v="color" onclick="setLook('--emph', 'color')">En couleurs</button>
+        </div>
+        <p class="faint small" style="margin:6px 0 0">Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde*</p>
+        <div class="row" style="margin-top:10px">
+          <label class="toggle"><input type="checkbox" id="fr-upper" onchange="setLook('--fr-case', this.checked ? 'uppercase' : null)"> MAJUSCULES</label>
+          <label class="toggle"><input type="checkbox" id="fr-smallcaps" onchange="setLook('--fr-variant', this.checked ? 'small-caps' : null)"> Petites capitales</label>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <div class="field"><label>Police du numéro</label><select id="font-num" onchange="setFontVar('--num-font', this.value)"></select></div>
+          <div class="field"><label>Police de la phonétique</label><select id="font-tr" onchange="setFontVar('--tr-font', this.value)"></select></div>
+        </div>
         <div id="colors-text" style="margin-top:8px"></div>
       </div>
       <div class="section">
         <div class="sh"><h3>Bloc des sous-titres</h3></div>
+        <label>Disposition</label>
+        <div class="seg-ctl" id="layout-ctl">
+          <button data-v="stack" onclick="setLayout(null)">Empilée</button>
+          <button data-v="cinema" onclick="setLayout('cinema')">Arabe en haut</button>
+          <button data-v="band" onclick="setLayout('band')">Bandeau en bas</button>
+        </div>
+        <div id="band-row" class="grid2 hidden" style="margin-top:10px">
+          <div><label>Opacité du bandeau</label><input type="range" id="band-alpha" min="0" max="0.9" step="0.05" oninput="setBand(this.value)"></div>
+          <div class="xform"><label>Position du bandeau</label>
+            <div class="nf"><span class="scrub" data-scrub="band.y">Y</span><input type="number" step="1" data-ctl="band.y"><span class="unit">px</span></div></div>
+        </div>
+        <label style="margin-top:12px">Position</label>
         <div class="xform">${XFORM:blk}</div>
         <div class="grid2" style="margin-top:12px">
           <div><label>Fondu d'apparition (s)</label><input id="r-fade" type="number" step="0.05" min="0" max="1" onchange="setRender()"></div>
           <div><label>Contour</label><div id="colors-outline"></div></div>
+        </div>
+        <label style="margin-top:10px">Épaisseur du contour</label>
+        <select id="stroke" onchange="setLook('--stroke', this.value === '1' ? null : this.value)">
+          <option value="0">Aucun (ombre douce)</option><option value="0.5">Léger</option><option value="1">Normal</option><option value="1.6">Épais</option>
+        </select>
+      </div>
+      <div class="section">
+        <div class="sh"><h3>Logo</h3><span class="muted small">ta chaîne, ta page</span></div>
+        <div class="row"><img id="logo-thumb" class="logo-thumb hidden" alt="">
+          <button class="small" onclick="$('logo-file').click()"><svg class="i" style="width:14px"><use href="#i-upload"/></svg><span id="logo-btn">Importer mon logo</span></button>
+          <button class="small ghost hidden" id="logo-del" onclick="deleteLogo()">Retirer</button></div>
+        <input id="logo-file" type="file" accept="image/*,.heic,.heif" class="hidden" onchange="importLogo(this.files[0])">
+        <p class="faint small" id="logo-hint" style="margin:8px 0 0">Importe d'abord ton logo (png, jpg…). Il est gardé pour toutes tes vidéos.</p>
+        <div id="logo-opts" class="hidden" style="margin-top:10px">
+          <label>Position</label>
+          <div class="seg-ctl" id="logo-pos">
+            <button data-v="none" onclick="setLook('--logo-pos', null)">Aucun</button>
+            <button data-v="tl" onclick="setLook('--logo-pos', 'tl')" title="en haut à gauche">↖</button>
+            <button data-v="tr" onclick="setLook('--logo-pos', 'tr')" title="en haut à droite">↗</button>
+            <button data-v="bl" onclick="setLook('--logo-pos', 'bl')" title="en bas à gauche">↙</button>
+            <button data-v="br" onclick="setLook('--logo-pos', 'br')" title="en bas à droite">↘</button>
+          </div>
+          <div class="grid2" style="margin-top:10px">
+            <div class="sizes">${SIZE:logo:Taille}</div>
+            <div><label>Opacité</label><input type="range" id="logo-alpha" min="0.2" max="1" step="0.05" oninput="setLogoAlpha(this.value)"></div>
+          </div>
+          <label class="toggle" style="margin-top:8px"><input type="checkbox" id="logo-round" onchange="setLook('--logo-round', this.checked ? '1' : null)"> Rond</label>
         </div>
       </div>
       <button class="ghost small" onclick="resetTexts()">Tout remettre par défaut</button>
@@ -869,6 +934,28 @@ const EN = {
     "Brings the recitation to the standard level of YouTube, TikTok and Instagram (−14 LUFS) with a single volume change: the reciter's nuances stay intact.",
   "Silences coupés : la vidéo commence et finit avec la récitation": "Silences cut: the video starts and ends with the recitation",
   // export
+  // YouTube styles, layouts, key words, title cards, logo
+  "Pour YouTube (horizontal)": "For YouTube (horizontal)", "Tous formats": "All formats", "Affichage": "Display",
+  "En haut": "At the top", "Étiquette dans un coin": "Label in a corner", "Cartes d'intro": "Intro cards",
+  "▶ Voir l'intro": "▶ Preview the intro",
+  "{n} cartes avant la récitation : la vidéo commence {s} s plus tôt.": "{n} cards before the recitation: the video starts {s} s earlier.",
+  "Mots importants": "Key words", "Normal": "Normal", "En gras": "Bold", "En couleurs": "In colour",
+  "Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde*":
+    "Pick them yourself by putting asterisks around them in the subtitle: *mercy*",
+  "MAJUSCULES": "CAPITALS", "Petites capitales": "Small caps", "Police du numéro": "Number font",
+  "Police de la phonétique": "Transliteration font", "Comme la traduction": "Same as the translation",
+  "Disposition": "Layout", "Empilée": "Stacked", "Arabe en haut": "Arabic on top", "Bandeau en bas": "Band at the bottom",
+  "Opacité du bandeau": "Band opacity", "Position du bandeau": "Band position", "Épaisseur du contour": "Outline thickness",
+  "Aucun (ombre douce)": "None (soft shadow)", "Léger": "Light", "Épais": "Thick",
+  "Logo": "Logo", "ta chaîne, ta page": "your channel, your page", "Importer mon logo": "Import my logo",
+  "Changer de logo": "Change logo", "Retirer": "Remove", "Opacité": "Opacity", "Rond": "Round",
+  "Importe d'abord ton logo (png, jpg…). Il est gardé pour toutes tes vidéos.": "Import your logo first (png, jpg…). It is kept for all your videos.",
+  "Logo importé": "Logo imported", "Retirer le logo ?": "Remove the logo?",
+  "en haut à gauche": "top left", "en haut à droite": "top right", "en bas à gauche": "bottom left", "en bas à droite": "bottom right",
+  "Cinéma": "Cinema", "Le Chemin des Pieux — YouTube": "Le Chemin des Pieux — YouTube", "Bandeau classique": "Classic band",
+  "Bandeau titre": "Headline band", "Cinéma doré": "Golden cinema", "Minimal": "Minimal",
+  "Open Sans — net, lisible": "Open Sans — clean, readable", "Arimo — comme Arial": "Arimo — like Arial",
+  "Oswald — titres serrés": "Oswald — condensed headlines",
   "Changer de format replace les textes. Tu peux aussi garder ce projet et en faire une copie dans un autre format.":
     "Changing the format moves the texts. You can also keep this project and make a copy in another format.",
   "Résolution": "Resolution", "Qualité": "Quality", "Native": "Native", "Full HD": "Full HD",
@@ -923,7 +1010,7 @@ function t(s, vars) {
 }
 // the fixed texts of the page; parts filled by the code are rendered with t()
 const DYN = ["ed-badges", "saved", "new-formats", "surah", "a-surah", "lang", "e-lang", "new-style", "job-title", "job-stage", "job-error",
-  "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes",
+  "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes", "font-num", "font-tr", "intro-note",
   "font-title", "font-arabic", "font-text", "colors-title", "colors-ar", "colors-text", "colors-outline", "res", "r-done", "r-stage",
   "r-pct", "r-error", "exports", "ed-formats", "still-t", "time", "safe", "tl-ruler", "tl-bg", "tl-subs", "fmt-name", "toasts", "src-name", "ui-lang"];
 const original = new WeakMap();
@@ -972,7 +1059,9 @@ const FORMAT_INFO = {
   "9:16": ["Vertical", "Shorts · Reels · TikTok", [18, 32]], "16:9": ["Horizontal", "YouTube", [34, 19]],
   "1:1": ["Carré", "Instagram, Facebook", [26, 26]], "4:5": ["Portrait", "Instagram (fil)", [22, 28]] };
 const BASE_DEFAULTS = { "--header-x": 0, "--header-zoom": 1, "--block-x": 0, "--block-zoom": 1, "--title-size": 64, "--reciter-size": 34,
-  "--num-size": 34, "--fr-size": 35, "--ar-size": 42, "--tr-size": 29 };
+  "--num-size": 34, "--fr-size": 35, "--ar-size": 42, "--tr-size": 29, "--logo-size": 160 };
+// title cards before the recitation: same timing as render.py (INTRO_CARD, INTRO_FADE, INTRO_GAP)
+const INTRO_CARD = 2.6, INTRO_FADE = 0.45, INTRO_GAP = 0.3;
 const MOTION_ZOOM = 1.12;
 let surahs = [], langs = [], styles = [], fonts = [], settings = {}, projects = [], info = {};
 let P = null, saveTimer = null, overlayReady = false, tab = "subs", selClip = 0, wave = null;
@@ -1114,10 +1203,12 @@ function formatTiles(current, onclick) {
     <div class="shape" style="width:${w}px;height:${h}px"></div><b>${t(name)} ${f}</b><small>${t(sub)}</small></div>`).join("");
 }
 function renderFormatTiles() { $("new-formats").innerHTML = formatTiles(newFormat, "pickNewFormat"); }
-function pickNewFormat(f) { newFormat = f; renderFormatTiles(); }
+function pickNewFormat(f) { newFormat = f; renderFormatTiles(); renderStyleSelect(); }
 function renderStyleSelect() {
-  $("new-style").innerHTML = styles.map(s => `<option value="${s.id}">${esc(t(s.name))}${s.id === settings.style ? " ★" : ""}</option>`).join("");
-  $("new-style").value = settings.style || "pieux";
+  const ok = styles.filter(s => !s.formats || s.formats.includes(newFormat));
+  const cur = $("new-style").value;
+  $("new-style").innerHTML = ok.map(s => `<option value="${s.id}">${esc(t(s.name))}${s.id === settings.style ? " ★" : ""}</option>`).join("");
+  $("new-style").value = [cur, settings.style].find(id => ok.some(s => s.id === id)) || "pieux";
 }
 async function createProject() {
   if (!newSource) return;
@@ -1314,10 +1405,11 @@ async function serverEdit(path, body) {
 function payload(b) {
   const rtl = langs.find(l => l.code === P.lang)?.rtl;
   return { num: b.kind === "verse" ? b.ayah + "." : "", fr: b.fr, ar: b.ar, tr: b.tr, highlight: b.highlight,
-           ayah: b.ends_verse ? b.ayah : 0, rtl };
+           ayah: b.ends_verse ? b.ayah : 0, rtl, lang: P.lang };
 }
 function currentIndex(t) { return P.blocks.findIndex(b => t >= b.start && t < b.end); }
-let lastShown = "", lastHeader = "", lastStyle = "";
+let lastShown = "", lastHeader = "", lastStyle = "", lastLogo = null, introPlay = null;
+const logoURL = () => settings.logo ? "/userlogo/logo.png?v=" + settings.logo : null;
 function draw() {
   if (!P) return;
   const t = $("video").currentTime;
@@ -1335,6 +1427,8 @@ function draw() {
   }
   const hd = JSON.stringify([P.title, P.reciter, P.render.show_header]);
   if (hd !== lastHeader) { w.setHeader({ title: P.title, reciter: P.reciter, visible: P.render.show_header }); lastHeader = hd; }
+  if (logoURL() !== lastLogo) { lastLogo = logoURL(); w.setLogo(lastLogo); }
+  if (introPlay && drawIntro(w)) return;
   let i = currentIndex(t), sample = false;
   // while styling the texts, show a subtitle even between two of them
   if (i < 0 && tab === "text" && P.blocks.length) { i = nearestBlock(t); sample = true; }
@@ -1354,6 +1448,25 @@ function draw() {
     if (el) el.style.opacity = Math.max(0, a);
   }
 }
+// the title cards, played over the paused video (the final video shows them before the recitation)
+function introCards() { return ow().introCards(P.title, P.reciter, P.surah_info, P.lang); }
+function previewIntro() {
+  const cards = introCards();
+  if (!cards.length) return;
+  $("video").pause();
+  introPlay = { cards, t0: performance.now(), k: -1 };
+}
+function drawIntro(w) {
+  const el = (performance.now() - introPlay.t0) / 1000, k = Math.floor(el / INTRO_CARD);
+  if (k >= introPlay.cards.length || $("video").paused === false) {
+    introPlay = null; w.setIntro(null); w.setFrame(true); lastShown = "";
+    return false;
+  }
+  if (k !== introPlay.k) { w.setFrame(false); w.setBlock(null); w.setIntro(introPlay.cards[k]); introPlay.k = k; lastShown = "intro"; }
+  const t = el - k * INTRO_CARD;
+  w.document.getElementById("intro").style.opacity = Math.max(0, Math.min(1, t / INTRO_FADE, (INTRO_CARD - t) / INTRO_FADE));
+  return true;
+}
 function nearestBlock(t) {
   let best = 0;
   P.blocks.forEach((b, k) => { if (Math.abs(b.start - t) < Math.abs(P.blocks[best].start - t)) best = k; });
@@ -1361,7 +1474,7 @@ function nearestBlock(t) {
 }
 function tick() { draw(); requestAnimationFrame(tick); }
 requestAnimationFrame(tick);
-function redraw() { lastShown = ""; lastHeader = ""; lastStyle = ""; draw(); }
+function redraw() { lastShown = ""; lastHeader = ""; lastStyle = ""; lastLogo = null; draw(); }
 
 function togglePlay() { const v = $("video"); v.paused ? v.play() : v.pause(); }
 $("video").addEventListener("play", () => $("play").innerHTML = icon("pause", 18));
@@ -1570,7 +1683,7 @@ function textBox(id) {
 }
 function textAt(pt) {
   const X = pt.x * pt.k, Y = pt.y * pt.k;
-  for (const id of ["block", "header"]) {
+  for (const id of ["block", "band", "header"]) {
     const q = textBox(id);
     if (q && X >= q.l - 16 && X <= q.r + 16 && Y >= q.t - 16 && Y <= q.b + 16) return id;
   }
@@ -1584,7 +1697,7 @@ function showOutline(id) {
     width: (q.r - q.l + 20) * k + "px", height: (q.b - q.t + 20) * k + "px" });
 }
 function defaultOf(k) {
-  const lay = overlayReady && ow().LAYOUTS ? ow().LAYOUTS[P.format] || {} : {};
+  const lay = overlayReady && ow().layoutDefaults ? ow().layoutDefaults(P.format, P.style["--layout"]) : {};
   if (k in lay) return parseFloat(lay[k]);
   if (k === "--header-top") return 140;
   if (k === "--block-top") return 1188;
@@ -1606,8 +1719,8 @@ hit.addEventListener("pointerdown", (e) => {
   const pt = stagePoint(e), id = textAt(pt);
   hit.setPointerCapture(e.pointerId);
   if (id) {
-    const pre = id === "block" ? "--block" : "--header";
-    drag = { kind: "text", pre, x0: e.clientX, y0: e.clientY, top: getVar(pre + "-top"), x: getVar(pre + "-x"), k: pt.k, moved: false };
+    const pre = "--" + id;
+    drag = { kind: "text", id, pre, x0: e.clientX, y0: e.clientY, top: getVar(pre + "-top"), x: getVar(pre + "-x"), k: pt.k, moved: false };
   } else {
     const i = currentClip(), c = P.background.clips[i];
     if (selClip !== i) { selClip = i; renderBgPanel(); }
@@ -1630,8 +1743,8 @@ hit.addEventListener("pointermove", (e) => {
     let x = drag.x + dx * drag.k;
     if (Math.abs(x) < 14) { x = 0; snapped = true; }
     setVar(drag.pre + "-top", Math.max(0, Math.min(canvasH() - 60, drag.top + dy * drag.k)), true);
-    setVar(drag.pre + "-x", Math.max(-canvasW() / 2, Math.min(canvasW() / 2, x)), true);
-    showOutline(drag.pre === "--block" ? "block" : "header");
+    if (drag.id !== "band") setVar(drag.pre + "-x", Math.max(-canvasW() / 2, Math.min(canvasW() / 2, x)), true);  // the band spans the width
+    showOutline(drag.id);
   } else {
     const c = P.background.clips[drag.i];
     let x = drag.cx + dx / drag.W, y = drag.cy + dy / drag.H;
@@ -1658,7 +1771,7 @@ hit.addEventListener("wheel", (e) => {
   e.preventDefault();
   const f = Math.exp(-e.deltaY * 0.01), id = textAt(stagePoint(e));
   if (id) {
-    const k = (id === "block" ? "--block" : "--header") + "-zoom";
+    const k = (id === "header" ? "--header" : "--block") + "-zoom";
     setVar(k, Math.max(0.3, Math.min(3, getVar(k) * f)), true);
     showOutline(id);
   } else {
@@ -1683,14 +1796,15 @@ const CTL = {
   "blk.x": { get: () => canvasW() / 2 + getVar("--block-x"), set: v => setVar("--block-x", v - canvasW() / 2, true), step: 1 },
   "blk.y": { get: () => getVar("--block-top"), set: v => setVar("--block-top", v, true), step: 1 },
   "blk.s": { get: () => getVar("--block-zoom") * 100, set: v => setVar("--block-zoom", Math.max(20, Math.min(400, v)) / 100, true), step: 1 },
+  "band.y": { get: () => getVar("--band-top"), set: v => setVar("--band-top", v, true), step: 1 },
   // background: centre of the picture in the frame, scale 100 % = whole picture visible
   "clip.x": { get: () => canvasW() / 2 + (+clipNow().x || 0) * canvasW(), set: v => clipNow().x = Math.round((v - canvasW() / 2) / canvasW() * 1e5) / 1e5, step: 1 },
   "clip.y": { get: () => canvasH() / 2 + (+clipNow().y || 0) * canvasH(), set: v => clipNow().y = Math.round((v - canvasH() / 2) / canvasH() * 1e5) / 1e5, step: 1 },
   "clip.s": { get: () => (+clipNow().zoom || 1) * 100, set: v => clipNow().zoom = Math.max(5, Math.min(1000, v)) / 100, step: 1 },
 };
-for (const k of ["title", "reciter", "num", "fr", "ar", "tr"]) {
+for (const k of ["title", "reciter", "num", "fr", "ar", "tr", "logo"]) {
   const v = `--${k}-size`;
-  CTL["size." + k] = { get: () => getVar(v), set: x => setVar(v, Math.max(8, Math.min(200, x)), true), step: 1 };
+  CTL["size." + k] = { get: () => getVar(v), set: x => setVar(v, Math.max(8, Math.min(k === "logo" ? 600 : 200, x)), true), step: 1 };
 }
 for (const [k, , min, max, step] of ADJUST) {
   CTL["adj." + k] = { step, get: () => +(clipNow().adjust || {})[k] || 0,
@@ -1733,7 +1847,7 @@ document.addEventListener("pointerdown", (e) => {
   }
 });
 // markup of a position control (texts and backgrounds)
-function xformHTML(p) {
+function xformHTML(p, t = window.t) {
   return `<div class="pad"><button data-nudge="${p}.y:-1" class="up" title="${t("monter")}">▲</button><button data-nudge="${p}.x:-1" class="left" title="${t("gauche")}">◀</button>
     <button data-nudge="${p}.x:1" class="right" title="${t("droite")}">▶</button><button data-nudge="${p}.y:1" class="down" title="${t("descendre")}">▼</button></div>
     <div class="fields">
@@ -1743,12 +1857,13 @@ function xformHTML(p) {
       ${p !== "clip" ? `<button class="small ghost" onclick="setVar('--${p === "hdr" ? "header" : "block"}-x', 0)">${t("Centrer")}</button>` : ""}
     </div>`;
 }
-function sizeHTML(k, label) {
+function sizeHTML(k, label) {  // label: French, translated with the rest of the page
   return `<div class="nf"><span class="scrub" data-scrub="size.${k}">${label}</span><input type="number" step="1" data-ctl="size.${k}"></div>`;
 }
 // fill the ${XFORM:...} and ${SIZE:...} placeholders of the static markup
 document.querySelectorAll(".xform, .sizes").forEach(el => {
-  el.innerHTML = el.innerHTML.replace(/\$\{XFORM:(\w+)\}/g, (_, p) => xformHTML(p)).replace(/\$\{SIZE:(\w+):([^}]+)\}/g, (_, k, l) => sizeHTML(k, l));
+  // in French: the page is translated afterwards, once the interface language is known
+  el.innerHTML = el.innerHTML.replace(/\$\{XFORM:(\w+)\}/g, (_, p) => xformHTML(p, s => s)).replace(/\$\{SIZE:(\w+):([^}]+)\}/g, (_, k, l) => sizeHTML(k, l));
 });
 
 // ---------------------------------------------------------------- subtitles
@@ -1912,8 +2027,46 @@ function themeCard(s) {
     <div class="t3" style="font-family:${f("--text-font", "'Comic Neue'")};color:${st["--tr-color"] || "#f3df8f"}">Bismi Allahi</div>
     <div class="nm">${esc(t(s.name))}</div></div>`;
 }
+// the themes for every format, and those made for this format (YouTube styles for 16:9)
+function renderThemes() {
+  const own = styles.filter(s => s.formats && s.formats.includes(P.format)), all = styles.filter(s => !s.formats);
+  const grid = (list) => `<div class="themes">${list.map(themeCard).join("")}</div>`;
+  $("themes").innerHTML = own.length
+    ? `<div class="themes-head">${t("Pour YouTube (horizontal)")}</div>${grid(own)}<div class="themes-head">${t("Tous formats")}</div>${grid(all)}`
+    : grid(all);
+}
+const lookOf = (k, d) => String(P.style[k] ?? d).replace(/"/g, "");
+function segOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle("on", b.dataset.v === v)); }
 function renderStylePanel() {
-  $("themes").innerHTML = styles.map(themeCard).join("");
+  renderThemes();
+  segOn("header-mode", lookOf("--header-mode", "top"));
+  segOn("emph", lookOf("--emph", "none"));
+  segOn("layout-ctl", lookOf("--layout", "stack"));
+  segOn("logo-pos", lookOf("--logo-pos", "none"));
+  const intro = lookOf("--header-mode", "top") === "intro";
+  $("intro-row").classList.toggle("hidden", !intro);
+  if (intro && overlayReady) {
+    const n = introCards().length;
+    $("intro-note").textContent = t("{n} cartes avant la récitation : la vidéo commence {s} s plus tôt.", { n, s: (n * INTRO_CARD + INTRO_GAP).toFixed(1) });
+  }
+  $("fr-upper").checked = P.style["--fr-case"] === "uppercase";
+  $("fr-smallcaps").checked = P.style["--fr-variant"] === "small-caps";
+  const latin = fonts.filter(f => f.script === "latin");
+  for (const [id, v] of [["font-num", "--num-font"], ["font-tr", "--tr-font"]]) {
+    $(id).innerHTML = `<option value="">${t("Comme la traduction")}</option>` + latin.map(f => `<option value="${esc(f.family)}">${esc(f.family)}</option>`).join("");
+    $(id).value = lookOf(v, "");
+  }
+  $("band-row").classList.toggle("hidden", lookOf("--layout", "stack") !== "band");
+  $("band-alpha").value = (String(P.style["--band-bg"] || "").match(/,\s*([\d.]+)\s*\)$/) || [, 0.32])[1];
+  $("stroke").value = String(P.style["--stroke"] ?? "1");
+  $("logo-thumb").classList.toggle("hidden", !settings.logo);
+  if (settings.logo) $("logo-thumb").src = logoURL();
+  $("logo-del").classList.toggle("hidden", !settings.logo);
+  $("logo-btn").textContent = t(settings.logo ? "Changer de logo" : "Importer mon logo");
+  $("logo-hint").classList.toggle("hidden", !!settings.logo);
+  $("logo-opts").classList.toggle("hidden", !settings.logo);
+  $("logo-alpha").value = P.style["--logo-opacity"] ?? 1;
+  $("logo-round").checked = !!parseFloat(P.style["--logo-round"] || 0);
   fontPicker("font-title", "--title-font", "latin", t("Sourate Al-Fatiha"));
   fontPicker("font-text", "--text-font", "latin", t("Au nom d'Allah, le Tout Miséricordieux"));
   fontPicker("font-arabic", "--arabic", "arabic", "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ");
@@ -1929,6 +2082,41 @@ function fontPicker(el, v, script, sample) {
   $(el).innerHTML = fonts.filter(f => f.script === script).map(f => `<div class="font ${f.family === cur ? "on" : ""}"
       onclick="pickFont('${v}', '${f.family.replace(/'/g, "\\'")}')"><span class="sample ${script === "arabic" ? "ar" : ""}" style="font-family:'${f.family}'">${sample}</span>
       <small>${esc(f.user ? f.family + " " + t("(importée)") : t(f.label))}${f.user ? ` <a href="#" onclick="event.stopPropagation(); event.preventDefault(); deleteFont('${f.family.replace(/'/g, "\\'")}')" style="color:var(--danger)">${t("retirer")}</a>` : ""}</small></div>`).join("");
+}
+function setFontVar(v, family) {
+  if (family) P.style[v] = `"${family}"`; else delete P.style[v];
+  changed({ look: true });
+}
+// another arrangement of the texts: they go back to its default places
+function setLayout(v) {
+  for (const k of PLACE_KEYS) delete P.style[k];
+  setLook("--layout", v);
+}
+function setBand(a) {
+  P.style["--band-bg"] = `rgba(0, 0, 0, ${(+a).toFixed(2)})`;
+  draw();
+  clearTimeout(setBand.t); setBand.t = setTimeout(() => changed({ group: "band" }), 250);
+}
+function setLogoAlpha(a) {
+  if (+a >= 1) delete P.style["--logo-opacity"]; else P.style["--logo-opacity"] = String(a);
+  draw();
+  clearTimeout(setLogoAlpha.t); setLogoAlpha.t = setTimeout(() => changed({ group: "logo" }), 250);
+}
+async function importLogo(file) {
+  if (!file) return;
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    settings = await api("/api/logo", { method: "POST", body: fd });
+    if (lookOf("--logo-pos", "none") === "none") P.style["--logo-pos"] = canvasW() > canvasH() ? "tr" : "tl";
+    changed({ look: true });
+    toast(`${icon("check")} ${t("Logo importé")}`, "ok");
+  } catch (e) { toast(esc(e.message), "err"); }
+  $("logo-file").value = "";
+}
+async function deleteLogo() {
+  if (!await ask(t("Retirer le logo ?"))) return;
+  settings = await api("/api/logo", { method: "DELETE" });
+  renderStylePanel(); draw();
 }
 function pickFont(v, family) {
   const def = v === "--arabic" ? "Amiri Quran" : "Comic Neue";
@@ -1952,12 +2140,13 @@ async function deleteFont(family) {
   await api(`/api/fonts/${encodeURIComponent(family)}`, { method: "DELETE" });
   fonts = await api("/api/fonts"); loadFaces(); reloadOverlay(); renderStylePanel();
 }
-const PLACE_KEYS = ["--header-top", "--header-x", "--block-top", "--block-x", "--header-zoom", "--block-zoom"];
+const PLACE_KEYS = ["--header-top", "--header-x", "--block-top", "--block-x", "--header-zoom", "--block-zoom", "--band-top"];
 function applyStyle(id) {
   const s = styles.find(x => x.id === id);
   if (!s) return;
-  // a theme sets the look; the places of the texts stay
-  const keep = Object.fromEntries(Object.entries(P.style).filter(([k]) => PLACE_KEYS.includes(k)));
+  // a theme sets the look; the places of the texts stay (unless it arranges them differently)
+  const same = (s.style["--layout"] || "stack") === (P.style["--layout"] || "stack");
+  const keep = same ? Object.fromEntries(Object.entries(P.style).filter(([k]) => PLACE_KEYS.includes(k))) : {};
   P.style = { ...keep, ...s.style };
   changed({ look: true });
   toast(t("Style « {name} » appliqué", { name: esc(t(s.name)) }));

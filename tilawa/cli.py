@@ -67,7 +67,8 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--title", help='defaults to "SOURATE <NAME>"')
     m.add_argument("--format", default="9:16", choices=["9:16", "16:9", "1:1", "4:5"])
     m.add_argument("--lang", default="fr", help="translation: fr, en, es, de, it, pt, nl, sv, tr, id, ms, bs, sq, ru, ur, none")
-    m.add_argument("--style", help="style preset id (pieux, mushaf, moderne, doux, elegant, calligraphie)")
+    m.add_argument("--style", help="style preset id (pieux, mushaf, moderne, doux, elegant, calligraphie; "
+                   "for 16:9: cinema, pieux-youtube, bandeau, bandeau-titre, cinema-dore, minimal)")
     m.add_argument("--size", choices=["auto", "hd", "2k", "4k"])
     m.add_argument("--quality", choices=["max", "high", "hevc", "prores", "studio"])
     m.add_argument("--fit", choices=["auto", "crop", "blur", "pad"])

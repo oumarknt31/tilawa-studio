@@ -195,7 +195,7 @@ def make_video(p: Project, out_dir: Path | None = None, progress: Progress | Non
     out_dir = out_dir or p.folder
     out_dir.mkdir(parents=True, exist_ok=True)
     return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / output_name(p), opt, p.style, progress,
-                         p.get_background(), p.media_dir, p.format, p.lang)
+                         p.get_background(), p.media_dir, p.format, p.lang, p.surah)
 
 
 def make_still(p: Project, t: float, out_dir: Path, progress: Progress | None = None) -> Path:
@@ -205,10 +205,10 @@ def make_still(p: Project, t: float, out_dir: Path, progress: Progress | None = 
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     name = f"{output_name(p)}_{t:.1f}s"
     return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / name, opt, p.style, progress,
-                         p.get_background(), p.media_dir, p.format, p.lang)
+                         p.get_background(), p.media_dir, p.format, p.lang, p.surah)
 
 
-POSITION_KEYS = ("--header-top", "--header-x", "--block-top", "--block-x")
+POSITION_KEYS = ("--header-top", "--header-x", "--block-top", "--block-x", "--band-top")
 
 
 def convert_format(p: Project, fmt: str) -> None:

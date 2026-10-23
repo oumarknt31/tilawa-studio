@@ -70,7 +70,17 @@ The installation downloads the components, the recitation recognition model
        for example the official King Fahd Complex Mushaf font;
      - **verse number** in its ornament at the end of the verse (۝١٢ or ﴿١٢﴾);
      - sizes, colours (title and reciter as gradients), X/Y positions to the pixel;
-     - translation language (replaces the whole translation, split like the Arabic).
+     - translation language (replaces the whole translation, split like the Arabic);
+     - **for YouTube (16:9)**, styles modelled on popular recitation channels: *Cinema* (Arabic on top,
+       numbered translation in capitals with its key words in bold, light transliteration), *Le Chemin des
+       Pieux — YouTube*, *Classic band*, *Headline band* (translation in the middle, Arabic and transliteration
+       in a translucent band at the bottom), *Golden cinema*, *Minimal*;
+     - **layout** (stacked, Arabic on top, band at the bottom); **key words** of the translation in bold or
+       in colour, found automatically or chosen by putting *asterisks* around them; capitals or small caps;
+       outline thickness (or just a soft shadow);
+     - title and reciter at the top, as a small **label in a corner**, or as **intro cards** before the
+       recitation (the surah, "Chapter 2 of the Noble Quran", "Recited by…"; ▶ *Preview the intro*);
+     - your **logo** (channel, page) in a corner: imported once, kept for all your videos.
    - **Audio**: start and end of the video (*Cut the silences* in one click), sound fades,
      **loudness optimised for social media** (−14 LUFS, the level of YouTube, TikTok and Instagram).
    - **Export**: format (or a copy of the project in another format), resolution, quality,
@@ -147,8 +157,8 @@ Tests: `uv run python -m pytest -q`
 - Transliteration: **Tanzil** (`en.transliteration`).
 - Surah names: quran.com.
 - Fonts (SIL Open Font License, see `tilawa/fonts/`): Amiri Quran, Amiri, Scheherazade New,
-  Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Montserrat, Nunito, Baloo 2,
-  Playfair Display, Lora, Cinzel.
+  Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat,
+  Nunito, Baloo 2, Playfair Display, Lora, Cinzel.
 - Recognition model: Apache 2.0.
 
 The files in `tilawa/data/` are provided as is, with their copyright notices.

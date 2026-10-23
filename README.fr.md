@@ -70,7 +70,17 @@ L'installation télécharge les composants, le modèle de reconnaissance de la r
        par exemple la police officielle du Mushaf du Complexe Roi Fahd ;
      - **numéro de verset** dans son ornement à la fin du verset (۝١٢ ou ﴿١٢﴾) ;
      - tailles, couleurs (titre et récitateur en dégradé), positions X/Y au pixel ;
-     - langue de la traduction (change toute la traduction, coupée comme l'arabe).
+     - langue de la traduction (change toute la traduction, coupée comme l'arabe) ;
+     - **pour YouTube (16:9)**, des styles inspirés des chaînes de récitation connues : *Cinéma* (arabe en haut,
+       traduction numérotée en majuscules avec ses mots importants en gras, phonétique légère), *Le Chemin des
+       Pieux — YouTube*, *Bandeau classique*, *Bandeau titre* (traduction au milieu, arabe et phonétique dans
+       un bandeau translucide en bas), *Cinéma doré*, *Minimal* ;
+     - **disposition** (empilée, arabe en haut, bandeau en bas) ; **mots importants** de la traduction en gras
+       ou en couleurs, trouvés automatiquement ou choisis en les entourant d'*astérisques* ; majuscules ou
+       petites capitales ; épaisseur du contour (ou simple ombre douce) ;
+     - titre et récitateur en haut, en petite **étiquette dans un coin**, ou en **cartes d'intro** avant la
+       récitation (la sourate, « Chapitre 2 du noble Coran », « Récitée par… » ; ▶ *Voir l'intro*) ;
+     - ton **logo** (chaîne, page) dans un coin : importé une fois, gardé pour toutes tes vidéos.
    - **Audio** : début et fin de la vidéo (*Couper les silences* en un clic), fondus du son,
      **volume optimisé pour les réseaux** (−14 LUFS, le niveau de YouTube, TikTok et Instagram).
    - **Export** : format (ou une copie du projet dans un autre format), résolution, qualité,
@@ -149,7 +159,7 @@ Tests : `uv run python -m pytest -q`
 - Phonétique : **Tanzil** (`en.transliteration`).
 - Noms des sourates : quran.com.
 - Polices (SIL Open Font License, voir `tilawa/fonts/`) : Amiri Quran, Amiri, Scheherazade New,
-  Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Montserrat, Nunito, Baloo 2,
+  Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat, Nunito, Baloo 2,
   Playfair Display, Lora, Cinzel.
 - Modèle de reconnaissance : Apache 2.0.
 

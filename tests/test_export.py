@@ -48,3 +48,37 @@ def test_encoders(monkeypatch):
     monkeypatch.setattr(render.sys, "platform", "win32")
     opt.quality = "max"
     assert render._encode_args(info, opt)[0][1] == "libx264"
+
+
+def _info(**kw):
+    base = dict(path=None, width=1920, height=1080, fps=30.0, fps_str="30/1", duration=60.0, vcodec="h264",
+                pix_fmt="yuv420p", bit_depth=8, color_primaries="bt709", color_transfer="bt709", color_space="bt709",
+                color_range="tv", acodec="aac", asample_rate=48000, achannels=2)
+    return media.VideoInfo(**(base | kw))
+
+
+def test_bt601_sources_skip_the_slow_matrix_conversion():
+    assert "colormatrix=src=bt601:dst=bt709" in render._prep(_info(color_space="smpte170m"))
+    assert "colormatrix" not in render._prep(_info())
+    assert "in_color_matrix=bt709" in render._prep(_info(color_space=None))  # untagged HD is BT.709
+    assert "in_color_matrix" not in render._prep(_info(color_space=None, width=640, height=360))  # untagged SD: BT.601
+
+
+def test_title_cards_start_the_background_earlier(tmp_path):
+    bg = {"clips": [{"src": "original", "dur": 5, "zoom": 1.0}], "transition": 0.5, "fill": "blur", "dim": 0}
+    graph = []
+    render._background_graph(bg, _info(), tmp_path / "v.mp4", None, 2.0, 10.0, 1920, 1080, render._Inputs(), graph,
+                             tmp_path, lambda s, f: None, "16:9", lead=8.0)
+    # the video starts at 0 (2 s before the recitation), its first picture fills the 6 s before
+    assert "tpad=start_duration=6.000:start_mode=clone" in graph[0]
+    assert "trim=duration=16.000" in graph[0]
+
+
+def test_youtube_styles():
+    from tilawa import library
+
+    yt = [s for s in library.BUILTIN_STYLES if s.get("formats")]
+    assert len(yt) >= 4 and all(s["formats"] == ["16:9"] for s in yt)
+    for s in library.BUILTIN_STYLES:  # a style never moves the texts
+        assert not set(s["style"]) & set(library.POSITION_KEYS)
+    assert render.header_mode({"--header-mode": "intro"}) == "intro" and render.header_mode(None) == "top"

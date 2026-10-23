@@ -32,6 +32,7 @@ MESSAGES = {
                          "This file can't be read (damaged photo or video, or unsupported format)."),
     "bad_font": ("Choisis un fichier de police .ttf ou .otf", "Choose a .ttf or .otf font file"),
     "unreadable_font": ("Impossible de lire cette police.", "This font can't be read."),
+    "bad_logo": ("Choisis une image (png, jpg, heic…) pour le logo.", "Choose a picture (png, jpg, heic…) for the logo."),
     "nothing_to_render": ("Rien à exporter : il n'y a pas de sous-titres.", "Nothing to export: there are no subtitles."),
     "cannot_split": ("Impossible de couper ici.", "Can't split here."),
     "cannot_merge": ("Seules deux parties qui se suivent dans le même verset peuvent être réunies.",

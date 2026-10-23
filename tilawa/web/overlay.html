@@ -9,6 +9,11 @@
   Layout is defined on a canvas per format (1080 x 1920 for 9:16, 1920 x 1080
   for 16:9...) and scaled to the output size. Everything the editor can
   change is a CSS variable (setStyle).
+
+  Layers, drawn separately by the renderer:
+    * frame   what stays all along: the logo, the band behind the subtitles
+    * header  the title and the reciter (all along, or as cards at the start)
+    * block   one subtitle
 -->
 <style>
   :root {
@@ -17,6 +22,7 @@
     --text-font: var(--latin);
     --arabic: "Amiri Quran";
     --outline: #0b0b0d;
+    --stroke: 1;  /* outline thickness: 0 = none (the soft shadow stays) */
     --title-grad: linear-gradient(90deg, #f07ad6 0%, #c79ee0 38%, #a9bfe0 62%, #86dde6 100%);
     --reciter-grad: linear-gradient(90deg, #86dccb 0%, #b4b0aa 55%, #e6a1a5 100%);
     --white: #f6f6f8;
@@ -26,11 +32,21 @@
     --hl-phonetic: #f09aa4;
     /* text sizes */
     --title-size: 64px; --reciter-size: 34px; --num-size: 34px; --fr-size: 35px; --ar-size: 42px; --tr-size: 29px;
-    /* placement (9:16; other formats in LAYOUTS below), changed by dragging the texts in the editor */
+    /* placement (9:16; other formats and layouts in LAYOUTS below), changed by dragging the texts in the editor */
     --header-top: 140px; --header-x: 0px; --header-zoom: 1;
     --block-top: 1188px; --block-x: 0px; --block-zoom: 1;
     --block-side: 70px; --fr-width: 900px; --ar-width: 920px; --tr-width: 940px;
     --fr-gap: 10px; --ar-gap: 30px; --tr-gap: 60px;
+    --band-top: 1500px; --band-h: 330px; --band-bg: rgba(0, 0, 0, .32);
+    /* arrangement: read by applyLayout() */
+    --layout: stack;        /* stack | cinema (Arabic first) | band (Arabic in a band at the bottom) */
+    --header-mode: top;     /* top | corner (small label) | intro (cards before the recitation) */
+    --emph: none;           /* key words of the translation: none | bold | color */
+    --emph-colors: #ffffff #a8c8ff #fff0a0 #ffb4cc #ffc888 #a4ecd8;
+    --emph-weight: 700;
+    --intro-accent: #86dde6;
+    --logo-pos: none;       /* none | tl | tr | bl | br */
+    --logo-size: 160px; --logo-margin: 36px; --logo-opacity: 1; --logo-round: 0;
   }
   html, body { margin: 0; padding: 0; background: transparent; }
   body { width: 1080px; height: 1920px; overflow: hidden; position: relative; transform-origin: 0 0; }
@@ -42,53 +58,102 @@
   .ol > .o, .ol > .f { display: block; }
   .ol > .o {
     position: absolute; inset: 0; color: var(--outline);
-    -webkit-text-stroke: var(--sw, 6px) var(--outline);
+    -webkit-text-stroke: calc(var(--sw, 6px) * var(--stroke)) var(--outline);
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .55));
   }
   .ol > .f { position: relative; }
   .grad > .f { background: var(--g); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .em { font-weight: var(--emph-weight); }
 
   #header { position: absolute; top: var(--header-top); left: 0; right: 0; text-align: center; transform: translateX(var(--header-x)); }
   #header > .zoom { zoom: var(--header-zoom); }
-  #block > .zoom { zoom: var(--block-zoom); }
+  #block > .zoom, #band > .zoom { zoom: var(--block-zoom); }
   #title { font: 700 var(--title-size)/1.1 var(--title-font); letter-spacing: .5px; --g: var(--title-grad); --sw: 7px; white-space: nowrap; }
   #reciter { font: 700 var(--reciter-size)/1.2 var(--title-font); --g: var(--reciter-grad); --sw: 5px; }
   #reciter-line { margin-top: 30px; }
   #mic { font-size: calc(var(--reciter-size) * .88); margin-right: 10px; vertical-align: 4px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
 
   #block { position: absolute; top: var(--block-top); left: var(--block-side); right: var(--block-side); text-align: center; transform: translateX(var(--block-x)); }
-  #block[hidden] { display: none; }
+  #block[hidden], #band[hidden], #intro[hidden] { display: none; }
   #num-line { display: var(--num-display, block); }
-  #num { font: 400 var(--num-size)/1 var(--text-font); color: var(--num-color, var(--white)); --sw: 5px; }
+  #num { font: var(--num-weight, 400) var(--num-size)/1 var(--num-font, var(--text-font)); color: var(--num-color, var(--white)); --sw: 5px; }
   #fr-box { min-height: calc(var(--fr-size) * 2.46); display: flex; align-items: center; justify-content: center; margin-top: var(--fr-gap); }
-  #fr { font: 400 var(--fr-size)/1.18 var(--text-font), "Nunito", "Noto Naskh Arabic", sans-serif; color: var(--fr-color, var(--white));
+  #fr { font: var(--fr-weight, 400) var(--fr-size)/1.18 var(--text-font), "Nunito", "Noto Naskh Arabic", sans-serif; color: var(--fr-color, var(--white));
+        text-transform: var(--fr-case, none); font-variant-caps: var(--fr-variant, normal); letter-spacing: var(--fr-spacing, normal);
         --sw: 5px; max-width: var(--fr-width); text-wrap: balance; white-space: pre-line; }
   #fr[dir=rtl] { line-height: 1.6; }
   #ar-box { margin-top: var(--ar-gap); min-height: calc(var(--ar-size) * 1.9); display: flex; align-items: center; justify-content: center; }
   #ar { font: 400 var(--ar-size)/1.75 var(--arabic), "Amiri Quran", serif; direction: rtl; color: var(--ar-color, var(--white)); --sw: 5px; max-width: var(--ar-width); text-wrap: balance; }
   #ar .ayah { font-family: var(--ayah-font, "Amiri Quran"); white-space: nowrap; }
   #tr-line { display: var(--tr-display, block); }
-  #tr { margin-top: var(--tr-gap); font: 400 var(--tr-size)/1.2 var(--text-font), "Nunito", sans-serif; color: var(--tr-color, var(--phonetic)); --sw: 4px; max-width: var(--tr-width); text-wrap: balance; }
+  #tr { margin-top: var(--tr-gap); font: var(--tr-weight, 400) var(--tr-size)/1.2 var(--tr-font, var(--text-font)), "Nunito", sans-serif;
+        color: var(--tr-color, var(--phonetic)); text-transform: var(--tr-case, none); letter-spacing: var(--tr-spacing, normal);
+        --sw: 4px; max-width: var(--tr-width); text-wrap: balance; }
 
   #block.hl #num { color: #ef8fb8; }
-  #block.hl #fr { --g: var(--hl-grad); }
-  #block.hl #ar { --g: var(--hl-arabic-grad); }
-  #block.hl #tr { color: var(--hl-phonetic); }
+  #block.hl #fr, #band.hl #fr { --g: var(--hl-grad); }
+  #block.hl #ar, #band.hl #ar { --g: var(--hl-arabic-grad); }
+  #block.hl #tr, #band.hl #tr { color: var(--hl-phonetic); }
+
+  /* cinema: Arabic first, then the numbered translation, then the transliteration */
+  body[data-layout=cinema] #block > .zoom { display: flex; flex-direction: column; align-items: center; }
+  body[data-layout=cinema] #ar-box { order: 1; margin-top: 0; }
+  body[data-layout=cinema] #fr-box { order: 2; }
+  body[data-layout=cinema] #tr-line { order: 3; }
+  body[data-layout=cinema] #num-line { display: none; }
+
+  /* band: the translation in the middle, the Arabic and transliteration in a band at the bottom */
+  #band, #band-bg { position: absolute; left: 0; right: 0; top: var(--band-top); height: var(--band-h); display: none; }
+  body[data-layout=band] #band:not([hidden]) { display: flex; align-items: center; justify-content: center; text-align: center; }
+  body[data-layout=band] #band-bg { display: block; background: var(--band-bg); }
+  body[data-layout=band] #fr-box { min-height: 0; }
+  body[data-layout=band] #ar-box { margin-top: 0; min-height: 0; }
+
+  /* header as a small label in a corner */
+  body[data-header=corner] #header { left: var(--block-side); right: auto; text-align: left; }
+  body[data-header=corner] #header > .zoom { display: flex; align-items: center; gap: .7em; padding: 10px 22px;
+    border: 2px solid rgba(255, 255, 255, .85); border-radius: 4px; background: rgba(0, 0, 0, .18); font-size: var(--reciter-size); }
+  body[data-header=corner] #reciter-line { margin-top: 0; }
+  body[data-header=corner] #reciter-line::before { content: "|"; color: rgba(255, 255, 255, .8); margin-right: .7em; font: 400 var(--reciter-size)/1 var(--title-font); }
+  body[data-header=corner] #mic { display: none; }
+  body[data-header=intro] #header { display: none !important; }
+
+  /* title cards shown before the recitation */
+  #intro { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; }
+  #intro > .zoom { zoom: var(--header-zoom); }
+  #intro .big { font: 700 var(--title-size)/1.15 var(--title-font); --g: var(--title-grad); --sw: 7px; letter-spacing: 1.5px; }
+  #intro .big.r { --g: var(--reciter-grad); }
+  #intro .small { font: 400 calc(var(--title-size) * .55)/1.2 var(--title-font); color: var(--white); --sw: 5px; letter-spacing: 1px; }
+  #intro .acc { color: var(--intro-accent); }
+  #intro .gap { height: calc(var(--title-size) * .45); }
+
+  /* the logo */
+  #logo { position: absolute; display: none; width: var(--logo-size); opacity: var(--logo-opacity); }
+  body[data-logo]:not([data-logo=none]) #logo[src] { display: block; }
+  body[data-logo-round] #logo { aspect-ratio: 1; object-fit: cover; border-radius: 50%; }
+  body[data-logo=tl] #logo { top: var(--logo-margin); left: var(--logo-margin); }
+  body[data-logo=tr] #logo { top: var(--logo-margin); right: var(--logo-margin); }
+  body[data-logo=bl] #logo { bottom: var(--logo-margin); left: var(--logo-margin); }
+  body[data-logo=br] #logo { bottom: var(--logo-margin); right: var(--logo-margin); }
+  body.noframe #frame { display: none; }
 </style>
 <style id="layout"></style>
 <style id="faces"></style>
 </head>
 <body>
+  <div id="frame"><div id="band-bg" class="ink"></div><img id="logo" class="ink" alt=""></div>
   <div id="header"><div class="zoom">
     <div><span id="title" class="ol grad"></span></div>
     <div id="reciter-line"><span id="mic">🎙️</span><span id="reciter" class="ol grad"></span></div>
   </div></div>
+  <div id="intro" hidden><div class="zoom"></div></div>
   <div id="block" hidden><div class="zoom">
     <div id="num-line"><span id="num" class="ol"></span></div>
     <div id="fr-box"><span id="fr" class="ol"></span></div>
     <div id="ar-box"><span id="ar" class="ol" lang="ar"></span></div>
     <div id="tr-line"><span id="tr" class="ol"></span></div>
   </div></div>
+  <div id="band" hidden><div class="zoom"><div></div></div></div>
 <script>
   // canvas size and default placement per format; the editor reads these too
   window.FORMATS = { "9:16": [1080, 1920], "16:9": [1920, 1080], "1:1": [1080, 1080], "4:5": [1080, 1350] };
@@ -99,15 +164,50 @@
     "1:1": { "--header-top": 56, "--block-top": 560, "--ar-gap": "18px", "--tr-gap": "34px" },
     "4:5": { "--header-top": 80, "--block-top": 760, "--ar-gap": "22px", "--tr-gap": "44px" },
   };
+  // what the other arrangements change (16:9 measured on reference videos; other formats scaled)
+  const VARIANTS = {
+    cinema: {
+      "16:9": { "--header-top": 40, "--block-top": 232, "--block-side": "110px", "--fr-width": "1700px", "--ar-width": "1600px",
+                "--tr-width": "1600px", "--fr-gap": "96px", "--tr-gap": "86px" },
+      "*": ([w, h]) => ({ "--header-top": Math.round(h * .045), "--block-top": Math.round(h * .3), "--fr-gap": "60px", "--tr-gap": "50px" }),
+    },
+    band: {
+      "16:9": { "--header-top": 40, "--block-top": 330, "--block-side": "120px", "--fr-width": "1650px", "--ar-width": "1600px",
+                "--tr-width": "1600px", "--fr-gap": "18px", "--tr-gap": "26px", "--band-top": "785px", "--band-h": "250px" },
+      "*": ([w, h]) => ({ "--block-top": Math.round(h * .3), "--band-top": Math.round(h * .72) + "px", "--band-h": Math.round(h * .2) + "px" }),
+    },
+  };
+  // default placement of the texts for a format and an arrangement
+  window.layoutDefaults = function (fmt, layout) {
+    const v = VARIANTS[String(layout || "").replace(/"/g, "")];
+    const extra = v ? v[fmt] || v["*"](FORMATS[fmt] || FORMATS["9:16"]) : {};
+    return { ...(LAYOUTS[fmt] || LAYOUTS["9:16"]), ...extra };
+  };
   let format = "9:16";
   window.setCanvas = function (fmt, height) {
     format = fmt in FORMATS ? fmt : "9:16";
     const [w, h] = FORMATS[format];
     document.body.style.width = w + "px";
     document.body.style.height = (height || h) + "px";
-    const vars = Object.entries(LAYOUTS[format]).map(([k, v]) => `${k}: ${typeof v === "number" ? v + "px" : v};`).join(" ");
-    document.getElementById("layout").textContent = `:root { ${vars} }`;
+    applyLayout();
   };
+  const css = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim().replace(/^"|"$/g, "");
+  const $ = (id) => document.getElementById(id);
+  // the arrangement chosen by the style: defaults for it, and where the Arabic goes
+  function applyLayout() {
+    const layout = document.documentElement.style.getPropertyValue("--layout").replace(/"/g, "").trim() || "stack";
+    const vars = Object.entries(layoutDefaults(format, layout)).map(([k, v]) => `${k}: ${typeof v === "number" ? v + "px" : v};`).join(" ");
+    $("layout").textContent = `:root { ${vars} }`;
+    const b = document.body.dataset;
+    b.layout = layout;
+    b.header = css("--header-mode") || "top";
+    b.logo = css("--logo-pos") || "none";
+    if (parseFloat(css("--logo-round"))) b.logoRound = ""; else delete b.logoRound;
+    $("header").querySelector(".zoom").classList.toggle("ink", b.header === "corner");  // the frame of the label is drawn too
+    const band = $("band").querySelector(".zoom > div"), stack = $("block").querySelector(".zoom");
+    if (layout === "band") band.append($("ar-box"), $("tr-line"));
+    else if ($("ar-box").parentNode !== stack) stack.append($("ar-box"), $("tr-line"));
+  }
 
   // fonts: the bundled ones and those imported by the user, loaded when used
   const ORNAMENT = new Set();  // Arabic fonts able to draw the verse number inside ۝
@@ -121,16 +221,25 @@
       }
       if (f.ornament) ORNAMENT.add(f.family);
     }));
-    document.getElementById("faces").textContent = css;
+    $("faces").textContent = css;
   }
 
-  // text with an optional tail drawn in another font (the verse ornament)
-  function setText(el, text, tail) {
+  // text with an optional tail drawn in another font (the verse ornament);
+  // parts = [[text, colour or "" (key word), ...]] for words drawn in bold / colour
+  function setText(el, text, tail, parts) {
     el.replaceChildren();
     for (const cls of ["o", "f"]) {
       const layer = document.createElement("span");
       layer.className = cls;
-      layer.textContent = text || "";
+      if (parts) {
+        for (const [t, em] of parts) {
+          if (em === null) { layer.append(t); continue; }
+          const s = document.createElement("span");
+          s.className = "em"; s.textContent = t;
+          if (em && cls === "f") s.style.color = em;
+          layer.append(s);
+        }
+      } else layer.textContent = text || "";
       if (tail) {
         const t = document.createElement("span");
         t.className = "ayah"; t.textContent = tail;
@@ -140,10 +249,9 @@
     }
     el.style.display = text ? "" : "none";
   }
-  const css = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
   const DIGITS = "٠١٢٣٤٥٦٧٨٩";
   function ornament(n) {
-    const mark = css("--ayah-mark").replace(/"/g, "");
+    const mark = css("--ayah-mark");
     if (!n || !mark || mark === "none") return "";
     const d = String(n).replace(/\d/g, x => DIGITS[x]);
     return mark === "brackets" ? "﴿" + d + "﴾" : "۝" + d;
@@ -153,6 +261,48 @@
     document.documentElement.style.setProperty("--ayah-font", ORNAMENT.has(fam) ? `"${fam}"` : `"Amiri Quran"`);
   }
 
+  // Key words of the translation, drawn in bold (or colour): the words the
+  // user put between *asterisks*, or else every word that is not a small
+  // grammar word of the language.
+  const STOP = Object.fromEntries(Object.entries({
+    fr: "a à ai aie as au aux avait avaient avec avez avons aura auront aussi alors ainsi afin c ça car ce ceci cela ces cet cette ceux ci comme d dans de des dis dit dites disent dire donc dont du elle elles en es est et été êtes être eu eux fait faire fais font fut furent ici il ils j je l la là le les leur leurs lors lorsque lui m ma mais me même mes moi mon n ne ni non nos notre nous ô on ont ou où par pas peu peut peuvent plus point pour pu puis qu quand que quel quelle quels quelles qui quoi s sa sans se sera seront serez ses si soit sommes son sont suis sur t ta te tes toi ton tous tout toute toutes très tu un une vers vois voit voyez vos votre vous y",
+    en: "a about after again against all also am an and any are as at be been before being below between both but by can could did do does done down during each every for from further had has have having he her here hers him his how i if in indeed into is it its let lo me might more most must my no nor not now o of off on once only or other our ours out over own said say says see shall she should so some such surely than that the their theirs them then there these they this those through to too under until up upon us verily very was we were what when where which while who whom whose why will with would ye you your yours",
+    es: "a al algo como con cuando de del donde el él ella ellas ellos en entre era es esa ese eso esta este esto fue ha han hay la las le les lo los me mi mis muy ni no nos nosotros o os para pero por que qué quien se ser si sí sin sobre su sus te tu tus un una uno unos unas vosotros y ya yo",
+    de: "aber als am an auch auf aus bei bin bist da dann dass das dem den denn der des die dich dir doch du ein eine einem einen einer eines er es euch für hat haben hatte ich ihm ihn ihnen ihr ihre im in ist ja kein keine mich mir mit nach nicht noch nur oder schon sehr sein seine sich sie sind so über um und uns unter vom von vor war waren was wenn wer werden wie wir wird wo wurde zu zum zur",
+    it: "a ad agli ai al alla alle allo che chi ci come con da dal dalla dei del della delle di e è ed era essi gli ha hanno i il in io la le lei li lo loro lui ma mi ne nel nella noi non o per perché più quando se si sono su sua sue suo suoi tra tu un una uno vi voi",
+    pt: "a à ao aos as com como da das de do dos e é ela elas ele eles em entre era essa esse está eu foi há isso isto já lhe lhes mas me meu minha na nas não no nos nós o os ou para pela pelas pelo pelos por que quem se seu sua são também te teu tu um uma vos vós",
+    nl: "aan als bij dan dat de deze die dit door een en er geen had hebben heeft hem het hij hun ik in is je jij maar me met mij naar niet nog of om ons ook op over te tot u uit van voor was waren wat we wel wie wij worden wordt zal ze zij zijn zo",
+    sv: "att av de dem den det dig du där en er ett för han har hade hon i icke inte jag med men mig ni och om oss på sig sin sina sitt som så till var vi är",
+    id: "adalah akan apabila atau bagi dalam dan dari dengan di dia ia ini itu jika juga kami kamu ke kita maka mereka oleh pada sebagai sesungguhnya telah tidak untuk yang",
+    ms: "adalah akan apabila atau bagi dalam dan dari dengan di dia ia ini itu jika juga kami kamu ke kita maka mereka oleh pada sebagai sesungguhnya telah tidak untuk yang",
+    tr: "ama ben bir biz bu da de daha en fakat gibi ile ise için ki mi mı mu mü ne o olan olarak onlar sen siz şu ve veya ya çok",
+    bs: "a ali da do ga i ih ili im iz je joj kao koja koje koji mi mu na ne nije o od on ona oni ono pa sa se su ta taj te ti to u vi za što",
+    sq: "ai ajo ata ato do dhe e i janë ju ka me mos ne nga nuk një për që si së të ti u unë në",
+    ru: "а б без бы был была были было в вам вас во вот все всех вы где да для до его ее ей если есть еще же за и из или им их к как ко когда кто ли мне мы на над не нет ни но о об он она они от по под при с со так там те то тоже ты у уж уже что чтобы эти это этот я",
+  }).map(([k, v]) => [k, new Set(v.split(" "))]));
+  function keyWords(text, lang, mode, plain) {
+    if (/\*[^*\n]+\*/.test(text)) {  // chosen by hand
+      return text.split(/(\*[^*\n]+\*)/).filter(Boolean).map(s => s.startsWith("*") && s.endsWith("*") && s.length > 2 ? [s.slice(1, -1), ""] : [s.replace(/\*/g, ""), null]);
+    }
+    const stop = STOP[lang];
+    if (mode === "none" || !stop) return null;
+    const out = [];
+    let last = 0;
+    for (const m of text.matchAll(/[\p{L}\p{M}]+/gu)) {
+      const w = m[0];
+      if (w.length < 3 || stop.has(w.toLowerCase())) continue;
+      out.push([text.slice(last, m.index), null], [w, ""]);
+      last = m.index + w.length;
+    }
+    out.push([text.slice(last), null]);
+    if (mode === "color" && !plain) {
+      const palette = css("--emph-colors").split(/[\s,]+/).filter(Boolean);
+      let k = 0;
+      for (const p of out) if (p[1] === "") p[1] = palette[k++ % palette.length] || "";
+    }
+    return out;
+  }
+
   // When the translation needs two lines, break it after a sentence end close
   // to the middle (if both halves fit) rather than wherever the width runs out.
   const measure = document.createElement("span");
@@ -160,8 +310,9 @@
   document.body.append(measure);
   function lineWidth(t) { measure.textContent = t; return measure.getBoundingClientRect().width; }
   function sentenceBreak(text) {
-    const fr = document.getElementById("fr");
+    const fr = $("fr");
     measure.style.font = getComputedStyle(fr).font;
+    measure.style.textTransform = getComputedStyle(fr).textTransform;
     const max = parseFloat(getComputedStyle(fr).maxWidth) || 900;
     if (text.includes("\n") || lineWidth(text) <= max) return text;
     let best = null;
@@ -174,43 +325,110 @@
     }
     return best ? best.a + "\n" + best.b : text;
   }
+  // the line break chosen on the text without asterisks, put in the marked text
+  function withBreak(marked, broken) {
+    const at = broken.indexOf("\n");
+    if (at < 0 || marked.includes("\n")) return marked;
+    let seen = 0, i = 0;
+    for (; i < marked.length && seen < at; i++) if (marked[i] !== "*") seen++;
+    while (marked[i] === "*") i++;
+    const rest = marked.slice(i).replace(/^\s+/, "");
+    return marked.slice(0, i).trimEnd() + "\n" + rest;
+  }
   // header: {title, reciter, visible}
   window.setHeader = function (h) {
-    document.getElementById("header").style.display = h && h.visible !== false ? "" : "none";
+    $("header").style.display = h && h.visible !== false ? "" : "none";
     if (!h) return;
-    setText(document.getElementById("title"), h.title);
-    setText(document.getElementById("reciter"), h.reciter);
-    document.getElementById("reciter-line").style.display = h.reciter ? "" : "none";
+    setText($("title"), h.title);
+    setText($("reciter"), h.reciter);
+    $("reciter-line").style.display = h.reciter ? "" : "none";
   };
-  // block: {num, fr, ar, tr, highlight, ayah (verse number if the block ends the verse), rtl} or null
+  // block: {num, fr, ar, tr, highlight, ayah (verse number if the block ends the verse), rtl, lang} or null
   window.setBlock = function (b) {
-    const el = document.getElementById("block");
-    el.hidden = !b;
+    const el = $("block");
+    el.hidden = $("band").hidden = !b;
     if (!b) return;
-    el.classList.toggle("hl", !!b.highlight);
-    const fr = document.getElementById("fr");
+    for (const x of [el, $("band")]) x.classList.toggle("hl", !!b.highlight);
+    const fr = $("fr");
     fr.dir = b.rtl ? "rtl" : "auto";
-    setText(document.getElementById("num"), b.num);
-    setText(fr, sentenceBreak(b.fr || ""));
+    setText($("num"), b.num);
+    const inline = document.body.dataset.layout === "cinema" && css("--num-display") !== "none" && b.num;
+    const marked = (inline ? b.num + " " : "") + (b.fr || "");
+    const text = sentenceBreak(marked.replace(/\*/g, ""));
+    setText(fr, text, "", keyWords(withBreak(marked, text), b.lang || "fr", css("--emph") || "none", b.highlight));
     ornamentFont();
-    setText(document.getElementById("ar"), b.ar, ornament(b.ayah));
-    setText(document.getElementById("tr"), b.tr);
-    for (const id of ["fr", "ar"]) document.getElementById(id).classList.toggle("grad", !!b.highlight);
+    setText($("ar"), b.ar, ornament(b.ayah));
+    setText($("tr"), b.tr);
+    for (const id of ["fr", "ar"]) $(id).classList.toggle("grad", !!b.highlight);
   };
+
+  // title cards before the recitation: what they say, in the translation's language
+  const INTRO = {
+    fr: ["CHAPITRE {n} DU NOBLE CORAN", "RÉCITÉE PAR"], en: ["CHAPTER {n} OF THE NOBLE QURAN", "RECITED BY"],
+    es: ["CAPÍTULO {n} DEL NOBLE CORÁN", "RECITADA POR"], de: ["KAPITEL {n} DES EDLEN KORANS", "REZITIERT VON"],
+    it: ["CAPITOLO {n} DEL NOBILE CORANO", "RECITATA DA"], pt: ["CAPÍTULO {n} DO NOBRE ALCORÃO", "RECITADA POR"],
+    nl: ["HOOFDSTUK {n} VAN DE EDELE KORAN", "GERECITEERD DOOR"], sv: ["KAPITEL {n} I DEN ÄDLA KORANEN", "RECITERAD AV"],
+    tr: ["KUR'ÂN-I KERÎM'İN {n}. SURESİ", "OKUYAN"], id: ["SURAH KE-{n} DALAM AL-QUR'AN", "DIBACAKAN OLEH"],
+    ms: ["SURAH KE-{n} DALAM AL-QURAN", "BACAAN"], bs: ["{n}. SURA PLEMENITOG KUR'ANA", "UČI"],
+    sq: ["KAPITULLI {n} I KURANIT FISNIK", "RECITUAR NGA"], ru: ["{n}-Я СУРА БЛАГОРОДНОГО КОРАНА", "ЧИТАЕТ"],
+    ur: ["قرآنِ کریم کی سورت {n}", "تلاوت"], none: ["السورة {n} من القرآن الكريم", "بصوت"],
+  };
+  // [{lines: [[class, text], ...]}]: the surah, its place in the Quran, the reciter
+  window.introCards = function (title, reciter, surah, lang) {
+    const [chapter, by] = INTRO[lang] || INTRO.en;
+    const cards = [];
+    const meaning = surah && (lang === "fr" ? surah.fr : lang === "en" ? surah.en : surah.ar);
+    if (title) cards.push({ lines: [["big", title], ...(meaning ? [["gap", ""], ["small", lang === "fr" || lang === "en" ? `(${meaning.toUpperCase()})` : meaning]] : [])] });
+    if (surah && surah.n) cards.push({ lines: [["chapter", chapter.replace("{n}", "\u0000")], ["n", String(surah.n)]] });
+    if (reciter) cards.push({ lines: [["small", by], ["gap", ""], ["big r", reciter.toUpperCase()]] });
+    return cards;
+  };
+  window.setIntro = function (card) {
+    const el = $("intro"), box = el.querySelector(".zoom");
+    el.hidden = !card;
+    box.replaceChildren();
+    if (!card) return;
+    const n = (card.lines.find(([c]) => c === "n") || [])[1];
+    for (const [cls, text] of card.lines) {
+      if (cls === "n") continue;
+      const line = document.createElement("div");
+      if (cls === "gap") { line.className = "gap"; box.append(line); continue; }
+      const s = document.createElement("span");
+      if (cls === "chapter") {  // the number in the accent colour
+        s.className = "ol small";
+        const [a, b] = text.split("\u0000");
+        s.style.fontSize = "calc(var(--title-size) * .78)";
+        setText(s, a + n + b, "", [[a, null], [n, css("--intro-accent")], [b, null]]);
+        s.querySelectorAll(".em").forEach(e => e.style.fontWeight = "inherit");
+      } else {
+        s.className = "ol " + cls + (cls.startsWith("big") ? " grad" : "");
+        setText(s, text);
+      }
+      line.append(s);
+      box.append(line);
+    }
+  };
+  // what stays all along (logo, band): shown or not
+  window.setFrame = function (on) { document.body.classList.toggle("noframe", !on); };
+  window.setLogo = function (url) { if (url) $("logo").src = url; else $("logo").removeAttribute("src"); };
+
   // style overrides: {"--block-top": "1150px", ...}; keys left out go back to the defaults
   window.setStyle = function (vars) {
     const root = document.documentElement.style;
     for (const k of [...root]) if (k.startsWith("--") && k !== "--ayah-font" && !(k in (vars || {}))) root.removeProperty(k);
     for (const [k, v] of Object.entries(vars || {})) root.setProperty(k, v);
+    applyLayout();
   };
   window.ready = loadFonts().then(() => document.fonts.ready);
   // after a change: lay out (which starts loading the fonts in use) and wait for them
   window.settle = async function () {
     document.body.getBoundingClientRect();
     await document.fonts.ready;
+    if ($("logo").getAttribute("src") && !$("logo").complete) await new Promise(r => { $("logo").onload = $("logo").onerror = r; });
     await new Promise(r => requestAnimationFrame(() => r()));
     await document.fonts.ready;
   };
+  applyLayout();
 </script>
 </body>
 </html>

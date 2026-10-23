@@ -25,6 +25,7 @@ from .segment import Block
 PKG = Path(__file__).parent
 ORIGIN = "http://tilawa.local"
 USER_FONTS: Path | None = None  # fonts imported by the user (set by the app)
+USER_LOGO: Path | None = None  # the user's logo, a PNG (set by the app)
 RUNNING: set = set()  # ffmpeg encodes in progress (stopped if the app quits)
 
 # aspect -> overlay canvas: texts are laid out on this canvas (in CSS pixels)
@@ -72,7 +73,7 @@ def block_payload(b: Block, lang: str = "fr") -> dict:
     """What the overlay page draws for a block (same as payload() in index.html)."""
     return {"num": f"{b.ayah}." if b.kind == "verse" else "", "fr": b.fr, "ar": b.ar, "tr": b.tr,
             "highlight": b.highlight, "ayah": b.ayah if ends_verse(b) else 0,
-            "rtl": quran.LANGS.get(lang, ("", "", "", False))[3]}
+            "rtl": quran.LANGS.get(lang, ("", "", "", False))[3], "lang": lang}
 
 
 def _serve(route):
@@ -82,6 +83,8 @@ def _serve(route):
         f = PKG / "fonts" / path.removeprefix("/fonts/")
     elif path.startswith("/userfonts/") and USER_FONTS:
         f = USER_FONTS / Path(path.removeprefix("/userfonts/")).name
+    elif path.startswith("/userlogo/") and USER_LOGO:
+        f = USER_LOGO
     else:
         f = PKG / "web" / path.lstrip("/")
     if not f.is_file():
@@ -109,19 +112,28 @@ class OverlayRenderer:
         self.page.goto(f"{ORIGIN}/overlay.html")
         self.page.evaluate("window.ready")
         self.page.evaluate("(f) => setCanvas(f, window.innerHeight)", fmt)
+        if USER_LOGO and USER_LOGO.is_file():
+            self.page.evaluate("(u) => setLogo(u)", f"{ORIGIN}/userlogo/logo.png?v={USER_LOGO.stat().st_mtime_ns}")
 
-    def png(self, header: dict | None, block: dict | None, style: dict | None, out: Path) -> tuple[Path, int]:
-        """Draw one overlay; returns the PNG (cropped to the band that holds
-        text, full width) and its vertical position in output pixels."""
-        set_all = "([h, b, s]) => { setStyle(s); setHeader(h); setBlock(b); }"
-        self.page.evaluate(set_all, [header, block, style or {}])
+    def cards(self, title: str, reciter: str, surah: int, lang: str) -> list[dict]:
+        """The title cards shown before the recitation (made by the page)."""
+        info = quran.surah(surah) if surah else None
+        return self.page.evaluate("([t, r, s, l]) => introCards(t, r, s, l)", [title, reciter, info, lang])
+
+    def png(self, out: Path, style: dict | None, header: dict | None = None, block: dict | None = None,
+            frame: bool = False, intro: dict | None = None) -> tuple[Path, int]:
+        """Draw one layer of the overlay; returns the PNG (cropped to the band
+        that holds something, full width) and its vertical position in output pixels."""
+        set_all = "([h, b, s, f, c]) => { setStyle(s); setHeader(h); setBlock(b); setFrame(f); setIntro(c); }"
+        args = [header, block, style or {}, frame, intro]
+        self.page.evaluate(set_all, args)
         self.page.evaluate("settle()")
         # again, now that the fonts are loaded (line breaks depend on them)
-        self.page.evaluate(set_all, [header, block, style or {}])
+        self.page.evaluate(set_all, args)
         self.page.evaluate("settle()")
         top, bottom = self.page.evaluate("""() => {
             let t = Infinity, b = -Infinity;
-            for (const el of document.querySelectorAll('#header .o, #block .o, #mic')) {
+            for (const el of document.querySelectorAll('.o, #mic, .ink')) {
                 const r = el.getBoundingClientRect();
                 if (!r.height || el.closest('[hidden]') || getComputedStyle(el).display === 'none') continue;
                 t = Math.min(t, r.top); b = Math.max(b, r.bottom);
@@ -164,6 +176,13 @@ TONEMAP = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
            "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p10le")
 SCALE = "flags=lanczos+accurate_rnd+full_chroma_int"
 MOTION_ZOOM = 1.12  # slow zoom on a background clip: from 1 to this factor (or back)
+# title cards before the recitation (style "--header-mode": "intro"): each card's
+# time on screen and fades, and the pause before the recitation starts
+INTRO_CARD, INTRO_FADE, INTRO_GAP = 2.6, 0.45, 0.3
+
+
+def header_mode(style: dict | None) -> str:
+    return str((style or {}).get("--header-mode") or "top").strip('"')
 
 
 # ---------------------------------------------------------------- background
@@ -313,6 +332,15 @@ def adjust_filter(adj: dict, cube: Path) -> str:
 def _prep(info: media.VideoInfo | None) -> str:
     """Bring any source to BT.709 limited-range yuv444p."""
     pre = f"{TONEMAP}," if info is not None and info.is_hdr and "zscale" in media.encoders() else ""
+    if info is not None and not pre and info.bit_depth <= 8 and info.color_range in (None, "tv", "unknown"):
+        # swscale's accurate path converts colour matrices at ~15 fps in 1080p:
+        # BT.601 goes through the colormatrix filter instead (same picture, ~20x
+        # faster), and BT.709 (or untagged HD, which is BT.709) needs no conversion
+        space = info.color_space or "unknown"
+        if space in ("smpte170m", "bt470bg"):
+            pre = "colormatrix=src=bt601:dst=bt709,"
+        if pre or space == "bt709" or (space == "unknown" and min(info.width, info.height) >= 720):
+            return f"{pre}scale=in_color_matrix=bt709:out_color_matrix=bt709:out_range=tv:{SCALE},format=yuv444p"
     return f"{pre}scale=out_color_matrix=bt709:out_range=tv:{SCALE},format=yuv444p"
 
 
@@ -366,8 +394,9 @@ def work_size(clips: list[dict], sizes: list[tuple[int, int]], w: int, h: int) -
 def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: Path | None,
                       t0: float, t1: float, w: int, h: int, inputs: _Inputs, graph: list[str],
                       work: Path, progress: Callable[[str, float], None], fmt: str = "9:16",
-                      out_pix: str = "yuv420p") -> str:
-    """Adds the background (w x h in out_pix, t1 - t0 long) to the graph; returns its label."""
+                      out_pix: str = "yuv420p", lead: float = 0.0) -> str:
+    """Adds the background (w x h in out_pix, lead + t1 - t0 long) to the graph; returns its label.
+    lead: seconds before the recitation (title cards), where the first clip starts earlier."""
     fps, rate = info.fps_str, info.fps
     W, H = w, h
     spans = []
@@ -377,6 +406,8 @@ def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: P
             spans.append((c, s, e))
     if not spans:
         spans = [(default_background(info.width, info.height, "auto", fmt)["clips"][0], 0.0, t1 - t0)]
+    if lead:
+        spans = [(c, s + lead if i else 0.0, e + lead) for i, (c, s, e) in enumerate(spans)]
     w, h = work_size([c for c, _, _ in spans], [_source_size(c, info, media_dir) for c, _, _ in spans], W, H)
     # crossfades: centred on each cut, at most half of either neighbour
     d = [0.0] + [min(float(bg.get("transition") or 0), (spans[i - 1][2] - spans[i - 1][1]) / 2,
@@ -390,8 +421,12 @@ def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: P
         src = c["src"]
         if src == "original":
             sinfo = info
-            k = inputs.add("-ss", f"{t0 + a:.3f}", "-to", f"{t0 + b:.3f}", "-i", str(video))
+            # in sync with the recitation; before the video's start, its first picture
+            src0 = t0 + a - lead
+            k = inputs.add("-ss", f"{max(0.0, src0):.3f}", "-to", f"{t0 + b - lead:.3f}", "-i", str(video))
             head = f"[{k}:v]setpts=PTS-STARTPTS,{_prep(sinfo)}"
+            if src0 < -0.001:
+                head += f",tpad=start_duration={-src0:.3f}:start_mode=clone"
         else:
             f = (media_dir / Path(src).name) if media_dir else Path(src)
             if f.suffix.lower() == ".png":  # imported photo
@@ -502,7 +537,7 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
            opt: RenderOptions | None = None, style: dict | None = None,
            progress: Callable[[str, float], None] | None = None,
            background: dict | None = None, media_dir: Path | None = None,
-           fmt: str = "9:16", lang: str = "fr") -> Path:
+           fmt: str = "9:16", lang: str = "fr", surah: int = 0) -> Path:
     """Make the video (or, with quality "png", a still image of its first frame)."""
     opt = opt or RenderOptions()
     progress = progress or (lambda stage, f: None)
@@ -523,19 +558,25 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     shown = [b for b in blocks if b.end > t0 and b.start < t1]
     renderer = OverlayRenderer(w, h, fmt)
     try:
-        header = renderer.png({"title": title, "reciter": reciter, "visible": opt.show_header}, None, style, work / "header.png")
+        intro = header_mode(style) == "intro" and opt.show_header and not still_image
+        cards = renderer.cards(title, reciter, surah, lang) if intro else []
+        # what stays all along: the header (unless shown as cards), the logo, the band
+        header = renderer.png(work / "header.png", style, {"title": title, "reciter": reciter, "visible": opt.show_header},
+                              frame=True)
+        card_pngs = [renderer.png(work / f"intro{k}.png", style, intro=c) for k, c in enumerate(cards)]
         pngs = []
         for i, b in enumerate(shown):
-            pngs.append(renderer.png(None, block_payload(b, lang), style, work / f"block{i:03d}.png"))
+            pngs.append(renderer.png(work / f"block{i:03d}.png", style, block=block_payload(b, lang)))
             progress("overlays", (i + 1) / max(1, len(shown)))
     finally:
         renderer.close()
+    lead = len(cards) * INTRO_CARD + INTRO_GAP if cards else 0.0
 
     # 2) compose + encode
     # Each overlay PNG is decoded and colour-converted once, then repeated with
     # the loop filter (cheap), faded, and placed at its time and height.
     fps = info.fps_str
-    total = t1 - t0
+    total = lead + t1 - t0
     if still_image:
         vargs, ext, enc_pix = [], ".png", "yuv444p"
     else:
@@ -554,19 +595,29 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     audio = inputs.add("-ss", f"{t0:.3f}", "-to", f"{t1:.3f}", "-i", str(video))
     graph: list[str] = []
     base = _background_graph(background or default_background(info.width, info.height, opt.fit, fmt),
-                             info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress, fmt, pix)
+                             info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress, fmt, pix, lead)
     hdr = inputs.add("-i", str(header[0]))
-    graph.append(f"{still(hdr, total)}[hdr]")
+    if lead:  # after the cards
+        graph.append(f"{still(hdr, total - lead)},fade=t=in:st=0:d={INTRO_FADE}:alpha=1,setpts=PTS+{lead:.3f}/TB[hdr]")
+    else:
+        graph.append(f"{still(hdr, total)}[hdr]")
     graph.append(f"[{base}][hdr]overlay=x=0:y={header[1]}:format={ov}:eof_action=pass[v0]")
     last = "v0"
+    for k, (png, y) in enumerate(card_pngs):
+        c = inputs.add("-i", str(png))
+        graph.append(f"{still(c, INTRO_CARD)},fade=t=in:st=0:d={INTRO_FADE}:alpha=1,"
+                     f"fade=t=out:st={INTRO_CARD - INTRO_FADE:.3f}:d={INTRO_FADE}:alpha=1,trim=duration={INTRO_CARD},"
+                     f"setpts=PTS+{k * INTRO_CARD:.3f}/TB[in{k}]")
+        graph.append(f"[{last}][in{k}]overlay=x=0:y={y}:format={ov}:eof_action=pass[vi{k}]")
+        last = f"vi{k}"
     for i, (b, (png, y)) in enumerate(zip(shown, pngs)):
-        s, e = max(b.start, t0) - t0, min(b.end, t1) - t0
+        s, e = max(b.start, t0) - t0 + lead, min(b.end, t1) - t0 + lead
         dur = max(e - s, 1 / info.fps)
         fi, fo = min(opt.fade_in, dur / 3), min(opt.fade_out, dur / 3)
         if still_image:
             fi = fo = 0  # a still shows the subtitle fully
         k = inputs.add("-i", str(png))
-        fade_in = f"fade=t=in:st=0:d={fi:.3f}:alpha=1," if b.start > t0 + 0.01 and fi > 0 else ""
+        fade_in = f"fade=t=in:st=0:d={fi:.3f}:alpha=1," if (b.start > t0 + 0.01 or lead) and fi > 0 else ""
         fade_out = f"fade=t=out:st={dur - fo:.3f}:d={fo:.3f}:alpha=1," if fo > 0 else ""
         graph.append(f"{still(k, dur)},{fade_in}{fade_out}trim=duration={dur:.3f},setpts=PTS+{s:.3f}/TB[o{i}]")
         graph.append(f"[{last}][o{i}]overlay=x=0:y={y}:format={ov}:eof_action=pass[v{i + 1}]")
@@ -588,8 +639,10 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         if info.acodec is not None and opt.loudnorm:
             progress("loudness", 0.0)
             afilters += [media.loudnorm_filter(video, t0, t1), "aresample=48000"]
+        if lead:  # silence under the title cards
+            afilters.append(f"adelay=delays={round(lead * 1000)}:all=1")
         if afi > 0:
-            afilters.append(f"afade=t=in:st=0:d={afi:.3f}")
+            afilters.append(f"afade=t=in:st={lead:.3f}:d={afi:.3f}")
         if afo > 0:
             afilters.append(f"afade=t=out:st={total - afo:.3f}:d={afo:.3f}")
         if info.acodec is not None and afilters:
