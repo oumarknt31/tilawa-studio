@@ -656,13 +656,17 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         tail = [*_audio_args(info, t0 > 0 or t1 < info.duration or bool(afilters)),
                 "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
         cmd = [*head, *vargs, *tail]
-    code, err = _run(cmd, work, total, progress)
-    if code > 0 and any("videotoolbox" in a for a in vargs):
-        # the media engine refused the job: same video with the software encoder
-        progress("encoding", 0.0)
-        code, err = _run([*head, *_encode_args(info, opt, hardware=False)[0], *tail], work, total, progress)
-    if code != 0:
-        raise RuntimeError(f"ffmpeg failed:\n{err[-3000:]}")
+    try:
+        code, err = _run(cmd, work, total, progress)
+        if code > 0 and any("videotoolbox" in a for a in vargs):
+            # the media engine refused the job: same video with the software encoder
+            progress("encoding", 0.0)
+            code, err = _run([*head, *_encode_args(info, opt, hardware=False)[0], *tail], work, total, progress)
+        if code != 0:
+            raise RuntimeError(f"ffmpeg failed:\n{err[-3000:]}")
+    except BaseException:
+        out.unlink(missing_ok=True)  # stopped or failed: no half-made video left behind
+        raise
     progress("encoding", 1.0)
     return out
 
@@ -676,8 +680,12 @@ def _run(cmd: list[str], work: Path, total: float, progress: Callable[[str, floa
         for line in proc.stdout:
             m = re.match(r"out_time_us=(\d+)", line)
             if m:
-                progress("encoding", min(1.0, int(m.group(1)) / 1e6 / total))
+                progress("encoding", min(1.0, int(m.group(1)) / 1e6 / total))  # raises if the export is cancelled
         err = proc.stderr.read()
         return proc.wait(), err
+    except BaseException:
+        proc.kill()
+        proc.wait()
+        raise
     finally:
         RUNNING.discard(proc)

@@ -22,11 +22,11 @@ from dataclasses import asdict, dataclass, field
 
 import numpy as np
 
-from . import quran
+from . import quran, translit
 from .i18n import UserError
 from .align import WordTiming
 
-ISTIADHA_TR = "AAoothu biAllahi mina alshshaytani alrrajeemi"
+ISTIADHA_TR = "AAoothu biAllahi mina alshshaytani alrrajeemi"  # in the Tanzil convention
 ISTIADHA_UTHMANI = "أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَـٰنِ ٱلرَّجِيمِ"
 
 
@@ -43,10 +43,24 @@ class Options:
     show_istiadha: bool = True
     show_basmala: bool = True
     lang: str = "fr"  # translation language (quran.LANGS)
+    translation: str = ""  # which translation of that language (quran.EDITIONS); "" = the default one
+    translit: str = "simple"  # how the phonetic line is written: translit.STYLES, or "tanzil"
 
 
-def translation(v: quran.Verse, lang: str) -> str:
-    return v.french if lang == "fr" else quran.translation(lang, v.surah, v.ayah)
+def translation(v: quran.Verse, lang: str, chosen: str | None = None) -> str:
+    if lang == "fr" and quran.edition("fr", chosen) == "fr.hamidullah":
+        return v.french
+    return quran.translation(lang, v.surah, v.ayah, chosen)
+
+
+def phonetic(kind: str, v: quran.Verse | None, a0: int, a1: int, style: str) -> list[str]:
+    """Transliterated words of a block: verse words [a0, a1), or the isti'adha / basmala."""
+    if kind == "istiadha":
+        return ISTIADHA_TR.split() if style == "tanzil" else translit.transliterate(quran.ISTIADHA.split(), style, True)
+    if kind == "basmala":
+        v = quran.verse(1, 1)
+        a0, a1 = 0, len(v.align)
+    return v.phonetic(a0, a1, style)
 
 
 @dataclass
@@ -356,7 +370,7 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
     # 2) length
     def too_long(ws):
         a0, a1 = ws[0].word.index, ws[-1].word.index + 1
-        fr_len = len(translation(v, opt.lang)) * _arabic_weight(v, a0, a1) / max(1.0, _arabic_weight(v, 0, len(v.align)))
+        fr_len = len(translation(v, opt.lang, opt.translation)) * _arabic_weight(v, a0, a1) / max(1.0, _arabic_weight(v, 0, len(v.align)))
         return (len(ws) > opt.max_words or fr_len > opt.max_french_chars or ws[-1].end - ws[0].start > opt.max_part_s)
 
     changed = True
@@ -372,7 +386,7 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
                     balance = abs(k / len(ws) - 0.5)
                     # prefer cuts the French translation can follow too
                     frac = _arabic_weight(v, 0, ws[k].word.index) / max(1.0, _arabic_weight(v, 0, len(v.align)))
-                    fr_fit = french_cut_cost(translation(v, opt.lang), frac, ws[k].word.text, opt.lang)
+                    fr_fit = french_cut_cost(translation(v, opt.lang, opt.translation), frac, ws[k].word.text, opt.lang)
                     score = (2.0 * max(waqf, 0) + (1.5 if waqf >= 0 else 0) + 6 * quiet - dip / 8
                              - 6 * balance - 0.5 * fr_fit)
                     if score > best:
@@ -432,27 +446,28 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
             # cut the whole verse translation, then keep the slices this run covers
             # (a run may start or stop mid-verse, e.g. when the clip is cut)
             inner = [(f, v.align[b]) for f, b in zip(fracs, bounds) if 0 < f < 1]
-            fr_parts = split_french(translation(v, opt.lang), [f for f, _ in inner], [w for _, w in inner], opt.lang)
+            fr_parts = split_french(translation(v, opt.lang, opt.translation), [f for f, _ in inner], [w for _, w in inner], opt.lang)
             offset = 1 if fracs[0] > 0 else 0
             for gi, ws in enumerate(group):
                 a0, a1 = bounds[gi], bounds[gi + 1]
                 d0, d1 = v.align_to_display[a0], v.align_to_display[a1]
                 fr = fr_parts[gi + offset] if gi + offset < len(fr_parts) else ""
+                tr = phonetic("verse", v, a0, a1, opt.translit)
                 blocks.append(Block(
                     "verse", v.surah, v.ayah, a0, a1, 0, 0,
-                    v.display_text(d0, d1), fr, v.translit_text(a0, a1),
+                    v.display_text(d0, d1), fr, " ".join(tr),
                     highlight=_is_tasbih(v, a0),
                     voice_start=ws[0].start, voice_end=ws[-1].end,
                     words=[{"t0": round(o.start, 3), "t1": round(o.end, 3), "w": o.word.text,
-                            "tr": v.translit_text(a0 + k, a0 + k + 1)} for k, o in enumerate(ws)],
+                            "tr": tr[k] if k < len(tr) else ""} for k, o in enumerate(ws)],
                 ))
         else:
             ws = group[0]
+            tr = " ".join(phonetic(p.kind, None, 0, 0, opt.translit))
             if p.kind == "istiadha":
-                ar, fr, tr = ISTIADHA_UTHMANI, quran.ISTIADHA_TRANSLATION[opt.lang], ISTIADHA_TR
+                ar, fr = ISTIADHA_UTHMANI, quran.ISTIADHA_TRANSLATION[opt.lang]
             else:
-                b = quran.verse(1, 1)
-                ar, fr, tr = quran.BASMALA_UTHMANI, translation(b, opt.lang), b.translit_text(0, len(b.align))
+                ar, fr = quran.BASMALA_UTHMANI, translation(quran.verse(1, 1), opt.lang, opt.translation)
             blocks.append(Block(p.kind, 0, 0, 0, len(ws), 0, 0, ar, fr, tr,
                                 voice_start=ws[0].start, voice_end=ws[-1].end,
                                 words=[{"t0": round(o.start, 3), "t1": round(o.end, 3), "w": o.word.text} for o in ws]))
@@ -484,15 +499,30 @@ def retime(blocks: list[Block], duration: float, opt: Options | None = None) -> 
 
 # ---------------------------------------------------------------- editing
 
-def verse_texts(b: Block) -> None:
+def verse_texts(b: Block, style: str = "simple") -> None:
     """Refresh the Arabic and phonetic text of a verse block from its word range."""
     v = quran.verse(b.surah, b.ayah)
     b.ar = v.display_text(v.align_to_display[b.a0], v.align_to_display[b.a1])
-    b.tr = v.translit_text(b.a0, b.a1)
+    set_phonetic(b, style)
     b.edited = False
 
 
-def split_block(blocks: list[Block], i: int, k: int, lang: str = "fr") -> None:
+def set_phonetic(b: Block, style: str) -> None:
+    """The phonetic line of a block (and of each of its words), in a convention."""
+    tr = phonetic(b.kind, quran.verse(b.surah, b.ayah) if b.kind == "verse" else None, b.a0, b.a1, style)
+    b.tr = " ".join(tr)
+    if b.kind == "verse":
+        for k, w in enumerate(b.words):
+            w["tr"] = tr[k] if k < len(tr) else ""
+
+
+def rephonetize(blocks: list[Block], style: str) -> None:
+    """Write the phonetic line of every block in another convention."""
+    for b in blocks:
+        set_phonetic(b, style)
+
+
+def split_block(blocks: list[Block], i: int, k: int, lang: str = "fr", style: str = "simple") -> None:
     """Split block i before its k-th word (1 <= k < number of words)."""
     b = blocks[i]
     if b.kind != "verse" or not 0 < k < len(b.words):
@@ -511,12 +541,12 @@ def split_block(blocks: list[Block], i: int, k: int, lang: str = "fr") -> None:
     local = (frac - lo) / max(hi - lo, 1e-6)
     first.fr, second.fr = split_french(b.fr, [local], [v.align[first.a1]], lang)
     for x in (first, second):
-        verse_texts(x)
+        verse_texts(x, style)
     second.highlight = _is_tasbih(v, second.a0)
     blocks[i: i + 1] = [first, second]
 
 
-def merge_blocks(blocks: list[Block], i: int) -> None:
+def merge_blocks(blocks: list[Block], i: int, style: str = "simple") -> None:
     """Merge block i with block i+1 (same verse, consecutive words)."""
     a, b = blocks[i], blocks[i + 1]
     if a.kind != b.kind or (a.surah, a.ayah) != (b.surah, b.ayah) or a.a1 != b.a0:
@@ -526,11 +556,11 @@ def merge_blocks(blocks: list[Block], i: int) -> None:
     a.fr = (a.fr + " " + b.fr).strip()
     a.highlight = a.highlight and b.highlight
     if a.kind == "verse":
-        verse_texts(a)
+        verse_texts(a, style)
     del blocks[i + 1]
 
 
-def retranslate(blocks: list[Block], lang: str) -> None:
+def retranslate(blocks: list[Block], lang: str, chosen: str | None = None) -> None:
     """Replace the translation line of every block with another language,
     cut at the same places as the Arabic."""
     i = 0
@@ -538,7 +568,7 @@ def retranslate(blocks: list[Block], lang: str) -> None:
         b = blocks[i]
         if b.kind != "verse":
             v = quran.verse(1, 1)
-            b.fr = quran.ISTIADHA_TRANSLATION[lang] if b.kind == "istiadha" else translation(v, lang)
+            b.fr = quran.ISTIADHA_TRANSLATION[lang] if b.kind == "istiadha" else translation(v, lang, chosen)
             i += 1
             continue
         # consecutive parts of the same recitation of a verse
@@ -552,7 +582,7 @@ def retranslate(blocks: list[Block], lang: str) -> None:
         bounds = [g.a0 for g in group] + [group[-1].a1]
         fracs = [_arabic_weight(v, 0, x) / total for x in bounds]
         inner = [(f, v.align[x]) for f, x in zip(fracs, bounds) if 0 < f < 1]
-        parts = split_french(translation(v, lang), [f for f, _ in inner], [w for _, w in inner], lang)
+        parts = split_french(translation(v, lang, chosen), [f for f, _ in inner], [w for _, w in inner], lang)
         offset = 1 if fracs[0] > 0 else 0
         for k, g in enumerate(group):
             g.fr = parts[k + offset] if k + offset < len(parts) else ""

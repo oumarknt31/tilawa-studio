@@ -3,6 +3,7 @@ JSON so it can be reviewed and edited before rendering."""
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 import shutil
@@ -13,7 +14,7 @@ from typing import Callable
 
 import numpy as np
 
-from . import align, identify, media, quran, render, segment
+from . import align, identify, media, quran, render, segment, translit
 from .i18n import UserError
 
 Progress = Callable[[str, float], None]
@@ -75,12 +76,16 @@ class Project:
     def load(folder: Path) -> "Project":
         d = json.loads((folder / "project.json").read_text(encoding="utf-8"))
         d["folder"] = folder
-        return Project(**{k: v for k, v in d.items() if k in Project.__dataclass_fields__})
+        p = Project(**{k: v for k, v in d.items() if k in Project.__dataclass_fields__})
+        if p.blocks and "translit" not in p.segment:
+            p.segment["translit"] = "tanzil"  # made before the other conventions: its phonetic is Tanzil's
+        return p
 
 
 def create(folder: Path, source: str, surah: int, first_verse: int, last_verse: int | None = None,
            reciter: str = "", title: str = "", progress: Progress | None = None,
-           fmt: str = "9:16", lang: str = "fr", style: dict | None = None) -> Project:
+           fmt: str = "9:16", lang: str = "fr", style: dict | None = None, translit: str = "simple",
+           translation: str = "") -> Project:
     """Copy (or download) the source into the project folder. surah 0: find it in the audio."""
     progress = progress or (lambda s, f: None)
     folder.mkdir(parents=True, exist_ok=True)
@@ -110,7 +115,7 @@ def create(folder: Path, source: str, surah: int, first_verse: int, last_verse: 
     p = Project(folder, path.name, surah, first_verse or 1, last_verse, reciter.strip(),
                 title.strip() or (render.surah_title(surah, lang) if surah else ""), info.duration, info.width, info.height,
                 format=fmt, lang=lang, style=dict(style or {}), audio_only=audio_only)
-    p.segment["lang"] = lang
+    p.segment.update(lang=lang, translit=translit, translation=quran.edition(lang, translation) or "")
     p.save()
     return p
 
@@ -235,17 +240,139 @@ def convert_format(p: Project, fmt: str) -> None:
                 c["zoom"] = round(z_new, 4)  # filled the frame: keeps filling it
 
 
-def set_language(p: Project, lang: str) -> None:
-    """Translation in another language, cut like the Arabic."""
+def set_language(p: Project, lang: str, chosen: str | None = None) -> None:
+    """Translation in another language (or another translation of it), cut like the Arabic."""
     if lang not in quran.LANGS:
         raise UserError("bad_format_lang")
+    edition = quran.edition(lang, chosen) or ""
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
-    segment.retranslate(blocks, lang)
+    segment.retranslate(blocks, lang, edition)
     if p.surah and p.title == render.surah_title(p.surah, p.lang):
         p.title = render.surah_title(p.surah, lang)
     p.lang = lang
-    p.segment["lang"] = lang
+    p.segment["lang"], p.segment["translation"] = lang, edition
     p.blocks = [b.to_dict() for b in blocks]
+
+
+def set_translit(p: Project, style: str) -> None:
+    """Write the phonetic line of every subtitle in another convention."""
+    if style not in translit.STYLES and style != "tanzil":
+        raise UserError("bad_format_lang")
+    blocks = [segment.Block.from_dict(b) for b in p.blocks]
+    segment.rephonetize(blocks, style)
+    p.segment["translit"] = style
+    p.blocks = [b.to_dict() for b in blocks]
+
+
+# ---------------------------------------------------------------- a verse heard as another one
+#
+# Many verses are repeated word for word (Ar-Rahman's refrain, 31 times) or
+# nearly, in the same surah or elsewhere: the aligner may give a recitation the
+# number of the wrong one. These find the verses that read the same as a
+# subtitle, check each against the audio, and re-align that stretch of the
+# recitation with the one chosen.
+
+def occurrence(p: Project, i: int) -> tuple[int, int]:
+    """Blocks [j0, j1) of the recitation of the verse that block i is part of
+    (its parts in a row, repeats included: the aligner follows repeats)."""
+    bl = p.blocks
+    if not 0 <= i < len(bl) or bl[i]["kind"] != "verse":
+        raise UserError("not_a_verse")
+    def same(x, y):  # y goes on x's recitation: same verse, and not a new one after a complete one
+        return (x["kind"] == y["kind"] == "verse" and (x["surah"], x["ayah"]) == (y["surah"], y["ayah"])
+                and not (y["a0"] == 0 and x["a1"] >= len(quran.verse(x["surah"], x["ayah"]).align)))
+    j0, j1 = i, i + 1
+    while j0 > 0 and same(bl[j0 - 1], bl[j0]):
+        j0 -= 1
+    while j1 < len(bl) and same(bl[j1 - 1], bl[j1]):
+        j1 += 1
+    return j0, j1
+
+
+def _window(p: Project, j0: int, j1: int) -> tuple[float, float]:
+    """The stretch of audio of blocks [j0, j1), with a little margin (not into the neighbours' voice)."""
+    bl = p.blocks
+    lo = bl[j0 - 1]["voice_end"] if j0 > 0 else 0.0
+    hi = bl[j1]["voice_start"] if j1 < len(bl) else p.duration
+    return max(lo, bl[j0]["voice_start"] - 0.3), min(hi, bl[j1 - 1]["voice_end"] + 0.3)
+
+
+def _heard(em: np.ndarray, model, v: quran.Verse, t0: float, t1: float) -> list:
+    """The verse aligned on [t0, t1] of the recitation (word timings on the whole video's clock)."""
+    f0, f1 = int(t0 / align.FRAME_S), int(np.ceil(t1 / align.FRAME_S))
+    occ = align.align(em[f0:f1], model, [v], prefixes=False)
+    return [align.WordTiming(o.word, o.start + f0 * align.FRAME_S, o.end + f0 * align.FRAME_S, o.score) for o in occ]
+
+
+def verse_candidates(p: Project, i: int, progress: Progress | None = None, limit: int = 6) -> dict:
+    """Verses the recitation of block i's verse could be, the most likely first."""
+    progress = progress or (lambda s, f: None)
+    j0, j1 = occurrence(p, i)
+    blocks = p.blocks[j0:j1]
+    cur = (blocks[0]["surah"], blocks[0]["ayah"])
+    heard = quran.skeleton(" ".join(w["w"] for b in blocks for w in b["words"])).replace(" ", "")
+    prev = next((b for b in reversed(p.blocks[:j0]) if b["kind"] == "verse"), None)
+    after_prev = (prev["surah"], prev["ayah"] + 1) if prev else None
+    # verses reading the same: letter groups of the subtitle found in them
+    full, owner, grams = identify._index()
+    votes: dict[tuple[int, int], float] = {}
+    n = identify.N
+    for k in range(0, max(1, len(heard) - n + 1)):
+        for pos in grams.get(heard[k:k + n], [])[:400]:
+            votes[owner[pos]] = votes.get(owner[pos], 0) + 1
+    near = sorted(votes, key=lambda key: -votes[key])[:40]
+    for key in (cur, after_prev, (cur[0], cur[1] - 1), (cur[0], cur[1] + 1)):  # and the verses around
+        if key and 1 <= key[1] <= quran.surah(key[0])["verses"] and key not in near:
+            near.append(key)
+    def letters(key):
+        return quran.skeleton(" ".join(quran.verse(*key).align)).replace(" ", "")
+
+    alike = []
+    for key in near:
+        sm = difflib.SequenceMatcher(None, heard, letters(key), autojunk=False)
+        alike.append((sum(m.size for m in sm.get_matching_blocks()) / max(1, len(heard)), key))
+    alike.sort(key=lambda x: (-x[0], x[1] != cur, x[1] != after_prev))
+    picks = [key for c, key in alike if c >= 0.6][:limit] or [key for _, key in alike[:limit]]
+    # what the audio says: the letters the model hears on this stretch, compared with each verse
+    progress("listening", 0.3)
+    model = align.get_model()
+    em = np.load(p.folder / "emissions.npy")
+    t0, t1 = _window(p, j0, j1)
+    said = identify._letters(identify.transcript(em[int(t0 / align.FRAME_S):int(np.ceil(t1 / align.FRAME_S))], model))
+    # the part of each verse this recitation covers (a clip may stop mid-verse)
+    part = (blocks[-1]["a1"] - blocks[0]["a0"]) / max(1, len(quran.verse(*cur).align))
+    out = []
+    for key in picks:
+        text = letters(key)
+        m = sum(b.size for b in difflib.SequenceMatcher(None, said, text, autojunk=False).get_matching_blocks())
+        expect = len(text) * (part if key == cur or len(text) > len(heard) * 1.2 else 1.0)
+        out.append({"surah": key[0], "ayah": key[1], "name": quran.surah(key[0])["name"],
+                    "ar": quran.verse(*key).display_text(), "same_text": text == letters(cur),
+                    "audio": round(2 * m / max(1, len(said) + expect), 3), "current": key == cur, "follows": key == after_prev})
+    out.sort(key=lambda c: (-round(c["audio"], 2), not c["follows"], not c["current"]))
+    return {"index": j0, "parts": j1 - j0, "current": {"surah": cur[0], "ayah": cur[1]}, "candidates": out}
+
+
+def set_verse(p: Project, i: int, s: int, a: int, progress: Progress | None = None) -> None:
+    """Give the recitation of block i's verse to verse s:a: that stretch is aligned again with it."""
+    progress = progress or (lambda st, f: None)
+    j0, j1 = occurrence(p, i)
+    v = quran.verse(s, a)
+    progress("aligning", 0.2)
+    t0, t1 = _window(p, j0, j1)
+    occ = _heard(np.load(p.folder / "emissions.npy"), align.get_model(), v, t0, t1)
+    if not occ:
+        raise UserError("no_verse")
+    opt = segment.Options(**{k: x for k, x in p.segment.items() if k in segment.Options.__dataclass_fields__})
+    opt.lang = p.lang
+    progress("aligning", 0.6)
+    new = segment.build_blocks(occ, [v], media.load_audio(p.video_path), p.duration, opt)
+    new = [b for b in new if b.kind == "verse"]
+    if not new:
+        raise UserError("no_verse")
+    # the new parts take the place of the old ones on screen
+    new[0].start, new[-1].end = p.blocks[j0]["start"], p.blocks[j1 - 1]["end"]
+    p.blocks[j0:j1] = [b.to_dict() for b in new]
 
 
 def add_media(p: Project, src: Path, name: str) -> dict:

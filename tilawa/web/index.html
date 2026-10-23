@@ -208,6 +208,11 @@
   .themes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .themes-head { font-size: 12px; color: var(--muted); margin: 12px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
   .themes-head:first-child { margin-top: 0; }
+  .vcand { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 12px; margin-bottom: 8px; }
+  .vcand.best { border-color: var(--accent); }
+  .vcand .ar { grid-column: 1 / -1; direction: rtl; font: 20px/1.8 "Amiri Quran", serif; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vcand .meter { height: 5px; border-radius: 3px; background: var(--line-2); overflow: hidden; width: 120px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .vcand .meter > div { height: 100%; background: var(--accent); }
   .logo-sugg { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
   .lsug { border: 1px solid var(--line-2); border-radius: 12px; padding: 8px; cursor: pointer; background: var(--bg); }
   .lsug:hover { border-color: var(--accent); }
@@ -549,7 +554,10 @@
       </div>
       <div class="section">
         <div class="sh"><h3>Traduction</h3></div>
-        <div class="field"><label>Langue</label><select id="e-lang" onchange="changeLanguage(this.value)"></select></div>
+        <div class="grid2">
+          <div class="field"><label>Langue</label><select id="e-lang" onchange="changeLanguage(this.value)"></select></div>
+          <div class="field" id="e-trans-row"><label>Traduction de</label><select id="e-trans" onchange="changeLanguage($('e-lang').value, this.value)"></select></div>
+        </div>
         <label>Police (traduction, numéro et phonétique)</label>
         <div class="fontpick" id="font-text"></div>
         <div class="sizes" style="margin-top:10px">${SIZE:fr:Traduction}${SIZE:num:Numéro}${SIZE:tr:Phonétique}</div>
@@ -557,6 +565,14 @@
           <label class="toggle"><input type="checkbox" id="show-num" onchange="setLook('--num-display', this.checked ? null : 'none')"> Numéro au-dessus (« 12. »)</label>
           <label class="toggle"><input type="checkbox" id="show-tr" onchange="setLook('--tr-display', this.checked ? null : 'none')"> Phonétique</label>
         </div>
+        <div class="field" style="margin-top:10px"><label>Écriture de la phonétique</label>
+          <select id="e-translit" onchange="changeTranslit(this.value)">
+            <option value="simple">Lisible — Wal yawmil maw'ood</option>
+            <option value="fr">Lisible, à la française — Wal yawmil maw'oud</option>
+            <option value="academic">Savante — wa-l-yawmi l-mawʿūd</option>
+            <option value="tanzil">Tanzil (ancienne) — Waalyawmi almawAAoodi</option>
+          </select></div>
+        <p class="faint small" style="margin:4px 0 0">Écrite d'après l'arabe, mot par mot, avec les mêmes règles partout : rien ne manque, et un passage coupé ou corrigé se lit toujours de la même façon.</p>
         <label style="margin-top:12px">Mots importants</label>
         <div class="seg-ctl" id="emph">
           <button data-v="none" onclick="setLook('--emph', null)">Normal</button>
@@ -680,6 +696,8 @@
       <div id="r-box" class="hidden" style="margin-top:12px">
         <div class="row"><span id="r-stage" class="muted small grow"></span><span id="r-pct" class="small"></span></div>
         <div class="progress" style="margin-top:6px"><div id="r-bar"></div></div>
+        <div class="row" style="margin-top:8px"><span class="grow"></span>
+          <button class="small ghost" id="r-cancel" onclick="cancelJob()">Annuler l'export</button></div>
         <div id="r-error" class="error" style="margin-top:8px"></div>
       </div>
       <div id="r-done" class="done-box hidden"></div>
@@ -793,6 +811,13 @@
   </div>
 </dialog>
 
+<dialog id="verse-dlg" style="max-width:640px">
+  <h2>Quel verset est récité ici ?</h2>
+  <p class="muted" style="margin-top:0">Beaucoup de versets se répètent mot pour mot ou presque, dans la même sourate ou ailleurs.
+    Voici ceux qui se lisent pareil, comparés à ce que j'entends dans ce passage.</p>
+  <div id="verse-body"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="ghost" onclick="$('verse-dlg').close()">Fermer</button></div>
+</dialog>
 <dialog id="ask" style="max-width:440px">
   <p id="ask-msg" style="margin:0 0 14px;line-height:1.5"></p>
   <input id="ask-input" class="hidden" style="margin-bottom:14px">
@@ -996,6 +1021,26 @@ const EN = {
   "Studio — même qualité, fichier ⅓ plus léger, mais très lent": "Studio — same quality, ⅓ smaller file, but very slow", "Créer la vidéo": "Create the video", "Image": "Image",
   "L'image affichée dans l'aperçu, en pleine résolution (PNG) : idéale pour une miniature YouTube.":
     "The picture shown in the preview, at full resolution (PNG): ideal for a YouTube thumbnail.",
+  "Traduction de": "Translation by", "Écriture de la phonétique": "Transliteration style",
+  "Lisible — Wal yawmil maw'ood": "Easy to read — Wal yawmil maw'ood", "Lisible, à la française — Wal yawmil maw'oud": "Easy to read, French spelling — Wal yawmil maw'oud",
+  "Savante — wa-l-yawmi l-mawʿūd": "Scholarly — wa-l-yawmi l-mawʿūd", "Tanzil (ancienne) — Waalyawmi almawAAoodi": "Tanzil (old) — Waalyawmi almawAAoodi",
+  "Écrite d'après l'arabe, mot par mot, avec les mêmes règles partout : rien ne manque, et un passage coupé ou corrigé se lit toujours de la même façon.":
+    "Written from the Arabic, word by word, with the same rules everywhere: nothing is missing, and a part that is cut or corrected always reads the same way.",
+  "Réécrire la phonétique de tous les sous-titres ? (tes corrections de la phonétique seront remplacées)":
+    "Rewrite the transliteration of every subtitle? (your corrections of the transliteration will be replaced)",
+  "Phonétique réécrite": "Transliteration rewritten",
+  "Quel verset est récité ici ?": "Which verse is recited here?",
+  "Beaucoup de versets se répètent mot pour mot ou presque, dans la même sourate ou ailleurs.": "Many verses repeat word for word or nearly, in the same surah or elsewhere.",
+  "Voici ceux qui se lisent pareil, comparés à ce que j'entends dans ce passage.": "Here are those that read the same, compared with what I hear in this passage.",
+  "Fermer": "Close", "Pas le bon verset ?": "Wrong verse?", "si un autre verset qui se lit pareil a été reconnu à sa place": "if another verse that reads the same was recognised instead",
+  "J'écoute ce passage…": "Listening to this passage…", "Les {n} sous-titres de ce verset seront refaits ensemble.": "The {n} subtitles of this verse will be redone together.",
+  "verset {n}": "verse {n}", "actuel": "current", "suit le verset précédent": "follows the previous verse", "même texte": "same text",
+  "{p} % de ce que j'entends": "{p} % of what I hear", "déjà choisi": "already chosen", "C'est celui-là": "This one", "Un autre verset": "Another verse",
+  "Ce verset ne correspond pas bien à ce que j'entends ({p} %). Le choisir quand même ?": "This verse doesn't match what I hear well ({p} %). Choose it anyway?",
+  "Je recale ce passage sur le verset {n}…": "Aligning this passage with verse {n}…", "Verset {n} : sous-titres refaits": "Verse {n}: subtitles redone",
+  "Pas le bon passage ? J'ai aussi reconnu :": "Wrong passage? I also recognised:",
+  "Un seul verset mal reconnu : « Pas le bon verset ? » sous ce sous-titre.": "Only one verse recognised wrongly: « Wrong verse? » under that subtitle.",
+  "Annuler l'export": "Cancel the export", "Arrêt…": "Stopping…", "Export annulé": "Export cancelled", "Annulé": "Cancelled",
   "Exporter l'image à": "Export the image at", "Déjà exporté": "Already exported", "Analyse de la récitation": "Recitation analysis",
   "✨ Détection automatique": "✨ Automatic detection", "Choisir": "Choose", "premier verset": "first verse", "dernier verset": "last verse",
   "Réanalyser": "Analyse again", "annule les modifications d'horaires": "undoes timing changes", "Horaires automatiques": "Automatic timings",
@@ -1041,7 +1086,7 @@ function t(s, vars) {
 }
 // the fixed texts of the page; parts filled by the code are rendered with t()
 const DYN = ["ed-badges", "saved", "new-formats", "surah", "a-surah", "lang", "e-lang", "new-style", "job-title", "job-stage", "job-error",
-  "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes", "font-num", "font-tr", "intro-note", "logo-sugg",
+  "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes", "font-num", "font-tr", "intro-note", "logo-sugg", "e-trans", "verse-body",
   "font-title", "font-arabic", "font-text", "colors-title", "colors-ar", "colors-text", "colors-outline", "res", "r-done", "r-stage",
   "r-pct", "r-error", "exports", "ed-formats", "still-t", "time", "safe", "tl-ruler", "tl-bg", "tl-subs", "fmt-name", "toasts", "src-name", "ui-lang"];
 const original = new WeakMap();
@@ -1176,7 +1221,7 @@ async function init() {
   if (!localStorage.getItem("ui") && settings.ui) UI = settings.ui;
   translateDom();
   fillSelects();
-  $("lang").value = settings.lang || (UI === "fr" ? "fr" : "en");
+  $("lang").value = newLangValue(settings.lang || (UI === "fr" ? "fr" : "en"));
   renderStyleSelect();
   newFormat = settings.format || "9:16";
   renderFormatTiles();
@@ -1192,9 +1237,26 @@ function fillSelects() {
   const keep = [$("surah").value, $("a-surah").value, $("lang").value, $("e-lang").value];
   const opts = surahs.map(s => `<option value="${s.n}">${esc(surahLabel(s.n))}</option>`).join("");
   $("surah").innerHTML = opts; $("a-surah").innerHTML = opts;
-  const langOpts = langs.map(l => `<option value="${l.code}">${esc(t(l.name))}${l.translator ? " — " + esc(l.translator) : ""}</option>`).join("");
-  $("lang").innerHTML = langOpts; $("e-lang").innerHTML = langOpts;
-  [$("surah").value, $("a-surah").value, $("lang").value, $("e-lang").value] = keep.map((v, i) => v || [1, 1, "fr", "fr"][i]);
+  // the new video form lists each translation of a language; the editor has a second menu for them
+  $("lang").innerHTML = langs.map(l => l.editions.length > 1
+    ? l.editions.map(e => `<option value="${l.code}|${e.id}">${esc(t(l.name))} — ${esc(e.translator)}</option>`).join("")
+    : `<option value="${l.code}">${esc(t(l.name))}${l.translator ? " — " + esc(l.translator) : ""}</option>`).join("");
+  $("e-lang").innerHTML = langs.map(l => `<option value="${l.code}">${esc(t(l.name))}${l.editions.length === 1 ? " — " + esc(l.translator) : ""}</option>`).join("");
+  [$("surah").value, $("a-surah").value, $("lang").value, $("e-lang").value] = keep.map((v, i) => v || [1, 1, newLangValue("fr"), "fr"][i]);
+}
+// value of the new video form's language menu: the language and the translation used last for it
+function newLangValue(code) {
+  const l = langs.find(x => x.code === code);
+  if (!l || l.editions.length <= 1) return code;
+  const ed = (settings.translations || {})[code];
+  return `${code}|${l.editions.some(e => e.id === ed) ? ed : l.editions[0].id}`;
+}
+function renderEditions() {
+  const l = langs.find(x => x.code === P.lang), eds = l ? l.editions : [];
+  $("e-trans-row").classList.toggle("hidden", eds.length <= 1);
+  $("e-trans").innerHTML = eds.map(e => `<option value="${e.id}">${esc(e.translator)}</option>`).join("");
+  if (eds.length) $("e-trans").value = eds.some(e => e.id === P.segment.translation) ? P.segment.translation : eds[0].id;
+  $("e-translit").value = P.segment.translit || "tanzil";
 }
 function loadFaces() {
   // the fonts of the pickers (the preview loads its own, in the overlay)
@@ -1250,7 +1312,9 @@ async function createProject() {
     if ($("last").value) fd.append("last_verse", $("last").value);
   }
   const reciter = $("reciter").value.trim();
-  fd.append("reciter", reciter); fd.append("format", newFormat); fd.append("lang", $("lang").value); fd.append("style", $("new-style").value);
+  const [lang, translation = ""] = $("lang").value.split("|");
+  fd.append("reciter", reciter); fd.append("format", newFormat); fd.append("lang", lang); fd.append("translation", translation);
+  fd.append("style", $("new-style").value);
   if (newSource.file) fd.append("file", newSource.file); else fd.append("url", newSource.url);
   if (reciter) {
     const rec = [reciter, ...(settings.reciters || []).filter(x => x !== reciter)].slice(0, 40);
@@ -1286,6 +1350,7 @@ async function follow(job, stageEl, barEl, steps = false, pctEl = null) {
     });
     if (j.status === "done") return j.result;
     if (j.status === "error") throw new Error(j.error);
+    if (j.status === "cancelled") throw Object.assign(new Error(t("Annulé")), { cancelled: true });
     await new Promise(r => setTimeout(r, 400));
   }
 }
@@ -1350,7 +1415,7 @@ function refreshAll() {
   $("r-fade").value = r.fade_in; $("r-trim-start").value = r.trim_start || ""; $("r-trim-end").value = r.trim_end || "";
   $("r-afi").value = r.audio_fade_in || 0; $("r-afo").value = r.audio_fade_out || 0;
   $("r-header").checked = r.show_header; $("r-loud").checked = r.loudnorm !== false;
-  $("e-lang").value = P.lang;
+  $("e-lang").value = P.lang; renderEditions();
   $("ed-formats").innerHTML = formatTiles(P.format, "askFormat");
   renderResolutions(); renderNotice(); renderBlocks(); renderBgPanel(); renderStylePanel(); renderExports(); renderAnalysis();
   refreshCtls(); layoutStage(); tlRender(); redraw();
@@ -1936,6 +2001,13 @@ function renderNotice() {
     if (m.length && m[0].surah !== P.surah && m[0].coverage > 0.7)
       html += `<div class="notice warn">${t("J'entends plutôt la sourate {name} (versets {range}).", { name: `<b>${esc(name(m[0].surah))}</b>`, range: `${m[0].first}–${m[0].last}` })}
         <button class="small" style="margin-left:6px" onclick="useDetected()">${t("Utiliser la détection")}</button></div>`;
+    // the same words are in other places of the Quran: the other passages heard, one click away
+    const others = m.filter(x => !(x.surah === P.surah && x.first <= Math.max(...ayahs) && x.last >= Math.min(...ayahs)) && x.coverage > 0.5);
+    if (others.length)
+      html += `<div class="notice">${t("Pas le bon passage ? J'ai aussi reconnu :")} ${others.map(x => `<button class="small" style="margin:3px 4px 0 0"
+        onclick="reanalyze({ surah: ${x.surah}, first_verse: ${x.first}, last_verse: ${x.last} })">${esc(name(x.surah))} ${x.first}–${x.last}
+        <span class="faint">· ${Math.round(x.coverage * 100)} %</span></button>`).join("")}
+        <div class="small muted" style="margin-top:4px">${t("Un seul verset mal reconnu : « Pas le bon verset ? » sous ce sous-titre.")}</div></div>`;
   }
   $("notice").innerHTML = html;
   const pick = $("pick-surah");
@@ -1982,6 +2054,7 @@ function renderBlocks() {
       <div class="tools">
         <label class="toggle"><input type="checkbox" ${b.highlight ? "checked" : ""} onchange="setHl(${i}, this.checked)"> ${t("✨ Mise en valeur")}</label>
         <span class="grow"></span>
+        ${b.kind === "verse" ? `<button class="small ghost" onclick="chooseVerse(${i})" title="${t("si un autre verset qui se lit pareil a été reconnu à sa place")}">${t("Pas le bon verset ?")}</button>` : ""}
         ${b.edited && b.kind === "verse" ? `<button class="small ghost" onclick="restoreText(${i})" title="${t("annuler tes corrections de l'arabe et de la phonétique")}">${t("↺ Texte d'origine")}</button>` : ""}
         ${canMerge ? `<button class="small ghost" onclick="mergeNext(${i})" title="${t("réunir avec le sous-titre suivant")}">${t("Fusionner ↓")}</button>` : ""}
         <button class="small ghost icon danger" onclick="removeBlock(${i})" title="${t("supprimer ce sous-titre")}">${icon("trash", 14)}</button>
@@ -1996,6 +2069,46 @@ function setText(i, key, v) {
   if (first) $("b" + i).querySelector(".top").insertAdjacentHTML("beforeend", `<span class="badge gold">${t("corrigé")}</span>`);
 }
 async function restoreText(i) { await serverEdit("restore", { index: i }); }
+// A recitation heard as another verse that reads the same: the verses it could be,
+// checked against the audio, and the stretch aligned again with the one chosen.
+async function chooseVerse(i) {
+  await save();
+  const body = $("verse-body");
+  body.innerHTML = `<p class="muted">${t("J'écoute ce passage…")}</p>`;
+  $("verse-dlg").showModal();
+  try {
+    const { job } = await api(`/api/projects/${pid()}/verse-candidates`, json({ index: i }));
+    const r = await follow(job, null, null);
+    const name = (c) => `${t("Sourate {name}", { name: esc(c.name) })}, ${t("verset {n}", { n: c.ayah })}`;
+    body.innerHTML = (r.parts > 1 ? `<p class="small muted" style="margin-top:0">${t("Les {n} sous-titres de ce verset seront refaits ensemble.", { n: r.parts })}</p>` : "")
+      + r.candidates.map((c, k) => `<div class="vcand ${k === 0 ? "best" : ""}">
+        <div><b>${name(c)}</b>
+          ${c.current ? `<span class="badge">${t("actuel")}</span>` : ""}
+          ${c.follows ? `<span class="badge teal">${t("suit le verset précédent")}</span>` : ""}
+          ${c.same_text && !c.current ? `<span class="badge">${t("même texte")}</span>` : ""}
+          <div class="small muted" style="margin-top:4px"><span class="meter"><div style="width:${Math.round(c.audio * 100)}%"></div></span>${t("{p} % de ce que j'entends", { p: Math.round(c.audio * 100) })}</div></div>
+        ${c.current ? `<span class="small muted">${t("déjà choisi")}</span>` : `<button class="small ${k === 0 ? "primary" : ""}" onclick="setVerse(${i}, ${c.surah}, ${c.ayah}, ${c.audio})">${t("C'est celui-là")}</button>`}
+        <div class="ar">${esc(c.ar)}</div></div>`).join("")
+      + `<details style="margin-top:10px"><summary class="small">${t("Un autre verset")}</summary>
+          <div class="row" style="margin-top:8px"><select id="vd-surah" style="flex:2">${$("surah").innerHTML}</select>
+          <input id="vd-ayah" type="number" min="1" value="${r.current.ayah}" style="flex:1">
+          <button class="small" onclick="setVerse(${i}, +$('vd-surah').value, +$('vd-ayah').value, null)">${t("Choisir")}</button></div></details>`;
+    $("vd-surah").value = r.current.surah;
+  } catch (e) { body.innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+}
+async function setVerse(i, surah, ayah, audio) {
+  if (audio !== null && audio < 0.5 && !await ask(t("Ce verset ne correspond pas bien à ce que j'entends ({p} %). Le choisir quand même ?", { p: Math.round(audio * 100) }))) return;
+  $("verse-body").innerHTML = `<p class="muted">${t("Je recale ce passage sur le verset {n}…", { n: ayah })}</p>`;
+  try {
+    const { job } = await api(`/api/projects/${pid()}/set-verse`, json({ index: i, surah, ayah }));
+    await follow(job, null, null);
+    const p = await api(`/api/projects/${pid()}`);
+    undoStack.push(lastState); redoStack.length = 0; lastGroup = null;
+    loadState(p); lastState = state(); refreshAll();
+    $("verse-dlg").close();
+    toast(`${icon("check")} ${t("Verset {n} : sous-titres refaits", { n: ayah })}`, "ok");
+  } catch (e) { $("verse-body").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+}
 function setFr(i, v) { P.blocks[i].fr = v; changed({ group: "fr" + i }); }
 function setHl(i, v) { P.blocks[i].highlight = v; changed({ tl: true }); }
 function setMeta(title) {
@@ -2050,7 +2163,7 @@ async function reanalyze(body, quiet) {
   if (!quiet && !await ask(t("Réanalyser la récitation ? Les sous-titres seront recréés (tes modifications de sous-titres seront remplacées)."))) return;
   await save();
   setTab("export");
-  $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
+  $("r-box").classList.remove("hidden"); $("r-error").textContent = ""; $("r-cancel").classList.add("hidden");
   toast(t("Analyse en cours…"));
   try {
     const { job } = await api(`/api/projects/${pid()}/analyze`, json(body));
@@ -2271,12 +2384,24 @@ async function setDefaultStyle(id) {
   renderStylePanel(); renderStyleSelect();
   toast(t("Style par défaut des nouvelles vidéos : {name}", { name: esc(t(styles.find(s => s.id === id)?.name || "")) }));
 }
-async function changeLanguage(lang) {
+async function changeLanguage(lang, edition) {
   if (P.blocks.some(b => b.kind === "verse") && !await ask(t("Remplacer la traduction de tous les sous-titres ? (tes modifications de la traduction seront perdues)"))) {
-    $("e-lang").value = P.lang; return;
+    $("e-lang").value = P.lang; renderEditions(); return;
   }
-  await serverEdit("language", { lang });
-  toast(t("Traduction : {name}", { name: esc(t(langs.find(l => l.code === lang)?.name || "")) }));
+  // another language: the translation used last for it
+  edition = edition || (settings.translations || {})[lang] || "";
+  await serverEdit("language", { lang, translation: edition });
+  settings.translations = { ...(settings.translations || {}), [P.lang]: P.segment.translation };
+  const l = langs.find(x => x.code === lang), ed = l?.editions.find(e => e.id === P.segment.translation);
+  toast(t("Traduction : {name}", { name: esc(t(l?.name || "")) + (ed && l.editions.length > 1 ? " — " + esc(ed.translator) : "") }));
+}
+async function changeTranslit(style) {
+  if (P.blocks.some(b => b.edited) && !await ask(t("Réécrire la phonétique de tous les sous-titres ? (tes corrections de la phonétique seront remplacées)"))) {
+    renderEditions(); return;
+  }
+  await serverEdit("translit", { style });
+  settings.translit = style;
+  toast(t("Phonétique réécrite"));
 }
 
 // text colours: [label, css variable(s), default(s), gradient variable]
@@ -2595,20 +2720,30 @@ function notifyDone(title, body) {
   if (info.desktop) api("/api/notify", json({ title, text: body })).catch(() => {});
   else if (document.hidden && "Notification" in window && Notification.permission === "granted") new Notification(title, { body });
 }
+let runningJob = null;  // the export in progress, which "Cancel" stops
+async function cancelJob() {
+  if (!runningJob) return;
+  $("r-cancel").disabled = true; $("r-stage").textContent = t("Arrêt…");
+  await api(`/api/jobs/${runningJob}/cancel`, { method: "POST" }).catch(() => {});
+}
 async function renderVideo() {
   if (!info.desktop && "Notification" in window && Notification.permission === "default") Notification.requestPermission();
   await save();
   $("render").disabled = true; $("r-done").classList.add("hidden");
   $("r-box").classList.remove("hidden"); $("r-error").textContent = "";
+  $("r-cancel").classList.remove("hidden"); $("r-cancel").disabled = false;
   try {
     const { job } = await api(`/api/projects/${pid()}/render`, { method: "POST" });
+    runningJob = job;
     const name = await follow(job, $("r-stage"), $("r-bar"), false, $("r-pct"));
     $("r-box").classList.add("hidden");
     showDone(name);
     notifyDone(t("Ta vidéo est prête"), name);
     refreshExports();
-  } catch (e) { $("r-error").textContent = e.message; }
-  finally { $("render").disabled = false; }
+  } catch (e) {
+    if (e.cancelled) { $("r-box").classList.add("hidden"); toast(t("Export annulé")); }
+    else $("r-error").textContent = e.message;
+  } finally { $("render").disabled = false; runningJob = null; }
 }
 async function exportStill() {
   await save();

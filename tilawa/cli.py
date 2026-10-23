@@ -39,7 +39,7 @@ def make(args) -> int:
     folder = (Path(args.out) if args.out else HOME) / "projects" / slug
     print(f"Project: {folder}")
     p = project.create(folder, args.source, args.surah, args.first, args.last, args.reciter, args.title or "", _bar,
-                       args.format, args.lang, lib.style(args.style))
+                       args.format, args.lang, lib.style(args.style), args.translit, args.translation or "")
     p.render.update({k: v for k, v in (("size", args.size), ("quality", args.quality), ("fit", args.fit)) if v})
     project.analyze(p, _bar)
     print(f"Surah {p.surah}, verses {project.found_verses(p)}")
@@ -70,6 +70,10 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--lang", default="fr", help="translation: fr, en, es, de, it, pt, nl, sv, tr, id, ms, bs, sq, ru, ur, none")
     m.add_argument("--style", help="style preset id (pieux, mushaf, moderne, doux, elegant, calligraphie; "
                    "for 16:9: cinema, pieux-youtube, bandeau, bandeau-titre, cinema-dore, minimal)")
+    m.add_argument("--translation", help="for fr: fr.hamidullah (default), fr.maach, fr.noor; "
+                   "for en: en.sahih (default), en.yusufali, en.pickthall")
+    m.add_argument("--translit", default="simple", choices=["simple", "fr", "academic", "tanzil"],
+                   help="phonetic line: simple (Wal yawmil maw'ood), fr (maw'oud), academic (wa-l-yawmi l-mawʿūd), tanzil")
     m.add_argument("--size", choices=["auto", "hd", "2k", "4k"])
     m.add_argument("--quality", choices=["max", "high", "hevc", "prores", "studio"])
     m.add_argument("--fit", choices=["auto", "crop", "blur", "pad"])

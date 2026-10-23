@@ -81,17 +81,23 @@ def _job(kind: str, project_id: str, fn) -> str:
     jid = uuid.uuid4().hex[:10]
     lang = LANG.get()
     job = {"id": jid, "kind": kind, "project": project_id, "stage": "queued", "progress": 0.0,
-           "status": "running", "error": None, "result": None, "started": time.time()}
+           "status": "running", "error": None, "result": None, "started": time.time(), "cancel": False}
     with _lock:
         _jobs[jid] = job
 
     def progress(stage: str, f: float):
+        if job["cancel"]:
+            raise Cancelled()  # stops the job at its next step (the renderer stops ffmpeg)
         job["stage"], job["progress"] = stage, round(float(f), 4)
 
     def run():
         try:
+            if job["cancel"]:
+                raise Cancelled()
             job["result"] = fn(progress)
             job["status"] = "done"
+        except Cancelled:
+            job["status"] = "cancelled"
         except Exception as e:  # report to the UI
             traceback.print_exc()
             job["status"], job["error"] = "error", (e.text(lang) if isinstance(e, UserError) else str(e)) or e.__class__.__name__
@@ -100,11 +106,23 @@ def _job(kind: str, project_id: str, fn) -> str:
     return jid
 
 
+class Cancelled(Exception):
+    """The user stopped the job."""
+
+
 @app.get("/api/jobs/{jid}")
 def job_status(jid: str):
     if jid not in _jobs:
         raise HTTPException(404)
     return _jobs[jid]
+
+
+@app.post("/api/jobs/{jid}/cancel")
+def cancel_job(jid: str):
+    if jid not in _jobs:
+        raise HTTPException(404)
+    _jobs[jid]["cancel"] = True
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- projects
@@ -166,7 +184,7 @@ def list_projects():
 @app.post("/api/projects")
 async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_verse: int | None = Form(None),
                       reciter: str = Form(""), title: str = Form(""), url: str = Form(""),
-                      format: str = Form("9:16"), lang: str = Form("fr"), style: str = Form(""),
+                      format: str = Form("9:16"), lang: str = Form("fr"), style: str = Form(""), translation: str = Form(""),
                       file: UploadFile | None = File(None)):
     """surah 0: the surah and verses are found in the recitation."""
     try:
@@ -193,11 +211,16 @@ async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_ver
             shutil.copyfileobj(file.file, f, length=8 << 20)
         source = str(dst)
 
-    LIB.update_settings({"format": format, "lang": lang, "style": style})
+    settings = LIB.update_settings({"format": format, "lang": lang, "style": style})
     look = LIB.style(style)
+    translit = settings.get("translit", "simple")
+    translation = translation or (settings.get("translations") or {}).get(lang, "")
+    if translation:  # the one chosen in the form is remembered for this language
+        LIB.update_settings({"translations": {**(settings.get("translations") or {}), lang: translation}})
 
     def work(progress):
-        p = project.create(folder, source, surah, first_verse, last_verse, reciter, title, progress, format, lang, look)
+        p = project.create(folder, source, surah, first_verse, last_verse, reciter, title, progress, format, lang, look,
+                           translit, translation)
         if file:
             Path(source).unlink(missing_ok=True)
         project.analyze(p, progress)
@@ -251,7 +274,7 @@ def split(pid: str, body: dict):
     p = project.Project.load(_folder(pid))
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     try:
-        segment.split_block(blocks, int(body["index"]), int(body["word"]), p.lang)
+        segment.split_block(blocks, int(body["index"]), int(body["word"]), p.lang, p.segment.get("translit", "simple"))
     except (ValueError, IndexError) as e:
         raise HTTPException(400, _msg(e))
     p.blocks = [b.to_dict() for b in blocks]
@@ -264,7 +287,7 @@ def merge(pid: str, body: dict):
     p = project.Project.load(_folder(pid))
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     try:
-        segment.merge_blocks(blocks, int(body["index"]))
+        segment.merge_blocks(blocks, int(body["index"]), p.segment.get("translit", "simple"))
     except (ValueError, IndexError) as e:
         raise HTTPException(400, _msg(e))
     p.blocks = [b.to_dict() for b in blocks]
@@ -278,7 +301,7 @@ def restore_text(pid: str, body: dict):
     p = project.Project.load(_folder(pid))
     b = segment.Block.from_dict(p.blocks[int(body["index"])])
     if b.kind == "verse":
-        segment.verse_texts(b)
+        segment.verse_texts(b, p.segment.get("translit", "simple"))
         p.blocks[int(body["index"])] = b.to_dict()
         p.save()
     return _public(p)
@@ -299,11 +322,51 @@ def retime(pid: str):
 def set_language(pid: str, body: dict):
     p = project.Project.load(_folder(pid))
     try:
-        project.set_language(p, body["lang"])
+        project.set_language(p, body["lang"], body.get("translation"))
     except (ValueError, KeyError) as e:
         raise HTTPException(400, _msg(e))
     p.save()
+    # the translation chosen for a language is the one new videos get
+    LIB.update_settings({"translations": {**(LIB.settings().get("translations") or {}), p.lang: p.segment["translation"]}})
     return _public(p)
+
+
+@app.post("/api/projects/{pid}/translit")
+def set_translit(pid: str, body: dict):
+    """Write the phonetic line in another convention (and new videos too)."""
+    p = project.Project.load(_folder(pid))
+    try:
+        project.set_translit(p, str(body.get("style", "")))
+    except ValueError as e:
+        raise HTTPException(400, _msg(e))
+    p.save()
+    LIB.update_settings({"translit": p.segment["translit"]})
+    return _public(p)
+
+
+@app.post("/api/projects/{pid}/verse-candidates")
+def verse_candidates(pid: str, body: dict):
+    """The verses the recitation of a subtitle could be, checked against the audio (a job: it listens)."""
+    p = project.Project.load(_folder(pid))
+    i = int(body["index"])
+    project.occurrence(p, i)  # not a verse: refused now
+    return {"job": _job("verse", pid, lambda progress: project.verse_candidates(p, i, progress))}
+
+
+@app.post("/api/projects/{pid}/set-verse")
+def set_verse(pid: str, body: dict):
+    """Give the recitation of a subtitle to another verse: aligned again with it (a job)."""
+    folder = _folder(pid)
+    i, s, a = int(body["index"]), int(body["surah"]), int(body["ayah"])
+    quran.verse(s, a)  # validates
+
+    def work(progress):
+        p = project.Project.load(folder)
+        project.set_verse(p, i, s, a, progress)
+        p.save()
+        return True
+
+    return {"job": _job("verse", pid, work)}
 
 
 @app.post("/api/projects/{pid}/format")

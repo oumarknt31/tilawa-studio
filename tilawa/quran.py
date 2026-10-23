@@ -3,8 +3,9 @@
 Sources (bundled verbatim in tilawa/data, see README for licences):
   quran-uthmani.txt       Tanzil Uthmani text            -> what is displayed
   quran-align.txt         text the alignment model knows -> what is aligned
-  en.transliteration.txt  Tanzil transliteration         -> phonetic line
-  trans/*.txt             Tanzil translations            -> translation line (see LANGS)
+  en.transliteration.txt  Tanzil transliteration         -> phonetic line, "tanzil" convention
+                          (the other conventions are made from the Arabic: translit.py)
+  trans/*.txt             Tanzil and QuranEnc translations -> translation line (see LANGS, EDITIONS)
 
 The aligned text and the displayed text split some words differently
 (e.g. "يَا أَيُّهَا" vs "يَـٰٓأَيُّهَا"), so every verse carries a map from
@@ -21,6 +22,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
+from . import translit as _translit
 from .i18n import UserError
 
 DATA = Path(__file__).parent / "data"
@@ -44,6 +46,12 @@ def skeleton(word: str) -> str:
     return _HARAKAT.sub("", word).translate(_ALEF)
 
 
+# typos of the Tanzil transliteration (as written -> as it should be)
+# (in the file's own markup)
+TANZIL_TRANSLIT_FIXES = {(114, 6): ("s<b>m</b>", "s<b>i</b>"), (10, 94): ("anzalnn<u>a</u>", "anzaln<u>a</u>"),
+                         (3, 180): ("t<u>a</u>hummu", "t<u>a</u>humu")}
+
+
 def _load(name: str) -> dict[tuple[int, int], str]:
     out = {}
     with open(DATA / name, encoding="utf-8") as f:
@@ -59,12 +67,19 @@ def _sources():
     return (
         _load("quran-uthmani.txt"),
         _load("quran-align.txt"),
-        _load("en.transliteration.txt"),
+        _translit_fixed(),
         translation_table("fr"),
     )
 
 
-# code -> (name, Tanzil file, translator, right-to-left)
+def _translit_fixed() -> dict[tuple[int, int], str]:
+    t = _load("en.transliteration.txt")
+    for key, (bad, good) in TANZIL_TRANSLIT_FIXES.items():
+        t[key] = t[key].replace(bad, good)
+    return t
+
+
+# code -> (name, Tanzil file of the default translation, its translator, right-to-left)
 LANGS = {
     "fr": ("Français", "fr.hamidullah", "Muhammad Hamidullah", False),
     "en": ("English", "en.sahih", "Saheeh International", False),
@@ -105,20 +120,46 @@ ISTIADHA_TRANSLATION = {
 }
 
 
+# Languages with a choice of translations: the most read ones that may be
+# republished, the most used first (the default). Masson (French) and Khattab's
+# Clear Quran (English) are widely read too, but under copyright.
+EDITIONS = {
+    "fr": [("fr.hamidullah", "Muhammad Hamidullah"), ("fr.maach", "Rachid Maach"),
+           ("fr.noor", "Centre international Noor (ex-Montada)")],
+    "en": [("en.sahih", "Saheeh International"), ("en.yusufali", "Abdullah Yusuf Ali"),
+           ("en.pickthall", "Marmaduke Pickthall")],
+}
+
+
+def editions(lang: str) -> list[tuple[str, str]]:
+    """(file, translator) of the translations of a language, the default first."""
+    if lang in EDITIONS:
+        return EDITIONS[lang]
+    file = LANGS.get(lang, (None, None))[1]
+    return [(file, LANGS[lang][2])] if file else []
+
+
+def edition(lang: str, chosen: str | None = None) -> str | None:
+    """The translation file to use: the one chosen if it is of this language, else the default."""
+    files = [f for f, _ in editions(lang)]
+    return chosen if chosen in files else (files[0] if files else None)
+
+
 @lru_cache(maxsize=None)
-def translation_table(lang: str) -> dict[tuple[int, int], str]:
-    file = LANGS[lang][1]
+def translation_table(lang: str, chosen: str | None = None) -> dict[tuple[int, int], str]:
+    file = edition(lang, chosen)
     return _load(f"trans/{file}.txt") if file else {}
 
 
-def translation(lang: str, s: int, a: int) -> str:
+def translation(lang: str, s: int, a: int, chosen: str | None = None) -> str:
     if lang not in LANGS:
         raise ValueError(f"Unknown language {lang}")
-    return translation_table(lang).get((s, a), "")
+    return translation_table(lang, chosen).get((s, a), "")
 
 
 def languages() -> list[dict]:
-    return [{"code": k, "name": v[0], "translator": v[2], "rtl": v[3]} for k, v in LANGS.items()]
+    return [{"code": k, "name": v[0], "translator": v[2], "rtl": v[3],
+             "editions": [{"id": f, "translator": t} for f, t in editions(k)]} for k, v in LANGS.items()]
 
 
 @lru_cache(maxsize=None)
@@ -174,6 +215,13 @@ class Verse:
             words = self.translit[round(a0 * m / n): round(a1 * m / n)]
         text = " ".join(words)
         return text[:1].upper() + text[1:] if a0 == 0 else text
+
+    def phonetic(self, a0: int, a1: int, style: str = "simple") -> list[str]:
+        """One transliterated word per align word of [a0, a1), recited in a row.
+        "tanzil": the Tanzil transliteration; else made from the Arabic (translit.py)."""
+        if style == "tanzil":
+            return [self.translit_text(k, k + 1) if k else self.translit_text(0, 1) for k in range(a0, a1)]
+        return _translit.transliterate(self.align[a0:a1], style, start_of_verse=a0 == 0)
 
 
 def _clean_translit(text: str) -> list[str]:

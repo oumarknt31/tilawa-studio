@@ -8,7 +8,8 @@ chaque morceau apparaissant exactement quand le récitateur le prononce. Le logi
 la sourate et les versets** récités. Pas besoin de lire l'arabe.
 
 Formats : vertical 9:16 (Shorts, Reels, TikTok), horizontal 16:9 (YouTube), carré 1:1 et portrait 4:5,
-de la Full HD à la 4K. Traductions : français, anglais, espagnol, allemand, italien, portugais,
+de la Full HD à la 4K. Traductions : français (Hamidullah, Rachid Maach ou Centre international Noor), anglais
+(Saheeh International, Yusuf Ali ou Pickthall), espagnol, allemand, italien, portugais,
 néerlandais, suédois, turc, indonésien, malais, bosnien, albanais, russe, ourdou, ou arabe seul.
 L'interface est en français ou en anglais (bouton **FR | EN** en haut à droite).
 
@@ -50,6 +51,10 @@ L'installation télécharge les composants, le modèle de reconnaissance de la r
 4. **Vérifie et personnalise** dans l'éditeur (les icônes à gauche). L'aperçu montre exactement le résultat final.
    - **Sous-titres** :
      - ▶ pour réécouter un passage ; modifie la traduction directement dans la case ;
+     - **Pas le bon verset ?** sous un sous-titre : beaucoup de versets se répètent mot pour mot ou presque (le refrain
+       d'Ar-Rahman, des versets proches dans d'autres sourates). L'appli liste ceux qui se lisent pareil, dit à quel
+       point chacun correspond à ce qu'elle entend, signale celui qui suit le verset précédent, et recale ce passage
+       sur celui choisi. Si tout le passage est faux, les autres passages reconnus sont proposés en haut de la liste ;
      - corrige l'arabe ou la phonétique en cliquant dessus (↺ *Texte d'origine* pour annuler) ;
      - clique sur un mot phonétique (✂) pour **couper** un sous-titre avant ce mot, *Fusionner* pour en réunir deux ;
      - −/+ pour décaler un sous-titre de 0,05 s, *⤓ ici* pour le caler sur la lecture ;
@@ -70,7 +75,11 @@ L'installation télécharge les composants, le modèle de reconnaissance de la r
        par exemple la police officielle du Mushaf du Complexe Roi Fahd ;
      - **numéro de verset** dans son ornement à la fin du verset (۝١٢ ou ﴿١٢﴾) ;
      - tailles, couleurs (titre et récitateur en dégradé), positions X/Y au pixel ;
-     - langue de la traduction (change toute la traduction, coupée comme l'arabe) ;
+     - langue de la traduction et, en français et en anglais, quelle traduction (change toute la traduction, coupée comme l'arabe) ;
+     - **écriture de la phonétique** : *lisible* (Wal yawmil maw'ood), la même à la française (maw'oud), *savante*
+       (wa-l-yawmi l-mawʿūd) ou celle de Tanzil. Elle est écrite d'après l'arabe, mot par mot, avec les mêmes règles
+       partout (article et lettres solaires, hamza de liaison, pause en fin de sous-titre) : aucune partie ne manque,
+       et un passage coupé ou corrigé se lit toujours de la même façon ;
      - **pour YouTube (16:9)**, des styles inspirés des chaînes de récitation connues : *Cinéma* (arabe en haut,
        traduction numérotée en majuscules avec ses mots importants en gras, phonétique légère), *Le Chemin des
        Pieux — YouTube*, *Bandeau classique*, *Bandeau titre* (traduction au milieu, arabe et phonétique dans
@@ -109,6 +118,7 @@ Raccourcis : `Espace` lecture/pause, `←` `→` sous-titre précédent/suivant,
 | Qualité *Maximale* | H.264, visuellement identique à la source, lisible partout. Sur Mac, elle utilise le moteur vidéo de la puce Apple : une vidéo de 2 minutes prend environ 20 s en Full HD et 1 min en 4K (M4) |
 | Qualité *10-bit (H.265)* | encore plus fidèle (dégradés), fichiers plus légers, moins compatible avec les vieux appareils |
 | *Master ProRes* | pour retravailler la vidéo dans CapCut / Premiere / Final Cut sans perte |
+| *Annuler l'export* | l'arrête aussitôt (rien de laissé à moitié fait) |
 | Qualité *Studio* | la même image dans un fichier environ ⅓ plus léger, avec l'encodeur logiciel lent (x264 *slower*) : ~8× plus long |
 | Vidéo horizontale | onglet *Arrière-plan* : *Image entière* (fond flouté ou noir) ou *Remplir l'écran*, ou n'importe quel zoom |
 
@@ -162,7 +172,12 @@ Tests : `uv run python -m pytest -q`
   Hamza Roberto Piccardo (it), Samir El-Hayek (pt), Sofian S. Siregar (nl), Knut Bernström (sv),
   Diyanet İşleri (tr), Kementerian Agama RI (id), Abdullah Muhammad Basmeih (ms), Besim Korkut (bs),
   Sherif Ahmeti (sq), Elmir Kuliev (ru), Fateh Muhammad Jalandhry (ur).
-- Phonétique : **Tanzil** (`en.transliteration`).
+- Phonétique : écrite d'après l'arabe par `tilawa/translit.py` ; l'option *Tanzil* est celle de **Tanzil**
+  (`en.transliteration`, trois coquilles corrigées).
+- Traductions de **QuranEnc.com**, republiées sans modification selon ses conditions (renvois de notes et numéros de
+  versets retirés pour les sous-titres) : Rachid Maach (`french_rashid`, version 1.0.3), Centre international Noor,
+  anciennement Montada Islamic Foundation (`french_montada`, version 1.0.0). Aussi via Tanzil : Abdullah Yusuf Ali
+  et Marmaduke Pickthall (en).
 - Noms des sourates : quran.com.
 - Polices (SIL Open Font License, voir `tilawa/fonts/`) : Amiri Quran, Amiri, Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat, Nunito, Baloo 2,

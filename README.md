@@ -8,7 +8,8 @@ each part appearing exactly when the reciter says it. The app **recognises the s
 on its own**. No need to read Arabic.
 
 Formats: vertical 9:16 (Shorts, Reels, TikTok), horizontal 16:9 (YouTube), square 1:1 and portrait 4:5,
-from Full HD to 4K. Translations: French, English, Spanish, German, Italian, Portuguese, Dutch,
+from Full HD to 4K. Translations: French (Hamidullah, Rachid Maach or Noor International Center), English
+(Saheeh International, Yusuf Ali or Pickthall), Spanish, German, Italian, Portuguese, Dutch,
 Swedish, Turkish, Indonesian, Malay, Bosnian, Albanian, Russian, Urdu, or Arabic only.
 The interface is in English or French (**FR | EN** switch at the top right).
 
@@ -50,6 +51,10 @@ The installation downloads the components, the recitation recognition model
 4. **Check and customise** in the editor (icons on the left). The preview shows exactly the final result.
    - **Subtitles**:
      - ▶ to listen to a passage again; edit the translation right in its box;
+     - **Wrong verse?** under a subtitle: many verses repeat word for word or nearly (Ar-Rahman's refrain,
+       similar verses in other surahs). The app lists those that read the same, says how well each matches what
+       it hears, marks the one that follows the previous verse, and aligns that stretch again with the one chosen.
+       If the whole passage is wrong, the other passages it recognised are offered at the top of the list;
      - correct the Arabic or the transliteration by clicking it (↺ *Original text* to undo);
      - click a transliterated word (✂) to **split** a subtitle before that word, *Merge* to join two;
      - −/+ to shift a subtitle by 0.05 s, *⤓ here* to set it at the playhead;
@@ -70,7 +75,11 @@ The installation downloads the components, the recitation recognition model
        for example the official King Fahd Complex Mushaf font;
      - **verse number** in its ornament at the end of the verse (۝١٢ or ﴿١٢﴾);
      - sizes, colours (title and reciter as gradients), X/Y positions to the pixel;
-     - translation language (replaces the whole translation, split like the Arabic);
+     - translation language and, in French and English, which translation (replaces the whole translation, split like the Arabic);
+     - how the **transliteration** is written: *easy to read* (Wal yawmil maw'ood), the same with French spelling
+       (maw'oud), *scholarly* (wa-l-yawmi l-mawʿūd) or Tanzil's. It is written from the Arabic, word by word, with the
+       same rules everywhere (the article and sun letters, the connecting hamza, the pause at the end of a subtitle),
+       so no part is ever missing and a cut or corrected passage always reads the same way;
      - **for YouTube (16:9)**, styles modelled on popular recitation channels: *Cinema* (Arabic on top,
        numbered translation in capitals with its key words in bold, light transliteration), *Le Chemin des
        Pieux — YouTube*, *Classic band*, *Headline band* (translation in the middle, Arabic and transliteration
@@ -109,6 +118,7 @@ Shortcuts: `Space` play/pause, `←` `→` previous/next subtitle, `⌘Z` / `Ctr
 | *Maximum* quality | H.264, visually identical to the source, plays everywhere. On a Mac it uses the Apple chip's video engine: a 2-minute video takes about 20 s in Full HD and 1 min in 4K (M4) |
 | *10-bit (H.265)* quality | even more faithful (gradients), smaller files, less compatible with old devices |
 | *ProRes master* | to keep editing in CapCut / Premiere / Final Cut without loss |
+| *Cancel the export* | stops it at once (nothing is left half-made) |
 | *Studio* quality | the same picture in a file about ⅓ smaller, with the slow software encoder (x264 *slower*): ~8× longer |
 | Horizontal source video | *Background* tab: *Whole picture* (blurred or black behind) or *Fill the screen*, or any zoom |
 
@@ -160,7 +170,12 @@ Tests: `uv run python -m pytest -q`
   Hamza Roberto Piccardo (it), Samir El-Hayek (pt), Sofian S. Siregar (nl), Knut Bernström (sv),
   Diyanet İşleri (tr), Kementerian Agama RI (id), Abdullah Muhammad Basmeih (ms), Besim Korkut (bs),
   Sherif Ahmeti (sq), Elmir Kuliev (ru), Fateh Muhammad Jalandhry (ur).
-- Transliteration: **Tanzil** (`en.transliteration`).
+- Transliteration: made from the Arabic by `tilawa/translit.py`; the *Tanzil* option is **Tanzil**'s
+  (`en.transliteration`, three typos corrected).
+- Translations from **QuranEnc.com**, republished unchanged under its terms (footnote markers and verse numbers
+  left out for subtitles): Rachid Maach (`french_rashid`, version 1.0.3), Noor International Center, formerly
+  Montada Islamic Foundation (`french_montada`, version 1.0.0). Also via Tanzil: Abdullah Yusuf Ali and
+  Marmaduke Pickthall (en).
 - Surah names: quran.com.
 - Fonts (SIL Open Font License, see `tilawa/fonts/`): Amiri Quran, Amiri, Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat,
