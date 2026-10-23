@@ -32,7 +32,7 @@ curl -fL --progress-bar "$BASE/$FILE" -o "$tmp/$FILE" \
           "Download failed: check your internet connection and try again."
 curl -fsSL "$BASE/SHA256SUMS.txt" -o "$tmp/SHA256SUMS.txt" \
   || fail "Téléchargement impossible, réessaie dans un instant." "Download failed, try again in a moment."
-expected=$(awk -v f="$FILE" '$2 == f { print $1 }' "$tmp/SHA256SUMS.txt")
+expected=$(awk -v f="$FILE" '{ sub(/^\*/, "", $2) } $2 == f { print $1 }' "$tmp/SHA256SUMS.txt")  # "*" = binary mode
 actual=$(shasum -a 256 "$tmp/$FILE" | awk '{ print $1 }')
 [ -n "$expected" ] && [ "$expected" = "$actual" ] \
   || fail "Le téléchargement est abîmé, réessaie." "The download is damaged, try again."

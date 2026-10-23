@@ -35,7 +35,7 @@ try {
     } catch {
         Fail 'Téléchargement impossible : vérifie ta connexion internet et réessaie.' 'Download failed: check your internet connection and try again.'
     }
-    $line = Get-Content (Join-Path $tmp 'SHA256SUMS.txt') | Where-Object { ($_ -split '\s+')[1] -eq $file } | Select-Object -First 1
+    $line = Get-Content (Join-Path $tmp 'SHA256SUMS.txt') | Where-Object { ($_ -split '\s+')[1].TrimStart('*') -eq $file } | Select-Object -First 1
     $expected = if ($line) { ($line -split '\s+')[0] } else { '' }
     $actual = (Get-FileHash (Join-Path $tmp $file) -Algorithm SHA256).Hash
     if (-not $expected -or $expected -ne $actual) { Fail 'Le téléchargement est abîmé, réessaie.' 'The download is damaged, try again.' }
