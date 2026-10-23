@@ -208,6 +208,11 @@
   .themes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .themes-head { font-size: 12px; color: var(--muted); margin: 12px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
   .themes-head:first-child { margin-top: 0; }
+  .basmala-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .basmala-list .bas { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); border-radius: 10px; padding: 6px 8px; cursor: pointer; font-size: 12.5px; }
+  .basmala-list .bas.on { border-color: var(--accent); background: var(--accent-soft); }
+  .basmala-list .bas span { flex: 1; }
+  .basmala-list .bas button { padding: 2px 8px; }
   .vcand { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 12px; margin-bottom: 8px; }
   .vcand.best { border-color: var(--accent); }
   .vcand .ar { grid-column: 1 / -1; direction: rtl; font: 20px/1.8 "Amiri Quran", serif; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -531,6 +536,12 @@
           <button data-v="top" onclick="setLook('--header-mode', null)">En haut</button>
           <button data-v="corner" onclick="setLook('--header-mode', 'corner')">Étiquette dans un coin</button>
           <button data-v="intro" onclick="setLook('--header-mode', 'intro')">Cartes d'intro</button>
+        </div>
+        <div id="basmala-box" class="hidden" style="margin-top:12px">
+          <label>Basmala avant la récitation</label>
+          <p class="small" id="basmala-note" style="margin:0 0 8px"></p>
+          <div id="basmala-list" class="basmala-list"></div>
+          <p class="faint small" id="basmala-credit" style="margin:6px 0 0">Enregistrements d'EveryAyah.com, téléchargés quand tu en choisis un.</p>
         </div>
         <div id="intro-row" class="row hidden" style="margin-top:8px"><button class="small" onclick="previewIntro()">▶ Voir l'intro</button>
           <span class="faint small" id="intro-note"></span></div>
@@ -1040,6 +1051,16 @@ const EN = {
   "Je recale ce passage sur le verset {n}…": "Aligning this passage with verse {n}…", "Verset {n} : sous-titres refaits": "Verse {n}: subtitles redone",
   "Pas le bon passage ? J'ai aussi reconnu :": "Wrong passage? I also recognised:",
   "Un seul verset mal reconnu : « Pas le bon verset ? » sous ce sous-titre.": "Only one verse recognised wrongly: « Wrong verse? » under that subtitle.",
+  "Basmala avant la récitation": "Basmala before the recitation",
+  "Enregistrements d'EveryAyah.com, téléchargés quand tu en choisis un.": "Recordings from EveryAyah.com, downloaded when you choose one.",
+  "✓ Le récitateur dit déjà la basmala : c'est la sienne qui est utilisée.": "✓ The reciter already says the basmala: his own is used.",
+  "La sourate At-Tawbah ne commence pas par la basmala.": "Surah At-Tawbah does not begin with the basmala.",
+  "Dans Al-Fatiha, la basmala est le premier verset : elle fait déjà partie de la récitation.": "In Al-Fatiha, the basmala is the first verse: it is already part of the recitation.",
+  "Recommandé : la récitation commence au début de la sourate, mais sans la basmala. Choisis une voix pour l'ajouter après l'intro.":
+    "Recommended: the recitation starts at the beginning of the surah, but without the basmala. Choose a voice to add it after the intro.",
+  "Facultatif : la récitation commence au milieu de la sourate.": "Optional: the recitation starts in the middle of the surah.",
+  "Sans basmala": "No basmala", "Puis la basmala.": "Then the basmala.",
+  "Téléchargement impossible : vérifie ta connexion internet.": "Download failed: check your internet connection.",
   "Annuler l'export": "Cancel the export", "Arrêt…": "Stopping…", "Export annulé": "Export cancelled", "Annulé": "Cancelled",
   "Exporter l'image à": "Export the image at", "Déjà exporté": "Already exported", "Analyse de la récitation": "Recitation analysis",
   "✨ Détection automatique": "✨ Automatic detection", "Choisir": "Choose", "premier verset": "first verse", "dernier verset": "last verse",
@@ -1086,7 +1107,7 @@ function t(s, vars) {
 }
 // the fixed texts of the page; parts filled by the code are rendered with t()
 const DYN = ["ed-badges", "saved", "new-formats", "surah", "a-surah", "lang", "e-lang", "new-style", "job-title", "job-stage", "job-error",
-  "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes", "font-num", "font-tr", "intro-note", "logo-sugg", "e-trans", "verse-body",
+  "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes", "font-num", "font-tr", "intro-note", "logo-sugg", "e-trans", "verse-body", "basmala-note", "basmala-list",
   "font-title", "font-arabic", "font-text", "colors-title", "colors-ar", "colors-text", "colors-outline", "res", "r-done", "r-stage",
   "r-pct", "r-error", "exports", "ed-formats", "still-t", "time", "safe", "tl-ruler", "tl-bg", "tl-subs", "fmt-name", "toasts", "src-name", "ui-lang"];
 const original = new WeakMap();
@@ -1139,7 +1160,7 @@ const BASE_DEFAULTS = { "--header-x": 0, "--header-zoom": 1, "--block-x": 0, "--
 // title cards before the recitation: same timing as render.py (INTRO_CARD, INTRO_FADE, INTRO_GAP)
 const INTRO_CARD = 2.6, INTRO_FADE = 0.45, INTRO_GAP = 0.3;
 const MOTION_ZOOM = 1.12;
-let surahs = [], langs = [], styles = [], fonts = [], settings = {}, projects = [], info = {};
+let surahs = [], langs = [], styles = [], fonts = [], settings = {}, projects = [], info = {}, basmalas = [];
 let P = null, saveTimer = null, overlayReady = false, tab = "subs", selClip = 0, wave = null;
 
 async function api(path, opts = {}) {
@@ -1213,8 +1234,8 @@ overlayLoaded();
 
 // ---------------------------------------------------------------- start
 async function init() {
-  [surahs, langs, styles, fonts, settings, info] = await Promise.all(
-    ["/api/surahs", "/api/languages", "/api/styles", "/api/fonts", "/api/settings", "/api/info"].map(u => api(u)));
+  [surahs, langs, styles, fonts, settings, info, basmalas] = await Promise.all(
+    ["/api/surahs", "/api/languages", "/api/styles", "/api/fonts", "/api/settings", "/api/info", "/api/basmala"].map(u => api(u)));
   document.body.classList.toggle("desktop", !!info.desktop);
   setTimeout(checkUpdate, 1500);
   loadFaces();
@@ -1552,16 +1573,31 @@ function draw() {
 // the title cards, played over the paused video (the final video shows them before the recitation)
 function introCards() { return ow().introCards(P.title, P.reciter, P.surah_info, P.lang); }
 function previewIntro() {
-  const cards = introCards();
-  if (!cards.length) return;
+  const cards = lookOf("--header-mode", "top") === "intro" ? introCards() : [];
+  if (!cards.length && !basmalaChosen()) return;
   $("video").pause();
-  introPlay = { cards, t0: performance.now(), k: -1 };
+  introPlay = { cards, t0: performance.now(), k: -1, basmala: basmalaChosen() };
 }
 function drawIntro(w) {
   const el = (performance.now() - introPlay.t0) / 1000, k = Math.floor(el / INTRO_CARD);
-  if (k >= introPlay.cards.length || $("video").paused === false) {
+  if ($("video").paused === false || introPlay.done) {
+    if (basmalaAudio && introPlay.basmalaAudio === basmalaAudio) basmalaAudio.pause();
     introPlay = null; w.setIntro(null); w.setFrame(true); lastShown = "";
     return false;
+  }
+  if (k >= introPlay.cards.length) {  // then the basmala, with its subtitle, the logo and the band
+    if (!introPlay.basmala) { introPlay.done = true; return true; }
+    if (!introPlay.basmalaAudio) {
+      w.setIntro(null); w.setFrame(true);
+      const rtl = langs.find(l => l.code === P.lang)?.rtl;
+      w.setBlock({ ...P.basmala.payload, rtl, lang: P.lang });
+      w.document.getElementById("block").style.opacity = 1;
+      listenBasmala(introPlay.basmala);
+      introPlay.basmalaAudio = basmalaAudio;
+      basmalaAudio.onended = () => setTimeout(() => { if (introPlay) introPlay.done = true; }, 500);
+      lastShown = "intro";
+    }
+    return true;
   }
   if (k !== introPlay.k) { w.setFrame(false); w.setBlock(null); w.setIntro(introPlay.cards[k]); introPlay.k = k; lastShown = "intro"; }
   const t = el - k * INTRO_CARD;
@@ -2209,10 +2245,12 @@ function renderStylePanel() {
   segOn("layout-ctl", lookOf("--layout", "stack"));
   segOn("logo-pos", lookOf("--logo-pos", "auto"));
   const intro = lookOf("--header-mode", "top") === "intro";
-  $("intro-row").classList.toggle("hidden", !intro);
+  renderBasmala();
+  $("intro-row").classList.toggle("hidden", !intro && !basmalaChosen());
   if (intro && overlayReady) {
     const n = introCards().length;
-    $("intro-note").textContent = t("{n} cartes avant la récitation : la vidéo commence {s} s plus tôt.", { n, s: (n * INTRO_CARD + INTRO_GAP).toFixed(1) });
+    $("intro-note").textContent = t("{n} cartes avant la récitation : la vidéo commence {s} s plus tôt.", { n, s: (n * INTRO_CARD + INTRO_GAP).toFixed(1) })
+      + (basmalaChosen() ? " " + t("Puis la basmala.") : "");
   }
   $("fr-upper").checked = P.style["--fr-case"] === "uppercase";
   $("fr-smallcaps").checked = P.style["--fr-variant"] === "small-caps";
@@ -2249,6 +2287,44 @@ function fontPicker(el, v, script, sample) {
   $(el).innerHTML = fonts.filter(f => f.script === script).map(f => `<div class="font ${f.family === cur ? "on" : ""}"
       onclick="pickFont('${v}', '${f.family.replace(/'/g, "\\'")}')"><span class="sample ${script === "arabic" ? "ar" : ""}" style="font-family:'${f.family}'">${sample}</span>
       <small>${esc(f.user ? f.family + " " + t("(importée)") : t(f.label))}${f.user ? ` <a href="#" onclick="event.stopPropagation(); event.preventDefault(); deleteFont('${f.family.replace(/'/g, "\\'")}')" style="color:var(--danger)">${t("retirer")}</a>` : ""}</small></div>`).join("");
+}
+// The basmala (verse 1 of Al-Fatiha) before a surah: the reciter's own, or one recorded by
+// another reciter, put after the title cards (YouTube styles only).
+// a 16:9 video in one of the YouTube arrangements (same test as project.youtube_style)
+const youtubeStyle = () => P.format === "16:9" && (["cinema", "band"].includes(lookOf("--layout", "stack")) || lookOf("--header-mode", "top") === "intro");
+const basmalaChosen = () => youtubeStyle() && P.basmala?.possible && P.render.basmala ? P.render.basmala : "";
+function renderBasmala() {
+  const st = P.basmala || {};
+  $("basmala-box").classList.toggle("hidden", !youtubeStyle());
+  if (!youtubeStyle()) return;
+  const notes = {
+    said: t("✓ Le récitateur dit déjà la basmala : c'est la sienne qui est utilisée."),
+    tawbah: t("La sourate At-Tawbah ne commence pas par la basmala."),
+    fatiha: t("Dans Al-Fatiha, la basmala est le premier verset : elle fait déjà partie de la récitation."),
+    start: t("Recommandé : la récitation commence au début de la sourate, mais sans la basmala. Choisis une voix pour l'ajouter après l'intro."),
+    middle: t("Facultatif : la récitation commence au milieu de la sourate."),
+  };
+  $("basmala-note").textContent = notes[st.reason] || "";
+  $("basmala-note").style.color = st.reason === "start" && !P.render.basmala ? "var(--gold)" : "var(--muted)";
+  $("basmala-list").classList.toggle("hidden", !st.possible);
+  $("basmala-credit").classList.toggle("hidden", !st.possible);
+  if (!st.possible) return;
+  const cur = P.render.basmala || "";
+  $("basmala-list").innerHTML = `<div class="bas ${cur ? "" : "on"}" onclick="setBasmala('')"><span>${t("Sans basmala")}</span></div>`
+    + basmalas.map(r => `<div class="bas ${cur === r.id ? "on" : ""}" onclick="setBasmala('${r.id}')"><span>${esc(r.name)}</span>
+        <button class="small ghost" onclick="event.stopPropagation(); listenBasmala('${r.id}', this)" title="${t("écouter")}">▶</button></div>`).join("");
+}
+let basmalaAudio = null;
+function listenBasmala(id, btn) {
+  if (basmalaAudio) { basmalaAudio.pause(); basmalaAudio = null; }
+  basmalaAudio = new Audio(`/api/basmala/${id}.wav`);  // downloaded the first time
+  if (btn) { btn.textContent = "…"; basmalaAudio.onplaying = () => btn.textContent = "▶"; basmalaAudio.onerror = () => { btn.textContent = "▶"; toast(t("Téléchargement impossible : vérifie ta connexion internet."), "err"); }; }
+  basmalaAudio.play().catch(() => {});
+}
+function setBasmala(id) {
+  P.render.basmala = id;
+  changed({ look: true, group: "basmala" });
+  if (id) listenBasmala(id);
 }
 function setFontVar(v, family) {
   if (family) P.style[v] = `"${family}"`; else delete P.style[v];

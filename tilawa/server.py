@@ -26,7 +26,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import media, project, quran, render, segment
+from . import basmala, media, project, quran, render, segment
 from .cli import HOME
 from .i18n import UI_LANGS, UserError
 from .library import Library
@@ -38,6 +38,7 @@ LIB = Library(HOME)
 render.USER_FONTS = LIB.fonts_dir
 render.USER_LOGO = LIB.logo_file
 render.LOGO_AUTO = LIB.settings().get("logo_auto", True)
+basmala.HOME = HOME
 LIB.fonts_dir.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Tilawa Studio")
@@ -146,6 +147,7 @@ def _public(p: project.Project) -> dict:
     for b, raw in zip(d["blocks"], p.blocks):  # for the verse ornament in the preview
         b["ends_verse"] = render.ends_verse(segment.Block.from_dict(raw))
     d["exports"] = _exports(p)
+    d["basmala"] = project.basmala_state(p) | {"payload": project.basmala_payload(p)}
     return d
 
 
@@ -652,6 +654,23 @@ def logo():
     if not LIB.logo_file.is_file():
         raise HTTPException(404)
     return FileResponse(LIB.logo_file, media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/basmala")
+def basmala_list():
+    """Reciters whose basmala can go before a recitation (YouTube styles)."""
+    return basmala.listing(HOME)
+
+
+@app.get("/api/basmala/{rid}.wav")
+def basmala_audio(rid: str):
+    if rid not in basmala.RECITERS:
+        raise HTTPException(404)
+    try:
+        f = basmala.ensure(HOME, rid)  # downloaded the first time it is listened to
+    except OSError:
+        raise UserError("download_failed")
+    return FileResponse(f, media_type="audio/wav")
 
 
 @app.get("/overlay.html")

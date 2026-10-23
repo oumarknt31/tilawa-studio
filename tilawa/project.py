@@ -14,7 +14,7 @@ from typing import Callable
 
 import numpy as np
 
-from . import align, identify, media, quran, render, segment, translit
+from . import align, basmala, identify, media, quran, render, segment, translit
 from .i18n import UserError
 
 Progress = Callable[[str, float], None]
@@ -194,13 +194,50 @@ def output_name(p: Project) -> str:
     return "_".join(x for x in (name, verses, reciter) if x)
 
 
+def youtube_style(p: Project) -> bool:
+    """A 16:9 video in one of the YouTube arrangements (not a horizontal Short)."""
+    look = lambda k: str(p.style.get(k) or "").strip('"')
+    return p.format == "16:9" and (look("--layout") in ("cinema", "band") or look("--header-mode") == "intro")
+
+
+def basmala_state(p: Project) -> dict:
+    """Whether a basmala by another reciter can go before the recitation, and why (or why not).
+    reason: "said" (the reciter says it) | "tawbah" | "fatiha" (it is the first verse) |
+            "start" (the surah starts without it: recommended) | "middle" (optional)"""
+    blocks = p.blocks
+    first = next((b for b in blocks if b["kind"] == "verse"), None)
+    if any(b["kind"] == "basmala" for b in blocks):
+        reason = "said"
+    elif p.surah == 9:
+        reason = "tawbah"
+    elif p.surah == 1:
+        reason = "fatiha"
+    else:
+        reason = "start" if first and first["ayah"] == 1 else "middle"
+    return {"available": youtube_style(p), "reason": reason, "possible": reason in ("start", "middle")}
+
+
+def basmala_payload(p: Project) -> dict:
+    """The subtitle of the basmala, in the project's translation and transliteration."""
+    b = segment.Block("basmala", 0, 0, 0, 4, 0, 0, quran.BASMALA_UTHMANI,
+                      segment.translation(quran.verse(1, 1), p.lang, p.segment.get("translation")),
+                      " ".join(segment.phonetic("basmala", None, 0, 0, p.segment.get("translit", "simple"))))
+    return render.block_payload(b, p.lang)
+
+
 def make_video(p: Project, out_dir: Path | None = None, progress: Progress | None = None) -> Path:
     opt = render.RenderOptions(**{k: v for k, v in p.render.items() if k in render.RenderOptions.__dataclass_fields__})
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     out_dir = out_dir or p.folder
     out_dir.mkdir(parents=True, exist_ok=True)
+    extra = None
+    state = basmala_state(p)
+    if opt.basmala and state["available"] and state["possible"] and basmala.HOME:
+        if progress:
+            progress("prepare", 0.0)
+        extra = {"file": basmala.ensure(basmala.HOME, opt.basmala), "payload": basmala_payload(p)}
     return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / output_name(p), opt, p.style, progress,
-                         p.get_background(), p.media_dir, p.format, p.lang, p.surah)
+                         p.get_background(), p.media_dir, p.format, p.lang, p.surah, extra)
 
 
 def make_still(p: Project, t: float, out_dir: Path, progress: Progress | None = None) -> Path:

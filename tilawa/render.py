@@ -51,6 +51,7 @@ class RenderOptions:
     audio_fade_in: float = 0.0
     audio_fade_out: float = 0.0
     loudnorm: bool = True  # -14 LUFS, the level YouTube, TikTok and Instagram play at
+    basmala: str = ""  # YouTube styles: a reciter's basmala said before the recitation (basmala.RECITERS), "" = none
 
 
 # "Surah X" in each translation language ({} = the surah's name)
@@ -180,6 +181,8 @@ MOTION_ZOOM = 1.12  # slow zoom on a background clip: from 1 to this factor (or 
 # title cards before the recitation (style "--header-mode": "intro"): each card's
 # time on screen and fades, and the pause before the recitation starts
 INTRO_CARD, INTRO_FADE, INTRO_GAP = 2.6, 0.45, 0.3
+# a basmala recited by another reciter after the cards (basmala.py): pause before it, and before the recitation
+BASMALA_BEFORE, BASMALA_AFTER = 0.3, 0.6
 
 
 def header_mode(style: dict | None) -> str:
@@ -513,8 +516,8 @@ def _encode_args(info: media.VideoInfo, opt: RenderOptions, hardware: bool | Non
             "-x264-params", "aq-mode=3", *tags], ".mp4", "yuv420p"
 
 
-def _audio_args(info: media.VideoInfo, trimmed: bool) -> list[str]:
-    if info.acodec is None:
+def _audio_args(info: media.VideoInfo, trimmed: bool, extra_sound: bool = False) -> list[str]:
+    if info.acodec is None and not extra_sound:
         return ["-an"]
     if info.acodec == "aac" and not trimmed:
         return ["-c:a", "copy"]  # no generational loss
@@ -538,8 +541,9 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
            opt: RenderOptions | None = None, style: dict | None = None,
            progress: Callable[[str, float], None] | None = None,
            background: dict | None = None, media_dir: Path | None = None,
-           fmt: str = "9:16", lang: str = "fr", surah: int = 0) -> Path:
-    """Make the video (or, with quality "png", a still image of its first frame)."""
+           fmt: str = "9:16", lang: str = "fr", surah: int = 0, basmala: dict | None = None) -> Path:
+    """Make the video (or, with quality "png", a still image of its first frame).
+    basmala: {"file": recording, "payload": its subtitle}, said after the title cards, before the recitation."""
     opt = opt or RenderOptions()
     progress = progress or (lambda stage, f: None)
     # absolute paths: ffmpeg runs inside the work folder
@@ -565,13 +569,24 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         header = renderer.png(work / "header.png", style, {"title": title, "reciter": reciter, "visible": opt.show_header},
                               frame=True)
         card_pngs = [renderer.png(work / f"intro{k}.png", style, intro=c) for k, c in enumerate(cards)]
+        basmala = basmala if basmala and not still_image else None
+        if basmala:
+            b_png = renderer.png(work / "basmala.png", style, block=basmala["payload"])
         pngs = []
         for i, b in enumerate(shown):
             pngs.append(renderer.png(work / f"block{i:03d}.png", style, block=block_payload(b, lang)))
             progress("overlays", (i + 1) / max(1, len(shown)))
     finally:
         renderer.close()
-    lead = len(cards) * INTRO_CARD + INTRO_GAP if cards else 0.0
+    # before the recitation: the cards, then the basmala of another reciter
+    cards_end = len(cards) * INTRO_CARD
+    lead = cards_end + INTRO_GAP if cards else 0.0
+    if basmala:
+        from . import basmala as _basmala
+
+        b_start = cards_end + BASMALA_BEFORE
+        b_end = b_start + _basmala.duration(Path(basmala["file"]))
+        lead = b_end + BASMALA_AFTER
 
     # 2) compose + encode
     # Each overlay PNG is decoded and colour-converted once, then repeated with
@@ -598,8 +613,9 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     base = _background_graph(background or default_background(info.width, info.height, opt.fit, fmt),
                              info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress, fmt, pix, lead)
     hdr = inputs.add("-i", str(header[0]))
-    if lead:  # after the cards
-        graph.append(f"{still(hdr, total - lead)},fade=t=in:st=0:d={INTRO_FADE}:alpha=1,setpts=PTS+{lead:.3f}/TB[hdr]")
+    frame_at = cards_end if basmala else lead  # the logo and the band come with the basmala, else with the recitation
+    if frame_at:  # after the cards
+        graph.append(f"{still(hdr, total - frame_at)},fade=t=in:st=0:d={INTRO_FADE}:alpha=1,setpts=PTS+{frame_at:.3f}/TB[hdr]")
     else:
         graph.append(f"{still(hdr, total)}[hdr]")
     graph.append(f"[{base}][hdr]overlay=x=0:y={header[1]}:format={ov}:eof_action=pass[v0]")
@@ -611,6 +627,13 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
                      f"setpts=PTS+{k * INTRO_CARD:.3f}/TB[in{k}]")
         graph.append(f"[{last}][in{k}]overlay=x=0:y={y}:format={ov}:eof_action=pass[vi{k}]")
         last = f"vi{k}"
+    if basmala:
+        k = inputs.add("-i", str(b_png[0]))
+        bs, dur = max(0.0, b_start - 0.15), b_end + 0.35 - max(0.0, b_start - 0.15)
+        graph.append(f"{still(k, dur)},fade=t=in:st=0:d={opt.fade_in:.3f}:alpha=1,fade=t=out:st={dur - opt.fade_out:.3f}:"
+                     f"d={opt.fade_out:.3f}:alpha=1,trim=duration={dur:.3f},setpts=PTS+{bs:.3f}/TB[ob]")
+        graph.append(f"[{last}][ob]overlay=x=0:y={b_png[1]}:format={ov}:eof_action=pass[vb]")
+        last = "vb"
     for i, (b, (png, y)) in enumerate(zip(shown, pngs)):
         s, e = max(b.start, t0) - t0 + lead, min(b.end, t1) - t0 + lead
         dur = max(e - s, 1 / info.fps)
@@ -651,9 +674,20 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
             amap = ["-map", "[aout]"]
         else:
             amap = ["-map", f"{audio}:a?"]
+        if basmala:  # its sound, at the level of the recitation, mixed in before it
+            ba = inputs.add("-i", str(basmala["file"]))
+            level = "loudnorm=I=-14:TP=-1.5:LRA=11," if opt.loudnorm else ""
+            graph.append(f"[{ba}:a]{level}aresample=48000,adelay=delays={round(b_start * 1000)}:all=1[ab]")
+            if info.acodec is not None:
+                if not afilters:
+                    graph.append(f"[{audio}:a]adelay=delays={round(lead * 1000)}:all=1[aout]")
+                graph.append("[aout][ab]amix=inputs=2:duration=longest:normalize=0[amix]")
+                amap = ["-map", "[amix]"]
+            else:
+                amap = ["-map", "[ab]"]
         script.write_text(";\n".join(graph))
         head = [*common, *inputs.args, *_graph_arg(script), "-map", "[vout]", *amap, "-fps_mode", "cfr", "-r", fps]
-        tail = [*_audio_args(info, t0 > 0 or t1 < info.duration or bool(afilters)),
+        tail = [*_audio_args(info, t0 > 0 or t1 < info.duration or bool(afilters) or bool(basmala), bool(basmala)),
                 "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
         cmd = [*head, *vargs, *tail]
     try:

@@ -35,6 +35,7 @@ MESSAGES = {
     "bad_logo": ("Choisis une image (png, jpg, heic…) pour le logo.", "Choose a picture (png, jpg, heic…) for the logo."),
     "nothing_to_render": ("Rien à exporter : il n'y a pas de sous-titres.", "Nothing to export: there are no subtitles."),
     "cannot_split": ("Impossible de couper ici.", "Can't split here."),
+    "download_failed": ("Téléchargement impossible : vérifie ta connexion internet.", "Download failed: check your internet connection."),
     "not_a_verse": ("Ce sous-titre n'est pas un verset.", "This subtitle is not a verse."),
     "cannot_merge": ("Seules deux parties qui se suivent dans le même verset peuvent être réunies.",
                      "Only two consecutive parts of the same verse can be merged."),

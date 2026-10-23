@@ -35,6 +35,9 @@ def make(args) -> int:
     lib = Library(HOME)
     render.USER_FONTS = lib.fonts_dir
     render.USER_LOGO, render.LOGO_AUTO = lib.logo_file, lib.settings().get("logo_auto", True)
+    from . import basmala
+
+    basmala.HOME = HOME
     slug = re.sub(r"[^\w-]+", "-", f"{args.surah or 'auto'}-{args.first}-{time.strftime('%Y%m%d-%H%M%S')}")
     folder = (Path(args.out) if args.out else HOME) / "projects" / slug
     print(f"Project: {folder}")

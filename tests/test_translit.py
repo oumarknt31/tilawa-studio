@@ -66,3 +66,23 @@ def test_a_verse_recitation_is_grouped(tmp_path):
     p.blocks = [v(153, 0, 5), v(153, 5, n), v(153, 0, 4), v(153, 4, 7), v(155, 0, 3)]
     assert project.occurrence(p, 1) == (0, 2)
     assert project.occurrence(p, 3) == (2, 4)
+
+
+def test_basmala_before_the_recitation(tmp_path):
+    from tilawa import basmala
+
+    p = project.Project(tmp_path, "v.mp4", 85, 1, format="16:9", style={"--layout": "band", "--header-mode": "intro"})
+    verse = lambda ayah: {"kind": "verse", "surah": p.surah, "ayah": ayah, "a0": 0, "a1": 2}
+    p.blocks = [verse(1), verse(2)]
+    assert project.basmala_state(p) == {"available": True, "reason": "start", "possible": True}  # recommended
+    p.blocks = [{"kind": "basmala", "surah": 0, "ayah": 0, "a0": 0, "a1": 4}, verse(1)]
+    assert project.basmala_state(p)["reason"] == "said"  # the reciter's own is used
+    p.blocks = [verse(5)]
+    assert project.basmala_state(p)["reason"] == "middle"
+    p.surah = 9
+    assert not project.basmala_state(p)["possible"]  # At-Tawbah
+    p.surah, p.format = 85, "9:16"
+    assert not project.basmala_state(p)["available"]  # Shorts and Reels: not offered
+    pay = project.basmala_payload(p)
+    assert pay["num"] == "" and pay["ar"].startswith("بِسْمِ") and pay["tr"]
+    assert len(basmala.RECITERS) == 10

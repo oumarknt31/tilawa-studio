@@ -89,6 +89,10 @@ The installation downloads the components, the recitation recognition model
        outline thickness (or just a soft shadow);
      - title and reciter at the top, as a small **label in a corner**, or as **intro cards** before the
        recitation (the surah, "Chapter 2 of the Noble Quran", "Recited by…"; ▶ *Preview the intro*);
+     - in the YouTube styles, the **basmala** before the recitation: when the reciter says it, his own is used;
+       when he starts a surah without it, the app recommends adding it after the intro cards, in the voice of one
+       of 10 well-known reciters (▶ to listen; optional for a passage in the middle of a surah, never for
+       At-Tawbah). The recordings come from EveryAyah.com and are downloaded when chosen;
      - your **logo** (channel, page): imported once, it goes on all your videos, in every format, at the
        best place for it: top left in vertical videos (below the top bar of TikTok, Reels and Shorts, clear
        of their buttons and caption, kept in Instagram's 4:5 preview), top right in 16:9 (YouTube puts its own

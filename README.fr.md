@@ -89,6 +89,10 @@ L'installation télécharge les composants, le modèle de reconnaissance de la r
        petites capitales ; épaisseur du contour (ou simple ombre douce) ;
      - titre et récitateur en haut, en petite **étiquette dans un coin**, ou en **cartes d'intro** avant la
        récitation (la sourate, « Chapitre 2 du noble Coran », « Récitée par… » ; ▶ *Voir l'intro*) ;
+     - dans les styles YouTube, la **basmala** avant la récitation : quand le récitateur la dit, c'est la sienne ;
+       quand il commence une sourate sans elle, l'appli recommande de l'ajouter après les cartes d'intro, avec la voix
+       d'un de 10 récitateurs connus (▶ pour écouter ; facultatif pour un passage au milieu d'une sourate, jamais pour
+       At-Tawbah). Les enregistrements viennent d'EveryAyah.com et sont téléchargés quand on en choisit un ;
      - ton **logo** (chaîne, page) : importé une fois, il va sur toutes tes vidéos, dans tous les formats, au
        meilleur endroit : en haut à gauche en vertical (sous la barre du haut de TikTok, Reels et Shorts, loin
        de leurs boutons et de la légende, gardé dans l'aperçu 4:5 d'Instagram), en haut à droite en 16:9 (YouTube
