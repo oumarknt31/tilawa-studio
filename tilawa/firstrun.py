@@ -73,6 +73,12 @@ def smoke() -> int:
 
     ff, fp = media.tools()
     subprocess.run([ff, "-hide_banner", "-version"], check=True, capture_output=True)
+    # the link downloader merges video and audio with that same ffmpeg
+    import yt_dlp
+    from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+
+    with yt_dlp.YoutubeDL({"ffmpeg_location": str(Path(ff).parent), "quiet": True}) as ydl:
+        assert FFmpegPostProcessor(ydl).available, "yt-dlp does not find ffmpeg"
     ensure_browser()
     tmp = Path(tempfile.mkdtemp())
     r = render.OverlayRenderer(1080, 1920)

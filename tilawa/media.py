@@ -115,6 +115,18 @@ def load_audio(path: str | Path, sr: int = 16000) -> np.ndarray:
     return np.frombuffer(out, dtype=np.float32).copy()
 
 
+def _js_runtimes() -> dict:
+    try:
+        from playwright._impl._driver import compute_driver_executable
+
+        node = Path(compute_driver_executable()[0])
+        if node.exists():
+            return {"node": {"path": str(node)}}
+    except Exception:
+        pass
+    return {"deno": {}}
+
+
 def download(url: str, dest_dir: Path, progress=None) -> Path:
     """Download the best available quality of a video URL with yt-dlp."""
     import certifi
@@ -132,6 +144,11 @@ def download(url: str, dest_dir: Path, progress=None) -> Path:
         "format": "bv*+ba/b",
         "format_sort": ["res", "fps", "hdr:12", "vbr", "abr"],
         "merge_output_format": "mkv",  # mkv holds any codec combination without re-encoding
+        # the app's own ffmpeg (yt-dlp would look on the PATH, where there is none on most computers)
+        "ffmpeg_location": str(Path(tools()[0]).parent),
+        # YouTube asks to solve a JavaScript challenge: with the Node.js that comes with Playwright
+        # (and the yt-dlp-ejs solver), so nothing has to be installed
+        "js_runtimes": _js_runtimes(),
         "outtmpl": str(dest_dir / "source.%(ext)s"),
         "quiet": True,
         "noprogress": True,

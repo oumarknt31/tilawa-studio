@@ -19,6 +19,7 @@ dependencies = [
     "pillow>=13.0.0",
     "pillow-heif>=1.8.1",
     "pywebview>=6.2.1",
+    "yt-dlp-ejs>=0.8.0",
 ]
 
 [project.scripts]
