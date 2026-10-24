@@ -118,6 +118,8 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
      **volume optimisé pour les réseaux** (−14 LUFS, le niveau de YouTube, TikTok et Instagram).
    - **Export** : format (ou une copie du projet dans un autre format), résolution, qualité,
      **image** pleine résolution (pour une miniature YouTube), liste des fichiers déjà exportés.
+     Les vidéos horizontales peuvent être **répétées** (10 fois par défaut, ou le nombre choisi) : la récitation
+     revient encore et encore pour l'apprendre par cœur, les cartes de titre et la basmala ajoutée une seule fois, au début.
    - **Timeline** (en bas) : tire les bords d'un sous-titre pour changer son horaire, le bord d'un
      élément d'arrière-plan pour changer sa durée ; les **poignées roses** coupent le début et la fin.
    - **Zones des applis** (sous l'aperçu) : montre où TikTok, Reels et Shorts posent leurs boutons.

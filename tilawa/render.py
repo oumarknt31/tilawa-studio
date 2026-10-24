@@ -52,6 +52,7 @@ class RenderOptions:
     audio_fade_out: float = 0.0
     loudnorm: bool = True  # -14 LUFS, the level YouTube, TikTok and Instagram play at
     basmala: str = ""  # YouTube styles: a reciter's basmala said before the recitation (basmala.RECITERS), "" = none
+    repeat: int = 1  # horizontal (YouTube) videos: the recitation this many times in a row (to learn it by heart)
 
 
 # "Surah X" in each translation language ({} = the surah's name)
@@ -706,22 +707,57 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
                 amap = ["-map", "[ab]"]
         script.write_text(";\n".join(graph))
         head = [*common, *inputs.args, *_graph_arg(script), "-map", "[vout]", *amap, "-fps_mode", "cfr", "-r", fps]
+        times, final, keyframe = repeats(opt, fmt), out, []
+        if times > 1:  # made once, then copied end to end: a keyframe where the recitation starts
+            out = out.with_name(f".{out.stem}-once{out.suffix}")
+            keyframe = ["-force_key_frames", f"{lead:.3f}"] if lead else []
         tail = [*_audio_args(info, t0 > 0 or t1 < info.duration or bool(afilters) or bool(basmala), bool(basmala)),
                 "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
-        cmd = [*head, *vargs, *tail]
+        cmd = [*head, *vargs, *keyframe, *tail]
     try:
         code, err = _run(cmd, work, total, progress)
         if code > 0 and any("videotoolbox" in a for a in vargs):
             # the media engine refused the job: same video with the software encoder
             progress("encoding", 0.0)
-            code, err = _run([*head, *_encode_args(info, opt, hardware=False)[0], *tail], work, total, progress)
+            code, err = _run([*head, *_encode_args(info, opt, hardware=False)[0], *keyframe, *tail], work, total, progress)
         if code != 0:
             raise RuntimeError(f"ffmpeg failed:\n{err[-3000:]}")
+        if not still_image and times > 1:
+            progress("repeat", 0.0)
+            _repeat(out, final, times, lead, work)
+            out.unlink()
+            out = final
     except BaseException:
         out.unlink(missing_ok=True)  # stopped or failed: no half-made video left behind
+        if not still_image:
+            final.unlink(missing_ok=True)
         raise
     progress("encoding", 1.0)
     return out
+
+
+def repeats(opt: RenderOptions, fmt: str) -> int:
+    """How many times the recitation is played (only horizontal videos are repeated)."""
+    return max(1, min(100, int(opt.repeat or 1))) if fmt == "16:9" and opt.quality != "png" else 1
+
+
+def _repeat(once: Path, out: Path, times: int, lead: float, work: Path) -> None:
+    """The video, then its recitation (after the title cards / basmala: `lead` s) again and again,
+    copied without encoding again: cut once where the recitation starts (a keyframe), then joined."""
+    ff = media.tools()[0]
+    run = lambda *args: subprocess.run([ff, "-y", "-hide_banner", "-loglevel", "error", *args], check=True,
+                                       capture_output=True, cwd=work)
+    if lead:
+        run("-i", str(once), "-map", "0", "-c", "copy", "-f", "segment", "-segment_times", f"{lead:.3f}",
+            "-reset_timestamps", "1", "-segment_format", "mp4", str(work / f"part%d{once.suffix}"))
+        parts = [work / f"part0{once.suffix}"] + [work / f"part1{once.suffix}"] * times
+    else:
+        parts = [once] * times
+    lst = work / "repeat.txt"
+    lst.write_text("".join("file '{}'\n".format(str(f).replace("'", "'\\''")) for f in parts))
+    run("-f", "concat", "-safe", "0", "-i", str(lst), "-map", "0", "-c", "copy", "-movflags", "+faststart", str(out))
+    for f in set(parts) - {once}:
+        f.unlink(missing_ok=True)
 
 
 def _run(cmd: list[str], work: Path, total: float, progress: Callable[[str, float], None]) -> tuple[int, str]:

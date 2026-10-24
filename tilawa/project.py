@@ -268,7 +268,9 @@ def make_video(p: Project, out_dir: Path | None = None, progress: Progress | Non
         if progress:
             progress("prepare", 0.0)
         extra = {"file": basmala.ensure(basmala.HOME, opt.basmala), "payload": basmala_payload(p)}
-    return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / output_name(p), opt, p.style, progress,
+    times = render.repeats(opt, p.format)
+    name = output_name(p) + (f"_x{times}" if times > 1 else "")
+    return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / name, opt, p.style, progress,
                          p.get_background(), p.media_dir, p.format, p.lang, p.surah, extra, header_titles(p))
 
 

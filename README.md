@@ -117,6 +117,8 @@ downloaded in a browser.
      **loudness optimised for social media** (−14 LUFS, the level of YouTube, TikTok and Instagram).
    - **Export**: format (or a copy of the project in another format), resolution, quality,
      full-resolution **image** (for a YouTube thumbnail), list of files already exported.
+     Horizontal videos can be **repeated** (10 times by default, or any number): the recitation
+     plays again and again to learn it by heart, the title cards and added basmala only once, at the start.
    - **Timeline** (bottom): drag the edges of a subtitle to change its timing, the edge of a
      background item to change its length; the **pink handles** cut the start and the end.
    - **App safe zones** (below the preview): shows where TikTok, Reels and Shorts put their buttons.

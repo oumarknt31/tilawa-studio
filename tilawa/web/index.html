@@ -708,6 +708,14 @@
           <option value="studio">Studio — même qualité, fichier ⅓ plus léger, mais très lent</option>
         </select>
       </div>
+      <div class="section" id="rep-box">
+        <div class="sh"><h3>Répétition</h3></div>
+        <div class="seg-ctl"><button id="rep-once" onclick="setRepeat(false)">Normale</button><button id="rep-many" onclick="setRepeat(true)">Répétée</button></div>
+        <div id="rep-row" class="row hidden" style="align-items:center;gap:8px;margin-top:10px">
+          <input id="r-repeat" type="number" min="2" max="100" step="1" style="width:80px" onchange="setRepeat(true)"><span>fois</span>
+          <span id="rep-total" class="muted small"></span></div>
+        <p class="muted small" style="margin:8px 0 0">La récitation jouée plusieurs fois de suite, pour l'apprendre par cœur. Les cartes de titre et la basmala ajoutée ne passent qu'une fois, au début.</p>
+      </div>
       <button id="render" class="primary bigbtn" onclick="renderVideo()"><svg class="i"><use href="#i-download"/></svg>Créer la vidéo</button>
       <div id="r-box" class="hidden" style="margin-top:12px">
         <div class="row"><span id="r-stage" class="muted small grow"></span><span id="r-pct" class="small"></span></div>
@@ -1099,6 +1107,10 @@ const EN = {
   "Une nouvelle version de Tilawa Studio est prête ({when}) : « {msg} ». Tes projets et vidéos sont conservés.":
     "A new version of Tilawa Studio is ready ({when}): « {msg} ». Your projects and videos are kept.",
   "Installation des composants…": "Installing components…", "Téléchargement de la mise à jour…": "Downloading the update…",
+  "Répétition": "Repetition", "Normale": "Normal", "Répétée": "Repeated", "fois": "times", "durée totale ≈ {d}": "total length ≈ {d}",
+  "Assemblage des répétitions…": "Putting the repetitions together…",
+  "La récitation jouée plusieurs fois de suite, pour l'apprendre par cœur. Les cartes de titre et la basmala ajoutée ne passent qu'une fois, au début.":
+    "The recitation played several times in a row, to learn it by heart. The title cards and the added basmala come only once, at the start.",
   "Droits d'auteur : risque élevé de réclamation": "Copyright: high risk of a claim", "Droits d'auteur : réclamation possible": "Copyright: a claim is possible",
   "Droits d'auteur : risque faible": "Copyright: low risk", "Je publie sur :": "I post on:", "Si la plateforme reconnaît ce son :": "If the platform recognises this sound:",
   "Pour l'éviter :": "To avoid it:", "celui qui l'a publiée": "whoever posted it",
@@ -1182,7 +1194,7 @@ const STAGES_FR = { queued: "En attente…", download: "Téléchargement de la v
   identify: "Identification de la sourate et des versets…", aligning: "Synchronisation de chaque mot…", done: "Terminé",
   overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…", loudness: "Mesure du volume…",
   prepare: "Préparation des vidéos en aller-retour…", install: "Installation des composants…",
-  fetch_update: "Téléchargement de la mise à jour…" };
+  fetch_update: "Téléchargement de la mise à jour…", repeat: "Assemblage des répétitions…" };
 const STAGES = new Proxy(STAGES_FR, { get: (o, k) => o[k] && t(o[k]) });
 const STEP_OF = { queued: 0, download: 0, preview: 0, audio: 1, model: 1, listening: 1, identify: 2, aligning: 3, done: 4 };
 // same values as render.py / overlay.html
@@ -1473,6 +1485,7 @@ function refreshAll() {
   const r = P.render;
   $("r-quality").value = r.quality === "png" ? "max" : r.quality;
   $("r-fade").value = r.fade_in; $("r-trim-start").value = r.trim_start || ""; $("r-trim-end").value = r.trim_end || "";
+  renderRepeat();
   $("r-afi").value = r.audio_fade_in || 0; $("r-afo").value = r.audio_fade_out || 0;
   $("r-header").checked = r.show_header; $("r-loud").checked = r.loudnorm !== false;
   $("e-lang").value = P.lang; renderEditions();
@@ -2817,6 +2830,26 @@ function setRender() {
     loudnorm: $("r-loud").checked,
   });
   changed({ tl: true });
+}
+// horizontal (YouTube) videos: the recitation N times in a row (render.py repeats)
+let repeatN = 10;
+function setRepeat(on) {
+  const n = Math.round(parseFloat($("r-repeat").value));
+  if (on && n >= 2) repeatN = Math.min(100, n);
+  P.render.repeat = on ? repeatN : 1;
+  renderRepeat();
+  changed({});
+}
+function renderRepeat() {
+  $("rep-box").classList.toggle("hidden", P.format !== "16:9");
+  const n = P.render.repeat || 1, on = n > 1;
+  if (on) repeatN = n;
+  $("rep-once").classList.toggle("on", !on); $("rep-many").classList.toggle("on", on);
+  $("rep-row").classList.toggle("hidden", !on);
+  $("r-repeat").value = repeatN;
+  const once = (P.render.trim_end || P.duration) - (P.render.trim_start || 0), total = once * repeatN;
+  const h = Math.floor(total / 3600), m = Math.round((total % 3600) / 60);
+  $("rep-total").textContent = t("durée totale ≈ {d}", { d: h ? `${h} h ${String(m).padStart(2, "0")}` : `${Math.max(1, m)} min` });
 }
 function outSize(size) {
   const [cw, ch] = FORMATS[P.format], native = P.width * ch === P.height * cw && Math.min(P.width, P.height) >= 1080;

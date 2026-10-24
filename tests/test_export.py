@@ -91,3 +91,25 @@ def test_a_dragged_logo_place_stays_with_its_video(tmp_path):
     saved = lib.save_style("Mine", {"--logo-pos": "custom", "--logo-x": "250px", "--logo-y": "690px", "--logo-size": "150px"})
     assert saved["style"] == {"--logo-size": "150px"}  # other videos get the best corner of their format
     assert lib.save_style("Corner", {"--logo-pos": "tl"})["style"] == {"--logo-pos": "tl"}
+
+
+def test_repeated_version(tmp_path):
+    import json
+    import subprocess
+
+    opt = render.RenderOptions(repeat=10)
+    assert render.repeats(opt, "16:9") == 10 and render.repeats(opt, "9:16") == 1  # horizontal videos only
+    assert render.repeats(render.RenderOptions(), "16:9") == 1
+    # 1 s of title cards, then 1.5 s of recitation: the cards once, the recitation 3 times
+    ff, probe = media.tools()
+    once = tmp_path / "once.mp4"
+    subprocess.run([ff, "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=25:duration=2.5", "-f", "lavfi",
+                    "-i", "sine=frequency=440:duration=2.5", "-c:v", "libx264", "-force_key_frames", "1.0", "-c:a", "aac",
+                    "-shortest", str(once)], check=True)
+    out = tmp_path / "x3.mp4"
+    render._repeat(once, out, 3, 1.0, tmp_path)
+    dur = float(json.loads(subprocess.run([probe, "-v", "error", "-show_entries", "format=duration", "-of", "json", str(out)],
+                                          capture_output=True, text=True).stdout)["format"]["duration"])
+    assert abs(dur - 5.5) < 0.1
+    errors = subprocess.run([ff, "-v", "error", "-i", str(out), "-f", "null", "-"], capture_output=True, text=True).stderr
+    assert not errors.strip()
