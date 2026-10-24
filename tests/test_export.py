@@ -113,3 +113,22 @@ def test_repeated_version(tmp_path):
     assert abs(dur - 5.5) < 0.1
     errors = subprocess.run([ff, "-v", "error", "-i", str(out), "-f", "null", "-"], capture_output=True, text=True).stderr
     assert not errors.strip()
+
+
+def test_crossfades_after_a_cut_too_short_to_fade(tmp_path):
+    import subprocess
+
+    ff, _ = media.tools()
+    video = tmp_path / "v.mp4"
+    subprocess.run([ff, "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=4", "-c:v", "libx264",
+                    str(video)], check=True)
+    # the export starts just before the 1st cut: too little of the 1st clip to fade (concat), then a crossfade
+    clips = [{"src": "original", "dur": 1.0}, {"src": "original", "dur": 1.0}, {"src": "original", "dur": 2}]
+    bg = {"clips": clips, "transition": 0.5, "fill": "blur", "dim": 0}
+    graph, inputs = [], render._Inputs()
+    label = render._background_graph(bg, _info(width=320, height=180, duration=4.0), video, None, 0.95, 4.0, 320, 180,
+                                     inputs, graph, tmp_path, lambda s, f: None, "16:9")
+    assert any("concat" in g for g in graph) and any("xfade" in g for g in graph)
+    run = subprocess.run([ff, "-v", "error", *inputs.args, "-filter_complex", ";".join(graph), "-map", f"[{label}]",
+                          "-f", "null", "-"], capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr

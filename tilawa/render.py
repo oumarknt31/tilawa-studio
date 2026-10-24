@@ -468,8 +468,8 @@ def _background_graph(bg: dict, info: media.VideoInfo, video: Path, media_dir: P
             chain += "," + motion_filter(w, h, motion, frames)
         if not is_neutral(c.get("adjust")):
             chain += "," + adjust_filter(c["adjust"], work / f"adjust{i}.cube")
-        # constant rate and a common time base, as the crossfades require
-        chain += f",trim=duration={length:.3f},setpts=PTS-STARTPTS,settb=AVTB,fps={fps},format=yuv444p"
+        # constant rate and a common time base, as the crossfades require (concat outputs AVTB)
+        chain += f",trim=duration={length:.3f},setpts=PTS-STARTPTS,fps={fps},settb=AVTB,format=yuv444p"
         graph.append(f"{chain}[c{i}]")
         labels.append(f"c{i}")
     last = labels[0]
