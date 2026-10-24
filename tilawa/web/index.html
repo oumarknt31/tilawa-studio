@@ -2841,6 +2841,10 @@ async function checkUpdate() {
     const when = new Date(u.date).toLocaleDateString(UI === "fr" ? "fr-FR" : "en-GB", { dateStyle: "long" });
     $("update-text").textContent = t("Une nouvelle version de Tilawa Studio est prête ({when}) : « {msg} ». Tes projets et vidéos sont conservés.",
       { when, msg: u.message });
+    // a new version opens the dialog once by itself: the small button alone goes unnoticed
+    let seen = null;
+    try { seen = localStorage.getItem("update-seen"); localStorage.setItem("update-seen", u.tag); } catch {}
+    if (seen !== u.tag && !document.querySelector("dialog[open]")) $("update-dialog").showModal();
   } catch {}
 }
 async function runUpdate() {

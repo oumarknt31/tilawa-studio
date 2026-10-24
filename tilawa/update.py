@@ -19,6 +19,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 import zipfile
@@ -31,6 +32,7 @@ MAC, WIN = sys.platform == "darwin", os.name == "nt"
 ASSET = "TilawaStudio-macOS.zip" if MAC else "TilawaStudio-Windows.zip"
 _cache: dict = {}
 _pending: dict = {}  # an update ready to be swapped in when the app quits
+_applying = threading.Lock()  # one download at a time: a second one would delete the staged build
 
 
 def _get(url: str, timeout: float = 15):
@@ -105,7 +107,19 @@ def apply(progress) -> str:
     """Download the new version next to the installed one; it is swapped in when the app quits (restart())."""
     if kind() == "dev":
         raise RuntimeError("development copy: update with git")
+    if not _applying.acquire(blocking=False):
+        raise RuntimeError("an update is already downloading")
+    try:
+        return _apply(progress)
+    finally:
+        _applying.release()
+
+
+def _apply(progress) -> str:
     new = latest()
+    if _pending.get("tag") == new["tag"] and _pending["built"].exists():
+        progress("done", 1.0)
+        return new["tag"]
     url, sums_url = new["assets"].get(ASSET), new["assets"].get("SHA256SUMS.txt")
     if not url:
         raise RuntimeError("no build for this computer in the latest release")
@@ -140,7 +154,7 @@ def apply(progress) -> str:
     built = stage / (f"{NAME}.app" if MAC else NAME)
     if not built.exists():
         raise RuntimeError("the download does not contain the app")
-    _pending.update(built=built, target=target, stage=stage)
+    _pending.update(built=built, target=target, stage=stage, tag=new["tag"])
     progress("done", 1.0)
     return new["tag"]
 
@@ -158,11 +172,13 @@ def restart() -> None:
         exe = target / "python" / "pythonw.exe"
         swap = ""
         if built:
-            swap = (f"if (Test-Path '{target}') {{ Rename-Item '{target}' '{target}.old' }}; "
-                    f"Move-Item '{built}' '{target}'; Remove-Item '{target}.old','{stage}' -Recurse -Force -EA SilentlyContinue; "
-                    f"& '{target / 'python' / 'python.exe'}' -m tilawa.shortcuts; ")
+            swap = (f"if (Test-Path '{built}') {{ "
+                    f"if (Test-Path '{target}') {{ Rename-Item '{target}' '{target}.old' }}; "
+                    f"try {{ Move-Item '{built}' '{target}' -EA Stop; Remove-Item '{target}.old','{stage}' -Recurse -Force -EA SilentlyContinue }} "
+                    f"catch {{ if (Test-Path '{target}.old') {{ Rename-Item '{target}.old' '{target}' }} }}; "
+                    f"& '{target / 'python' / 'python.exe'}' -m tilawa.shortcuts }}; ")
         if legacy and built:
-            swap += f"Remove-Item '{legacy}' -Recurse -Force -EA SilentlyContinue; "
+            swap += f"if (Test-Path '{target}') {{ Remove-Item '{legacy}' -Recurse -Force -EA SilentlyContinue }}; "
         script = (f"while (Get-Process -Id {pid} -EA SilentlyContinue) {{ Start-Sleep -Milliseconds 300 }}; {swap}"
                   f"Start-Process '{exe}' -ArgumentList '-m','tilawa.cli','desktop' -WorkingDirectory '{target}'")
         subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", script],
@@ -170,11 +186,11 @@ def restart() -> None:
     else:
         swap = ""
         if built:
-            swap = (f'rm -rf "{target}.old"; [ -e "{target}" ] && mv "{target}" "{target}.old"; '
-                    f'mv "{built}" "{target}" && rm -rf "{target}.old" "{stage}"; '
-                    f'xattr -dr com.apple.quarantine "{target}" 2>/dev/null; ')
+            swap = (f'if [ -d "{built}" ]; then rm -rf "{target}.old"; [ -e "{target}" ] && mv "{target}" "{target}.old"; '
+                    f'if mv "{built}" "{target}"; then rm -rf "{target}.old" "{stage}"; else mv "{target}.old" "{target}"; fi; '
+                    f'xattr -dr com.apple.quarantine "{target}" 2>/dev/null; fi; ')
         if legacy and built:
-            swap += f'rm -rf "{legacy}"; '
+            swap += f'[ -d "{target}" ] && rm -rf "{legacy}"; '
         opener = f'open "{target}"' if MAC and (built or kind() == "app") else \
             subprocess.list2cmdline([sys.executable, "-m", "tilawa.cli", *sys.argv[1:]])
         subprocess.Popen(["/bin/sh", "-c", f"while kill -0 {pid} 2>/dev/null; do sleep 0.3; done; {swap}{opener}"],
