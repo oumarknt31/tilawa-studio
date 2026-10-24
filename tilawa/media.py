@@ -127,8 +127,19 @@ def _js_runtimes() -> dict:
     return {"deno": {}}
 
 
-def download(url: str, dest_dir: Path, progress=None) -> Path:
-    """Download the best available quality of a video URL with yt-dlp."""
+def link_info(url: str) -> dict:
+    """What a video link says about itself (title, channel, licence...), without downloading it."""
+    import certifi
+    import yt_dlp
+
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True, "noplaylist": True, "js_runtimes": _js_runtimes()}) as ydl:
+        return ydl.extract_info(url, download=False)
+
+
+def download(url: str, dest_dir: Path, progress=None, info: dict | None = None) -> Path:
+    """Download the best available quality of a video URL with yt-dlp (info: filled with what
+    the link says about itself)."""
     import certifi
     import yt_dlp
 
@@ -155,8 +166,10 @@ def download(url: str, dest_dir: Path, progress=None) -> Path:
         "progress_hooks": [hook],
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        path = Path(ydl.prepare_filename(info)).with_suffix(".mkv")
+        got = ydl.extract_info(url, download=True)
+        path = Path(ydl.prepare_filename(got)).with_suffix(".mkv")
+    if info is not None:
+        info.update(got)
     if not path.exists():
         matches = sorted(dest_dir.glob("source.*"))
         if not matches:

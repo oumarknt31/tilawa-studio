@@ -105,3 +105,19 @@ def test_user_errors_speak_both_languages():
         quran.verse(1, 99)
     except UserError as e:
         assert e.text("fr") == "Le verset 1:99 n'existe pas." and e.text("en") == "Verse 1:99 does not exist."
+
+
+def test_copyright_estimate_of_a_link():
+    from tilawa import rights
+
+    level = lambda **info: rights.assess({"extractor_key": "Youtube", "title": "Sourate Al-Mulk", **info})["level"]
+    assert level(channel="Quelqu'un", channel_follower_count=900) == "medium"  # someone else's recording
+    assert level(channel="Alafasy", channel_follower_count=12_200_000, channel_is_verified=True) == "high"
+    assert level(description="© 2024 Label. All rights reserved") == "high"
+    assert level(license="Creative Commons Attribution license (reuse allowed)") == "low"
+    # "no copyright" in a description is not a licence
+    assert level(description="No copyright, free to share") == "medium"
+    # TikTok: a named sound is a registered track, the poster's own sound is not
+    tiktok = lambda **info: rights.assess({"extractor_key": "TikTok", **info})
+    assert tiktok(track="Song", artist="Label Artist")["level"] == "high"
+    assert [r["key"] for r in tiktok(track="original sound - someone")["reasons"]] == ["original_sound", "someone_else"]

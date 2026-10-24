@@ -87,8 +87,10 @@ jobs:
         run: |
           Get-ChildItem release\TilawaStudio-* | ForEach-Object { "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content release\SHA256SUMS.txt
           Get-Content release\SHA256SUMS.txt
-          Start-Process python -ArgumentList '-m', 'http.server', '8000' -WorkingDirectory release -WindowStyle Hidden
-          Start-Sleep -Seconds 3
+          Start-Process python -ArgumentList '-m', 'http.server', '8000', '--bind', '127.0.0.1' -WorkingDirectory release -WindowStyle Hidden
+          foreach ($i in 1..30) {  # until it answers
+            try { Invoke-WebRequest http://127.0.0.1:8000/SHA256SUMS.txt -UseBasicParsing | Out-Null; break } catch { Start-Sleep -Seconds 1 }
+          }
           Get-Content install.ps1 -Raw | Invoke-Expression
           $app = Join-Path $env:LOCALAPPDATA 'Programs\Tilawa Studio'
           & "$app\python\python.exe" -m tilawa.cli smoke

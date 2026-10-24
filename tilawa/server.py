@@ -26,7 +26,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import basmala, media, project, quran, render, segment
+from . import basmala, media, project, quran, render, rights, segment
 from .cli import HOME
 from .i18n import UI_LANGS, UserError
 from .library import Library
@@ -579,7 +579,7 @@ def get_settings():
 
 @app.put("/api/settings")
 def put_settings(body: dict):
-    s = LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour", "ui", "logo_auto")})
+    s = LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour", "ui", "logo_auto", "platforms")})
     render.LOGO_AUTO = s.get("logo_auto", True)
     return s
 
@@ -657,6 +657,18 @@ def logo():
     if not LIB.logo_file.is_file():
         raise HTTPException(404)
     return FileResponse(LIB.logo_file, media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/link-check")
+def link_check(url: str):
+    """Copyright risk of a video link, before making a video from it (rights.py: an estimate)."""
+    if not url.strip().startswith(("http://", "https://")):
+        raise UserError("need_https")
+    try:
+        info = media.link_info(url.strip())
+    except Exception as e:  # private, removed, or not a video: the download will say so
+        return {"error": str(e)[:300]}
+    return rights.assess(info) | {"duration": info.get("duration")}
 
 
 @app.get("/api/basmala")
