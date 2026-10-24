@@ -128,8 +128,10 @@ downloaded in a browser.
      - **Blade** (B) cuts where you click (a subtitle: between the nearest words); **S** or **⌘K** at the playhead.
      - **Slip** (Y, or ⌥ + drag): which part of a video its clip shows.
      - **Replace** (R): another media from the library, or a new file, in place of a clip (and its repeats if you like).
-     - ⌘C / ⌘V a clip in place of another (⌥⌘V: its look only), **Delete**, **snapping** (N) to verses,
-       cuts and the playhead, **right click** for every tool.
+     - ⌘C / ⌘V a clip in place of another (⌥⌘V: its look only), **Delete**, **right click** for every tool.
+     - **Magnet** (N): what you drag locks onto the verses and subtitles, the background cuts, the start and
+       end of the video and the playhead, across tracks; a gold line and a label show what it locked onto.
+       A moved subtitle locks by either end. Hold ⌘ while dragging to move freely.
      - J K L to play backwards / pause / forwards, ← → one frame, ↑ ↓ previous / next cut,
        I / O for the start and end of the exported video (the **pink handles**), + − \ to zoom.
    - **App safe zones** (below the preview): shows where TikTok, Reels and Shorts put their buttons.

@@ -130,8 +130,10 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
      - **Lame** (B) : coupe là où tu cliques (un sous-titre : entre les mots les plus proches) ; **S** ou **⌘K** à la tête de lecture.
      - **Décaler** (Y, ou ⌥ + glisser) : le passage d'une vidéo montré dans son clip.
      - **Remplacer** (R) : un autre média de la bibliothèque, ou un nouveau fichier, à la place d'un clip (et de ses répétitions si tu veux).
-     - ⌘C / ⌘V un clip à la place d'un autre (⌥⌘V : son apparence seulement), **Suppr**, **magnétisme** (N) sur les versets,
-       les coupes et la tête de lecture, **clic droit** pour tous les outils.
+     - ⌘C / ⌘V un clip à la place d'un autre (⌥⌘V : son apparence seulement), **Suppr**, **clic droit** pour tous les outils.
+     - **Magnétisme** (N) : ce que tu glisses s'aimante aux versets et sous-titres, aux coupes de l'arrière-plan, au début
+       et à la fin de la vidéo et à la tête de lecture, d'une piste à l'autre ; une ligne dorée et une étiquette montrent
+       à quoi. Un sous-titre déplacé s'aimante par l'un ou l'autre bout. ⌘ en glissant : sans aimant.
      - J K L pour lire en arrière / pause / en avant, ← → une image, ↑ ↓ coupe précédente / suivante,
        I / O pour le début et la fin de la vidéo exportée (les **poignées roses**), + − \ pour zoomer.
    - **Zones des applis** (sous l'aperçu) : montre où TikTok, Reels et Shorts posent leurs boutons.

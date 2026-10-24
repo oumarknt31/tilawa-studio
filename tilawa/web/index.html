@@ -326,7 +326,11 @@
   .reserve.drop { background-color: rgba(242, 201, 92, .12); }
   .reserve .lbl { position: absolute; left: 6px; top: 46px; font-size: 10px; color: var(--faint); white-space: nowrap; }
   .tl-line { position: absolute; top: 22px; bottom: 0; width: 1px; background: var(--pink); pointer-events: none; z-index: 6; }
-  .tl-line.snap { background: var(--gold); }
+  .tl-line.snap { background: var(--gold); top: 0; width: 2px; margin-left: -1px; box-shadow: 0 0 6px rgba(242, 201, 92, .8); }
+  .tl-line.snap::before, .tl-line.snap::after { content: ""; position: absolute; left: -4px; border: 5px solid transparent; }
+  .tl-line.snap::before { top: 22px; border-top-color: var(--gold); }
+  .tl-line.snap::after { bottom: 0; border-bottom-color: var(--gold); }
+  .tl-tip.snap { background: var(--gold); color: #1a1405; font-weight: 600; }
   .tl-tip { position: absolute; top: 2px; transform: translateX(-50%); background: rgba(0, 0, 0, .85); color: #fff; border-radius: 6px; padding: 1px 7px;
             font-size: 11px; white-space: nowrap; pointer-events: none; z-index: 7; }
   .tl-ghost { position: fixed; z-index: 1000; pointer-events: none; height: 30px; min-width: 60px; border-radius: 7px; border: 1px solid var(--gold);
@@ -821,7 +825,7 @@
         <button class="ghost small" onclick="openReplace()" title="Remplacer le média du clip choisi (R)"><svg class="i" style="width:14px"><use href="#i-swap"/></svg>Remplacer</button>
         <button class="ghost small icon" onclick="deleteSelected()" title="Supprimer l'élément choisi (Suppr)"><svg class="i" style="width:14px"><use href="#i-trash"/></svg></button>
         <span class="vsep"></span>
-        <button id="tool-snap" class="ghost small icon on" onclick="toggleSnap()" title="Magnétisme : s'aimanter aux versets, aux coupes et à la tête de lecture (N)"><svg class="i" style="width:15px"><use href="#i-magnet"/></svg></button>
+        <button id="tool-snap" class="ghost small icon on" onclick="toggleSnap()" title="Magnétisme : s'aimanter aux versets, aux coupes et à la tête de lecture (N ; ⌘ en glissant : sans aimant)"><svg class="i" style="width:15px"><use href="#i-magnet"/></svg></button>
       </div>
       <span class="muted small" id="tl-hint"></span>
       <span class="grow"></span>
@@ -863,7 +867,7 @@
     <kbd>Suppr</kbd><span>Supprimer l'élément choisi</span>
     <kbd>⌘C ⌘V</kbd><span>Copier un clip, le coller à la place d'un autre (⌥⌘V : son apparence seulement)</span>
     <kbd>I O</kbd><span>Début / fin de la vidéo exportée à la tête de lecture (⌥X : tout garder)</span>
-    <kbd>N</kbd><span>Magnétisme</span>
+    <kbd>N</kbd><span>Magnétisme (⌘ en glissant : sans aimant pour ce geste)</span>
     <kbd>+ − \</kbd><span>Zoomer / dézoomer / tout voir</span>
     <kbd>⌘Z</kbd><span>Annuler (⇧⌘Z ou Ctrl+Y : rétablir)</span>
     <kbd>Glisser</kbd><span>Sur l'aperçu : déplacer un texte ou l'image</span>
@@ -1216,6 +1220,12 @@ const EN = {
   "C'est une estimation d'après ce que dit la vidéo : aucune appli ne peut savoir à l'avance si une plateforme reconnaîtra un son.":
     "This is an estimate from what the video says about itself: no app can know in advance whether a platform will recognise a sound.",
   // timeline editing, reserve
+  "tête de lecture": "playhead",
+  "coupe de l'arrière-plan": "background cut",
+  "début du verset {n}": "start of verse {n}",
+  "fin du verset {n}": "end of verse {n}",
+  "début du sous-titre": "start of the subtitle",
+  "fin du sous-titre": "end of the subtitle",
   "Sélection : choisir, glisser, ajuster les bords (V)": "Selection: choose, drag, adjust the edges (V)",
   "Lame : couper là où tu cliques (B)": "Blade: cut where you click (B)",
   "Décaler : choisir le passage d'une vidéo montré dans son clip (Y)": "Slip: choose which part of a video its clip shows (Y)",
@@ -1224,7 +1234,7 @@ const EN = {
   "Remplacer le média du clip choisi (R)": "Replace the chosen clip's media (R)",
   "Remplacer": "Replace",
   "Supprimer l'élément choisi (Suppr)": "Delete the chosen item (Delete)",
-  "Magnétisme : s'aimanter aux versets, aux coupes et à la tête de lecture (N)": "Snapping: stick to verses, cuts and the playhead (N)",
+  "Magnétisme : s'aimanter aux versets, aux coupes et à la tête de lecture (N ; ⌘ en glissant : sans aimant)": "Snapping: stick to verses, cuts and the playhead (N; ⌘ while dragging: no snapping)",
   "Réserve : pas dans la vidéo": "Reserve: not in the video",
   "Lecture arrière / pause / avant (encore = plus vite)": "Play backwards / pause / forwards (again = faster)",
   "Image précédente / suivante (Maj : 1 seconde)": "Previous / next frame (Shift: 1 second)",
@@ -1237,7 +1247,7 @@ const EN = {
   "Supprimer l'élément choisi": "Delete the chosen item",
   "Copier un clip, le coller à la place d'un autre (⌥⌘V : son apparence seulement)": "Copy a clip, paste it in place of another (⌥⌘V: its look only)",
   "Début / fin de la vidéo exportée à la tête de lecture (⌥X : tout garder)": "Start / end of the exported video at the playhead (⌥X: keep everything)",
-  "Magnétisme": "Snapping",
+  "Magnétisme (⌘ en glissant : sans aimant pour ce geste)": "Snapping (⌘ while dragging: no snapping for that move)",
   "Zoomer / dézoomer / tout voir": "Zoom in / out / see everything",
   "Glisse un clip sur un autre pour les échanger, ou un média de la bibliothèque sur un clip pour le remplacer. Clic droit : tous les outils.": "Drag a clip onto another to swap them, or a media from the library onto a clip to replace it. Right click: every tool.",
   "La réserve, au bout de la timeline, garde les médias qui ne sont pas dans la vidéo : glisse-les sur un clip pour t'en servir.": "The reserve, at the end of the timeline, keeps the media that aren't in the video: drag them onto a clip to use them.",
@@ -3490,7 +3500,7 @@ function tlHead(t) {
 }
 
 // ---------------------------------------------------------------- timeline tools (as in Premiere and DaVinci)
-let tool = "select", snapOn = true, snapped = false, tlDrag = null;
+let tool = "select", snapOn = true, snapHold = false, snapInfo = null, tlDrag = null;
 const HINTS = {
   select: "glisser un clip sur un autre = les échanger · bords = déplacer la coupe (Maj : décaler la suite) · clic droit = tous les outils",
   blade: "clic = couper ici (un sous-titre : au mot le plus proche)",
@@ -3510,18 +3520,29 @@ function toggleSnap() {
   toast(t(snapOn ? "Magnétisme activé" : "Magnétisme désactivé"));
 }
 function tlTime(e) { const r = $("tl-content").getBoundingClientRect(); return Math.max(0, Math.min(P.duration, (e.clientX - r.left) / pps())); }
-// snaps to verses and subtitles, background cuts, the export's start and end, and the playhead
-// (where it was when the drag began: it follows the drag); skip: what is being moved
-function snapTime(at, head = $("video").currentTime, skip = {}) {
-  snapped = false;
-  if (!snapOn) return at;
-  const r = P.render, cands = [head, r.trim_start || 0, r.trim_end || P.duration,
-    ...clipTimes().slice(1).filter(x => x.i - 1 !== skip.cut).map(x => x.s),
-    ...P.blocks.flatMap((b, i) => i === skip.seg ? [] : [b.start, b.end])];
-  let best = at, bd = 8 / pps();
-  for (const c of cands) { const d = Math.abs(c - at); if (d < bd) { best = c; bd = d; snapped = true; } }
+// The magnet, as in Premiere: what can be snapped to on every track (subtitles and verses, background
+// cuts, the export's start and end, the playhead), named for the label. Taken when a drag begins,
+// leaving out what moves with it (skip: "s:3" / "e:3" = start / end of subtitle 3, "cut:2", "trim:start").
+function snapPoints(skip = new Set()) {
+  const r = P.render, pts = [], add = (at, key, what) => { if (!skip.has(key)) pts.push({ at, what }); };
+  add($("video").currentTime, "head", t("tête de lecture"));
+  add(r.trim_start || 0, "trim:start", t("début de la vidéo"));
+  add(r.trim_end || P.duration, "trim:end", t("fin de la vidéo"));
+  clipTimes().slice(1).forEach(x => add(x.s, "cut:" + (x.i - 1), t("coupe de l'arrière-plan")));
+  // starts first: where one verse ends and the next begins, the label names the one beginning
+  P.blocks.forEach((b, i) => add(b.start, "s:" + i, b.kind === "verse" ? t("début du verset {n}", { n: b.ayah }) : t("début du sous-titre")));
+  P.blocks.forEach((b, i) => add(b.end, "e:" + i, b.kind === "verse" ? t("fin du verset {n}", { n: b.ayah }) : t("fin du sous-titre")));
+  return pts;
+}
+// the nearest point within 10 px (snapInfo: what it is), unless the magnet is off or ⌘ / Ctrl is held
+function snapTo(at, pts) {
+  snapInfo = null;
+  if (!snapOn || snapHold) return at;
+  let best = at, bd = 10 / pps();
+  for (const p of pts) { const d = Math.abs(p.at - at); if (d < bd) { best = p.at; bd = d; snapInfo = p; } }
   return best;
 }
+const snapTime = (at) => snapTo(at, snapPoints());
 function showLine(at, label) {
   let ln = $("tl-line"), tip = $("tl-tip");
   if (!ln) {
@@ -3529,11 +3550,12 @@ function showLine(at, label) {
     tip = Object.assign(document.createElement("div"), { id: "tl-tip", className: "tl-tip" });
     $("tl-content").append(ln, tip);
   }
-  const x = at * pps() + "px";
-  ln.style.left = x; ln.classList.toggle("snap", snapped); ln.hidden = false;
-  tip.style.left = x; tip.textContent = label ?? fmt(at); tip.hidden = false;
+  const x = at * pps() + "px", on = !!snapInfo;
+  ln.style.left = x; ln.classList.toggle("snap", on); ln.hidden = false;
+  tip.style.left = x; tip.classList.toggle("snap", on); tip.hidden = false;
+  tip.textContent = (label ?? fmt(at)) + (on ? ` · 🧲 ${snapInfo.what}` : "");
 }
-function hideLine() { if ($("tl-line")) { $("tl-line").hidden = true; $("tl-tip").hidden = true; } }
+function hideLine() { snapInfo = null; if ($("tl-line")) { $("tl-line").hidden = true; $("tl-tip").hidden = true; } }
 const secs = (v) => t("{s} s", { s: v.toFixed(2) });
 
 // cuts the chosen subtitle if the playhead is in it, else the background clip under the playhead
@@ -3662,7 +3684,7 @@ $("tl-content").addEventListener("pointerdown", (e) => {
   const el = e.target, seg = el.closest(".seg"), clip = el.closest(".clip"), at = tlTime(e), head = $("video").currentTime;
   $("tl-content").setPointerCapture(e.pointerId);
   tlDrag = null;
-  if (el.dataset.trim) { tlDrag = { kind: "trim", which: el.dataset.trim }; return; }
+  if (el.dataset.trim) { tlDrag = { kind: "trim", which: el.dataset.trim, pts: snapPoints(new Set(["trim:" + el.dataset.trim])) }; return; }
   if (clip?.classList.contains("spare")) {
     const j = +clip.dataset.spare;
     selectSpare(j);
@@ -3678,7 +3700,10 @@ $("tl-content").addEventListener("pointerdown", (e) => {
     const i = +clip.dataset.i - (el.dataset.edge === "l" ? 1 : 0), times = clipTimes();
     const x = times.find(y => y.i === i), nx = times.find(y => y.i === i + 1);
     selectClip(i, false);
-    tlDrag = { kind: "cut", i, s: x.s, e2: nx ? nx.e : P.duration, last: i + 1 === P.background.clips.length - 1, ripple: e.shiftKey, head };
+    // a rolling edit moves this cut; a ripple edit (Shift) the ones after it too
+    const moving = P.background.clips.map((_, k) => "cut:" + k).filter((_, k) => e.shiftKey ? k >= i : k === i);
+    tlDrag = { kind: "cut", i, s: x.s, e2: nx ? nx.e : P.duration, last: i + 1 === P.background.clips.length - 1, ripple: e.shiftKey,
+               pts: snapPoints(new Set(moving)) };
     return;
   }
   if (clip) {
@@ -3699,20 +3724,27 @@ $("tl-content").addEventListener("pointerdown", (e) => {
     const nb = edge === "start" ? P.blocks[i - 1] : P.blocks[i + 1];
     const linked = nb && Math.abs(edge === "start" ? nb.end - b.start : nb.start - b.end) < 0.01;
     selectSeg(i);
-    tlDrag = { kind: "edge", i, edge, linked, head };
+    const skip = new Set([(edge === "start" ? "s:" : "e:") + i]);
+    if (linked) skip.add(edge === "start" ? "e:" + (i - 1) : "s:" + (i + 1));  // the touching neighbour's edge moves too
+    tlDrag = { kind: "edge", i, edge, linked, pts: snapPoints(skip) };
     return;
   }
   if (seg) {
     const i = +seg.dataset.i, b = P.blocks[i], prev = P.blocks[i - 1], next = P.blocks[i + 1];
+    const lp = prev && Math.abs(prev.end - b.start) < 0.01, ln = next && Math.abs(next.start - b.end) < 0.01;
+    const skip = new Set(["s:" + i, "e:" + i]);
+    if (lp) skip.add("e:" + (i - 1));
+    if (ln) skip.add("s:" + (i + 1));
+    const pts = snapPoints(skip);  // the playhead before it jumps to the click
     selectSeg(i); seek(at);
-    tlDrag = { kind: "pressSeg", i, x0: e.clientX, y0: e.clientY, at0: at, s0: b.start, e0: b.end, head,
-               lp: prev && Math.abs(prev.end - b.start) < 0.01, ln: next && Math.abs(next.start - b.end) < 0.01 };
+    tlDrag = { kind: "pressSeg", i, x0: e.clientX, y0: e.clientY, at0: at, s0: b.start, e0: b.end, lp, ln, pts };
     return;
   }
   seek(at); tlDrag = { kind: "scrub" };
 });
 $("tl-content").addEventListener("pointermove", (e) => {
   const d = tlDrag;
+  snapHold = e.metaKey || e.ctrlKey;  // held: no magnet for this move
   if (!d) {  // the blade shows where it would cut
     const over = e.target.closest?.(".clip:not(.spare), .seg");
     if (tool === "blade" && over && P) showLine(snapTime(tlTime(e))); else if (tool === "blade") hideLine();
@@ -3742,11 +3774,13 @@ $("tl-content").addEventListener("pointermove", (e) => {
     return;
   }
   if (d.kind === "trim") {
-    if (d.which === "start") P.render.trim_start = Math.round(Math.min(at, (P.render.trim_end || P.duration) - 1) * 100) / 100;
-    else { const v = Math.round(Math.max(at, (P.render.trim_start || 0) + 1) * 100) / 100; P.render.trim_end = v >= P.duration - 0.02 ? null : v; }
-    seek(d.which === "start" ? P.render.trim_start : (P.render.trim_end || P.duration) - 0.05);
+    const at2 = snapTo(at, d.pts);
+    if (d.which === "start") P.render.trim_start = Math.round(Math.min(at2, (P.render.trim_end || P.duration) - 1) * 1000) / 1000;
+    else { const v = Math.round(Math.max(at2, (P.render.trim_start || 0) + 1) * 1000) / 1000; P.render.trim_end = v >= P.duration - 0.02 ? null : v; }
+    const pos = d.which === "start" ? P.render.trim_start : P.render.trim_end || P.duration;
+    seek(d.which === "start" ? pos : pos - 0.05); showLine(pos);
   } else if (d.kind === "edge") {
-    const b = P.blocks[d.i], prev = P.blocks[d.i - 1], next = P.blocks[d.i + 1], v = Math.round(snapTime(at, d.head, { seg: d.i }) * 1000) / 1000;
+    const b = P.blocks[d.i], prev = P.blocks[d.i - 1], next = P.blocks[d.i + 1], v = Math.round(snapTo(at, d.pts) * 1000) / 1000;
     if (d.edge === "start") {
       b.start = Math.max(d.linked ? prev.start + 0.1 : prev ? prev.end : 0, Math.min(b.end - 0.1, v));
       if (d.linked) prev.end = b.start;
@@ -3759,17 +3793,23 @@ $("tl-content").addEventListener("pointermove", (e) => {
   } else if (d.kind === "slide") {  // the subtitle moves, touching neighbours give or take the time
     const b = P.blocks[d.i], prev = P.blocks[d.i - 1], next = P.blocks[d.i + 1];
     const lo = d.lp ? prev.start + 0.1 : prev ? prev.end : 0, hi = d.ln ? next.end - 0.1 : next ? next.start : P.duration;
-    let s0 = snapTime(d.s0 + at - d.at0, d.head, { seg: d.i });
-    s0 = Math.max(lo, Math.min(hi - (d.e0 - d.s0), s0));
-    b.start = r3(s0); b.end = r3(s0 + d.e0 - d.s0);
+    // either end can snap: the nearer one wins
+    const len = d.e0 - d.s0, free = d.s0 + at - d.at0;
+    const a = snapTo(free, d.pts), sa = snapInfo, z = snapTo(free + len, d.pts), sz = snapInfo;
+    const byEnd = sz && (!sa || Math.abs(z - free - len) < Math.abs(a - free));
+    snapInfo = byEnd ? sz : sa;
+    const s0 = Math.max(lo, Math.min(hi - len, byEnd ? z - len : sa ? a : free));
+    if (Math.abs(s0 - (byEnd ? z - len : a)) > 1e-6) snapInfo = null;  // stopped by a neighbour before reaching it
+    b.start = r3(s0); b.end = r3(s0 + len);
     if (d.lp) prev.end = b.start;
     if (d.ln) next.start = b.end;
-    seek(b.start); showLine(b.start);
+    seek(b.start); showLine(byEnd ? b.end : b.start);
   } else if (d.kind === "cut") {
-    const c = clips[d.i], n = clips[d.i + 1], v = snapTime(at, d.head, { cut: d.i });
+    const c = clips[d.i], n = clips[d.i + 1], v = snapTo(at, d.pts);
     if (d.ripple) c.dur = r3(Math.max(0.3, v - d.s));  // Maj: what follows moves with it
     else {  // rolling edit: only this cut moves
       const w = Math.min(d.e2 - 0.3, Math.max(d.s + 0.3, v));
+      if (w !== v) snapInfo = null;  // stopped by its neighbours before reaching it
       c.dur = r3(w - d.s);
       if (!d.last) n.dur = r3(d.e2 - w);
     }
