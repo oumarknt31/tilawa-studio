@@ -65,6 +65,7 @@ def detect(em: np.ndarray, audio: np.ndarray, model, opt: segment.Options, surah
         occ = _stitch(occ, mapped, a) if occ else mapped
     occ = _drop_strays(occ, verses, em, model)
     if passages and not surah:
+        occ = _finish_verses(occ, verses, passages, audio, opt)
         occ = _cut_verse(occ, verses, passages[0])  # (may add that verse to verses)
     blocks = segment.build_blocks(occ, verses, audio, duration, opt)
     return blocks, [p.to_dict() for p in passages]
@@ -223,6 +224,57 @@ def _cut_verse(occ: list[align.WordTiming], verses: list[quran.Verse], first: id
     step = (t1 - t0) / len(v.align)
     return [align.WordTiming(align.Word("verse", vi, i, text, [], w.seg), t0 + i * step, t0 + (i + 1) * step, 0.0)
             for i, text in enumerate(v.align)] + occ
+
+
+FINISH_AFTER_S = 0.5  # the tracker heard the passage this long after its last word placed...
+FINISH_TAIL_S = 0.4  # ...and the voice goes on this long after the last letter it heard
+
+
+def _finish_verses(occ: list[align.WordTiming], verses: list[quran.Verse], passages: list[identify.Passage],
+                   audio: np.ndarray, opt: segment.Options) -> list[align.WordTiming]:
+    """The last word or two of a passage, held on a long madd (Al-Fatiha's "ad-daallin"): the
+    model hears the madd as blank and its letters badly, so the aligner ends the passage before
+    them (the silence after a passage is free). The tracker still heard that passage later on:
+    those words are placed there, until the voice stops (the tracker's last letter may already
+    be the next passage's)."""
+    duration = len(audio) / align.SR
+    loud = segment.Loudness(audio)
+    need = max(1, int(opt.breath_quiet_s * 100))
+
+    def voice_end(t: float, limit: float) -> float:
+        run = 0
+        for i in range(int(t * 100), min(len(loud.rel), int(limit * 100))):
+            run = run + 1 if loud.rel[i] < -opt.breath_depth_db else 0
+            if run >= need:
+                return (i - run + 1) / 100
+        return limit
+
+    out = list(occ)
+    for k, p in enumerate(passages):
+        i = max((j for j, o in enumerate(out) if o.word.seg == k and o.word.unit == "verse"), default=None)
+        if i is None:
+            continue
+        o = out[i]
+        v = verses[o.word.verse_index]
+        missing = len(v.align) - o.word.index - 1
+        if not 0 < missing <= segment.MISSED_WORDS or (v.surah, v.ayah) != (p.surah, p.last):
+            continue
+        t0 = o.end + align.FRAME_S
+        if p.t1 < o.end + FINISH_AFTER_S:
+            continue
+        t1 = voice_end(t0, min(duration, p.t1 + FINISH_TAIL_S, *(x.start for x in out[i + 1:] if x.start > o.end)))
+        if t1 - t0 < 0.2 * missing:
+            continue
+        rest = v.align[o.word.index + 1:]
+        sizes = [max(1, len(quran.skeleton(w))) for w in rest]
+        at, added = t0, []
+        for n, (text, size) in enumerate(zip(rest, sizes)):
+            end = t1 if n + 1 == len(rest) else at + (t1 - t0) * size / sum(sizes)
+            added.append(align.WordTiming(align.Word("verse", o.word.verse_index, o.word.index + 1 + n, text, [],
+                                                     o.word.seg), at, end, 0.0))
+            at = end
+        out[i + 1:i + 1] = added
+    return out
 
 
 STRAY_FIT = 0.45  # an isolated stretch of words must match this share of the letters heard there
