@@ -312,6 +312,35 @@
   .trim::before { content: ""; position: absolute; left: 1px; top: -1px; width: 10px; height: 10px; border-radius: 3px; background: var(--pink); }
   .tl-head { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--gold); pointer-events: none; z-index: 5; }
   .tl-head::before { content: ""; position: absolute; top: 0; left: -5px; border: 6px solid transparent; border-top-color: var(--gold); }
+  .tl-tools { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
+  .tl-tools .vsep { height: 18px; }
+  #tl-hint { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .tl-content.blade .clip, .tl-content.blade .seg { cursor: crosshair; }
+  .tl-content.slip .clip { cursor: ew-resize; }
+  .seg.sel { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .clip.drop { box-shadow: 0 0 0 2px var(--gold) inset; filter: brightness(1.25); }
+  .clip.moving { opacity: .4; }
+  .clip.spare { border-style: dashed; opacity: .9; }
+  .reserve { position: absolute; top: 22px; height: 88px; border-left: 1px dashed var(--line-2);
+             background: repeating-linear-gradient(135deg, transparent 0 8px, rgba(255, 255, 255, .03) 8px 16px); }
+  .reserve.drop { background-color: rgba(242, 201, 92, .12); }
+  .reserve .lbl { position: absolute; left: 6px; top: 46px; font-size: 10px; color: var(--faint); white-space: nowrap; }
+  .tl-line { position: absolute; top: 22px; bottom: 0; width: 1px; background: var(--pink); pointer-events: none; z-index: 6; }
+  .tl-line.snap { background: var(--gold); }
+  .tl-tip { position: absolute; top: 2px; transform: translateX(-50%); background: rgba(0, 0, 0, .85); color: #fff; border-radius: 6px; padding: 1px 7px;
+            font-size: 11px; white-space: nowrap; pointer-events: none; z-index: 7; }
+  .tl-ghost { position: fixed; z-index: 1000; pointer-events: none; height: 30px; min-width: 60px; border-radius: 7px; border: 1px solid var(--gold);
+              background: #1f3247 center / cover; color: #fff; font-size: 11px; padding: 6px 8px; opacity: .9; text-shadow: 0 1px 2px #000; }
+  .ctx { position: fixed; z-index: 1000; background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; padding: 4px; min-width: 240px;
+         box-shadow: var(--shadow); font-size: 13px; }
+  .ctx button { display: flex; width: 100%; justify-content: space-between; gap: 18px; background: none; border: 0; border-radius: 6px; padding: 6px 10px; }
+  .ctx button:hover:not(:disabled) { background: var(--surface-3); }
+  .ctx kbd { color: var(--faint); font: inherit; font-size: 12px; }
+  .ctx hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  .media[draggable="true"] { cursor: grab; }
+  .media.cur { border-color: var(--accent); }
+  #replace-list .media { cursor: pointer; }
+  #replace-list .media:hover { border-color: var(--gold); }
 
   /* dialogs and toasts */
   dialog { background: var(--surface); color: var(--text); border: 1px solid var(--line-2); border-radius: 18px; padding: 22px; max-width: 560px; width: calc(100% - 32px); box-shadow: var(--shadow); }
@@ -358,6 +387,11 @@
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-cursor" viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6z"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="7" r="3"/><circle cx="6" cy="17" r="3"/><path d="M8.5 8.8 20 18M8.5 15.2 20 6"/></symbol>
+  <symbol id="i-slip" viewBox="0 0 24 24"><rect x="7" y="6" width="10" height="12" rx="1.5"/><path d="M3 12h2M19 12h2M4 10l-2 2 2 2M20 10l2 2-2 2"/></symbol>
+  <symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0 0 12 0V3M6 7h4M14 7h4"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h13l-3-3M20 16H7l3 3"/></symbol>
   <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></symbol>
 </svg>
 
@@ -485,7 +519,7 @@
           <button id="mode-orig" style="flex:1" onclick="useOriginal()">🎥 Vidéo d'origine</button>
           <button id="mode-own" style="flex:1" onclick="useOwnMedia()">🖼️ Mes photos et vidéos</button>
         </div>
-        <p class="muted small" style="margin:10px 0 0">Le son reste toujours celui de la récitation. 1 média remplit toute la vidéo ; plusieurs : un par verset.</p>
+        <p class="muted small" style="margin:10px 0 0">Le son reste toujours celui de la récitation. 1 média remplit toute la vidéo ; plusieurs : un par verset, repris dans l'ordre s'il y a plus de versets que de médias.</p>
       </div>
       <div class="section">
         <div class="sh"><h3>Mes médias</h3></div>
@@ -497,6 +531,7 @@
       <div class="section">
         <div class="sh"><h3>Séquence</h3></div>
         <div id="clip-list" class="clips"></div>
+        <div id="spare-list"></div>
         <div class="row" style="margin-top:8px">
           <button class="small" onclick="addOriginalClip()"><svg class="i" style="width:14px"><use href="#i-plus"/></svg>Vidéo d'origine</button>
           <button class="small" onclick="syncToVerses()" title="un élément par verset, le dernier jusqu'à la fin">Caler sur les versets</button>
@@ -764,9 +799,9 @@
       </div>
     </div>
     <div class="transport">
-      <button class="ghost icon" onclick="step(-1)" title="sous-titre précédent (←)"><svg class="i"><use href="#i-prev"/></svg></button>
+      <button class="ghost icon" onclick="step(-1)" title="sous-titre précédent"><svg class="i"><use href="#i-prev"/></svg></button>
       <button id="play" class="primary" onclick="togglePlay()" title="lecture (espace)"><svg class="i"><use href="#i-play"/></svg></button>
-      <button class="ghost icon" onclick="step(1)" title="sous-titre suivant (→)"><svg class="i"><use href="#i-next"/></svg></button>
+      <button class="ghost icon" onclick="step(1)" title="sous-titre suivant"><svg class="i"><use href="#i-next"/></svg></button>
       <span class="time" id="time">0:00.0</span>
       <span class="vsep"></span>
       <button id="safe-btn" class="ghost small" onclick="toggleSafe()" title="zones cachées par les boutons de TikTok, Reels et Shorts"><svg class="i" style="width:15px"><use href="#i-phone"/></svg>Zones des applis</button>
@@ -777,7 +812,18 @@
   <div class="tl" id="timeline">
     <div class="tl-bar">
       <b>Timeline</b>
-      <span class="muted small">clic = se placer · tirer les bords = changer les durées · poignées roses = début / fin</span>
+      <div class="tl-tools">
+        <button id="tool-select" class="ghost small icon on" onclick="setTool('select')" title="Sélection : choisir, glisser, ajuster les bords (V)"><svg class="i" style="width:15px"><use href="#i-cursor"/></svg></button>
+        <button id="tool-blade" class="ghost small icon" onclick="setTool('blade')" title="Lame : couper là où tu cliques (B)"><svg class="i" style="width:15px"><use href="#i-scissors"/></svg></button>
+        <button id="tool-slip" class="ghost small icon" onclick="setTool('slip')" title="Décaler : choisir le passage d'une vidéo montré dans son clip (Y)"><svg class="i" style="width:15px"><use href="#i-slip"/></svg></button>
+        <span class="vsep"></span>
+        <button class="ghost small" onclick="splitAtPlayhead()" title="Couper à la tête de lecture (S ou ⌘K)"><svg class="i" style="width:14px"><use href="#i-scissors"/></svg>Couper</button>
+        <button class="ghost small" onclick="openReplace()" title="Remplacer le média du clip choisi (R)"><svg class="i" style="width:14px"><use href="#i-swap"/></svg>Remplacer</button>
+        <button class="ghost small icon" onclick="deleteSelected()" title="Supprimer l'élément choisi (Suppr)"><svg class="i" style="width:14px"><use href="#i-trash"/></svg></button>
+        <span class="vsep"></span>
+        <button id="tool-snap" class="ghost small icon on" onclick="toggleSnap()" title="Magnétisme : s'aimanter aux versets, aux coupes et à la tête de lecture (N)"><svg class="i" style="width:15px"><use href="#i-magnet"/></svg></button>
+      </div>
+      <span class="muted small" id="tl-hint"></span>
       <span class="grow"></span>
       <button class="ghost small" onclick="tlZoom(1 / 1.5)" title="dézoomer">−</button>
       <button class="ghost small" onclick="tlZoom(0)" title="tout voir">Tout</button>
@@ -789,6 +835,7 @@
       <div class="tl-scroll" id="tl-scroll">
         <div class="tl-content" id="tl-content">
           <div class="tl-ruler" id="tl-ruler"></div>
+          <div class="reserve" id="tl-reserve"><span class="lbl">Réserve : pas dans la vidéo</span></div>
           <div class="tl-track" id="tl-bg"></div>
           <div class="tl-track" id="tl-subs"></div>
           <div class="tl-track audio" id="tl-audio"><canvas id="tl-wave"></canvas></div>
@@ -807,7 +854,17 @@
   <p class="muted" style="margin-top:0">Tout est enregistré automatiquement. ↶ annule la dernière modification.</p>
   <div class="keys">
     <kbd>Espace</kbd><span>Lecture / pause</span>
-    <kbd>← →</kbd><span>Sous-titre précédent / suivant</span>
+    <kbd>J K L</kbd><span>Lecture arrière / pause / avant (encore = plus vite)</span>
+    <kbd>← →</kbd><span>Image précédente / suivante (Maj : 1 seconde)</span>
+    <kbd>↑ ↓</kbd><span>Coupe ou sous-titre précédent / suivant</span>
+    <kbd>V B Y</kbd><span>Outils de la timeline : sélection, lame, décaler le contenu</span>
+    <kbd>S ou ⌘K</kbd><span>Couper à la tête de lecture</span>
+    <kbd>R</kbd><span>Remplacer le média du clip choisi</span>
+    <kbd>Suppr</kbd><span>Supprimer l'élément choisi</span>
+    <kbd>⌘C ⌘V</kbd><span>Copier un clip, le coller à la place d'un autre (⌥⌘V : son apparence seulement)</span>
+    <kbd>I O</kbd><span>Début / fin de la vidéo exportée à la tête de lecture (⌥X : tout garder)</span>
+    <kbd>N</kbd><span>Magnétisme</span>
+    <kbd>+ − \</kbd><span>Zoomer / dézoomer / tout voir</span>
     <kbd>⌘Z</kbd><span>Annuler (⇧⌘Z ou Ctrl+Y : rétablir)</span>
     <kbd>Glisser</kbd><span>Sur l'aperçu : déplacer un texte ou l'image</span>
     <kbd>Pincer</kbd><span>Sur l'aperçu (ou Ctrl + molette) : taille d'un texte ou zoom de l'image</span>
@@ -818,11 +875,25 @@
   <ul class="muted" style="margin:0;padding-left:18px;font-size:13px;line-height:1.6">
     <li>Clique sur un mot phonétique (✂) pour couper un sous-titre à cet endroit.</li>
     <li>Clique sur l'arabe ou la phonétique d'un sous-titre pour corriger une erreur.</li>
-    <li>Dans la timeline, tire le bord d'une image pour la faire changer au début d'un verset (elle s'y aimante).</li>
+    <li>Dans la timeline, tire le bord d'une image pour la faire changer au début d'un verset (elle s'y aimante). Maj en tirant : toute la suite se décale.</li>
+    <li>Glisse un clip sur un autre pour les échanger, ou un média de la bibliothèque sur un clip pour le remplacer. Clic droit : tous les outils.</li>
+    <li>La réserve, au bout de la timeline, garde les médias qui ne sont pas dans la vidéo : glisse-les sur un clip pour t'en servir.</li>
     <li>« Zones des applis » montre où TikTok, Reels et Shorts posent leurs boutons : garde tes textes en dehors.</li>
     <li>« Enregistrer mon style » le rend disponible pour toutes tes vidéos (et ★ en fait le style par défaut).</li>
   </ul>
   <div class="row" style="margin-top:18px;justify-content:flex-end"><button class="primary" onclick="$('help').close()">Compris</button></div>
+</dialog>
+
+<dialog id="replace-dlg" style="max-width:640px">
+  <h2>Remplacer le média</h2>
+  <p class="muted small" id="replace-what" style="margin-top:0"></p>
+  <div id="replace-list" class="media-grid"></div>
+  <label class="toggle hidden" id="replace-all-box" style="margin-top:12px"><input type="checkbox" id="replace-all"> <span id="replace-all-t"></span></label>
+  <div class="row" style="justify-content:space-between;margin-top:16px">
+    <button onclick="$('replace-file').click()"><svg class="i"><use href="#i-upload"/></svg>Importer un fichier…</button>
+    <button class="ghost" onclick="$('replace-dlg').close()">Annuler</button>
+  </div>
+  <input id="replace-file" type="file" accept="image/*,video/*,.heic,.heif,.mkv,.mov,.webm" class="hidden">
 </dialog>
 
 <dialog id="fmt-dialog">
@@ -931,8 +1002,8 @@ const EN = {
   "Analyse en cours…": "Analysing…", "Sous-titres recréés": "Subtitles recreated",
   // background
   "🎥 Vidéo d'origine": "🎥 Original video", "🖼️ Mes photos et vidéos": "🖼️ My photos and videos",
-  "Le son reste toujours celui de la récitation. 1 média remplit toute la vidéo ; plusieurs : un par verset.":
-    "The sound always stays the recitation's. 1 item fills the whole video; several: one per verse.",
+  "Le son reste toujours celui de la récitation. 1 média remplit toute la vidéo ; plusieurs : un par verset, repris dans l'ordre s'il y a plus de versets que de médias.":
+    "The sound always stays the recitation's. 1 item fills the whole video; several: one per verse, starting again in order if there are more verses than items.",
   "Mes médias": "My media", "Dépose des photos ou des vidéos": "Drop photos or videos",
   "jpg, png, heic (iPhone), mp4, mov… ou clique": "jpg, png, heic (iPhone), mp4, mov… or click",
   "Séquence": "Sequence", "Vidéo d'origine": "Original video", "un élément par verset, le dernier jusqu'à la fin": "one item per verse, the last until the end",
@@ -1085,7 +1156,7 @@ const EN = {
   "Annuler": "Cancel", "Modifier ce projet": "Change this project", "Créer une copie": "Make a copy",
   // preview, timeline, help
   "aperçu": "preview", "Fais glisser un texte ou l'image · pince ou Ctrl + molette pour zoomer": "Drag a text or the picture · pinch or Ctrl + wheel to zoom",
-  "sous-titre précédent (←)": "previous subtitle (←)", "lecture (espace)": "play (space)", "sous-titre suivant (→)": "next subtitle (→)",
+  "sous-titre précédent": "previous subtitle", "lecture (espace)": "play (space)", "sous-titre suivant": "next subtitle",
   "zones cachées par les boutons de TikTok, Reels et Shorts": "areas hidden by the TikTok, Reels and Shorts buttons", "Zones des applis": "App safe zones",
   "exporter cette image en pleine résolution": "export this picture at full resolution", "Timeline": "Timeline",
   "clic = se placer · tirer les bords = changer les durées · poignées roses = début / fin": "click = jump · drag edges = change lengths · pink handles = start / end",
@@ -1099,7 +1170,8 @@ const EN = {
   "Maj + flèches": "Shift + arrows", "Dans les réglages de position : déplacer de 10 px": "In the position settings: move by 10 px", "Cette aide": "This help",
   "Astuces": "Tips", "Clique sur un mot phonétique (✂) pour couper un sous-titre à cet endroit.": "Click a transliterated word (✂) to split a subtitle there.",
   "Clique sur l'arabe ou la phonétique d'un sous-titre pour corriger une erreur.": "Click a subtitle's Arabic or transliteration to correct a mistake.",
-  "Dans la timeline, tire le bord d'une image pour la faire changer au début d'un verset (elle s'y aimante).": "In the timeline, drag the edge of a picture to change it at the start of a verse (it snaps there).",
+  "Dans la timeline, tire le bord d'une image pour la faire changer au début d'un verset (elle s'y aimante). Maj en tirant : toute la suite se décale.":
+    "In the timeline, drag the edge of a picture to change it at the start of a verse (it snaps there). Shift while dragging: everything after it moves too.",
   "« Zones des applis » montre où TikTok, Reels et Shorts posent leurs boutons : garde tes textes en dehors.": "« App safe zones » shows where TikTok, Reels and Shorts put their buttons: keep your texts out of them.",
   "« Enregistrer mon style » le rend disponible pour toutes tes vidéos (et ★ en fait le style par défaut).": "« Save my style » makes it available for all your videos (and ★ makes it the default).",
   "Compris": "Got it", "OK": "OK", "Mise à jour disponible": "Update available", "Plus tard": "Later",
@@ -1143,6 +1215,84 @@ const EN = {
     "On YouTube, the \"Checks\" step of the upload tells you within minutes, before publishing, whether the sound is claimed.",
   "C'est une estimation d'après ce que dit la vidéo : aucune appli ne peut savoir à l'avance si une plateforme reconnaîtra un son.":
     "This is an estimate from what the video says about itself: no app can know in advance whether a platform will recognise a sound.",
+  // timeline editing, reserve
+  "Sélection : choisir, glisser, ajuster les bords (V)": "Selection: choose, drag, adjust the edges (V)",
+  "Lame : couper là où tu cliques (B)": "Blade: cut where you click (B)",
+  "Décaler : choisir le passage d'une vidéo montré dans son clip (Y)": "Slip: choose which part of a video its clip shows (Y)",
+  "Couper à la tête de lecture (S ou ⌘K)": "Cut at the playhead (S or ⌘K)",
+  "Couper": "Cut",
+  "Remplacer le média du clip choisi (R)": "Replace the chosen clip's media (R)",
+  "Remplacer": "Replace",
+  "Supprimer l'élément choisi (Suppr)": "Delete the chosen item (Delete)",
+  "Magnétisme : s'aimanter aux versets, aux coupes et à la tête de lecture (N)": "Snapping: stick to verses, cuts and the playhead (N)",
+  "Réserve : pas dans la vidéo": "Reserve: not in the video",
+  "Lecture arrière / pause / avant (encore = plus vite)": "Play backwards / pause / forwards (again = faster)",
+  "Image précédente / suivante (Maj : 1 seconde)": "Previous / next frame (Shift: 1 second)",
+  "Coupe ou sous-titre précédent / suivant": "Previous / next cut or subtitle",
+  "Outils de la timeline : sélection, lame, décaler le contenu": "Timeline tools: selection, blade, slip",
+  "S ou ⌘K": "S or ⌘K",
+  "Couper à la tête de lecture": "Cut at the playhead",
+  "Remplacer le média du clip choisi": "Replace the chosen clip's media",
+  "Suppr": "Delete",
+  "Supprimer l'élément choisi": "Delete the chosen item",
+  "Copier un clip, le coller à la place d'un autre (⌥⌘V : son apparence seulement)": "Copy a clip, paste it in place of another (⌥⌘V: its look only)",
+  "Début / fin de la vidéo exportée à la tête de lecture (⌥X : tout garder)": "Start / end of the exported video at the playhead (⌥X: keep everything)",
+  "Magnétisme": "Snapping",
+  "Zoomer / dézoomer / tout voir": "Zoom in / out / see everything",
+  "Glisse un clip sur un autre pour les échanger, ou un média de la bibliothèque sur un clip pour le remplacer. Clic droit : tous les outils.": "Drag a clip onto another to swap them, or a media from the library onto a clip to replace it. Right click: every tool.",
+  "La réserve, au bout de la timeline, garde les médias qui ne sont pas dans la vidéo : glisse-les sur un clip pour t'en servir.": "The reserve, at the end of the timeline, keeps the media that aren't in the video: drag them onto a clip to use them.",
+  "Remplacer le média": "Replace the media",
+  "Importer un fichier…": "Import a file…",
+  "glisse-le sur un clip de la timeline pour le remplacer": "drag it onto a clip of the timeline to replace that clip",
+  "remplacer ce média": "replace this media",
+  "Réserve": "Reserve",
+  "— pas dans la vidéo : glisse-les sur un clip de la timeline": "— not in the video: drag them onto a clip of the timeline",
+  "en réserve": "in the reserve",
+  "mettre à la place du clip choisi": "put in place of the chosen clip",
+  "retirer de la réserve": "remove from the reserve",
+  "Mis dans la réserve, au bout de la timeline": "Put in the reserve, at the end of the timeline",
+  "Trop près d'une coupe pour couper ici.": "Too close to a cut to cut here.",
+  "Clip copié : ⌘V le met à la place d'un autre, ⌥⌘V ne colle que son apparence": "Clip copied: ⌘V puts it in place of another, ⌥⌘V pastes only its look",
+  "{n} médias, chacun la même durée.": "{n} items, each the same length.",
+  "{n} médias pour {v} versets : ils reviennent dans l'ordre. Ajoutes-en quand tu veux, ils prendront leur place.": "{n} items for {v} verses: they come back in order. Add more whenever you like, they'll take their places.",
+  "{v} médias calés sur les {v} versets ; le dernier attend dans la réserve, au bout de la timeline.":
+    "{v} items on the {v} verses; the last one waits in the reserve, at the end of the timeline.",
+  "{v} médias calés sur les {v} versets ; les {x} autres attendent dans la réserve, au bout de la timeline.": "{v} items on the {v} verses; the other {x} wait in the reserve, at the end of the timeline.",
+  "Clip remplacé ; les autres médias attendent dans la réserve.": "Clip replaced; the other items wait in the reserve.",
+  "Clip remplacé.": "Clip replaced.",
+  "{n} média(s) dans la réserve, au bout de la timeline : glisse-les sur un clip.": "{n} item(s) in the reserve, at the end of the timeline: drag them onto a clip.",
+  "Tout répartir sur les versets": "Spread them all over the verses",
+  "Le début doit être au moins 1 s avant la fin.": "The start must be at least 1 s before the end.",
+  "La fin doit être au moins 1 s après le début.": "The end must be at least 1 s after the start.",
+  "glisser un clip sur un autre = les échanger · bords = déplacer la coupe (Maj : décaler la suite) · clic droit = tous les outils": "drag a clip onto another = swap them · edges = move the cut (Shift: move what follows) · right click = every tool",
+  "clic = couper ici (un sous-titre : au mot le plus proche)": "click = cut here (a subtitle: at the nearest word)",
+  "glisse une vidéo pour choisir le passage montré dans son clip": "drag a video to choose which part its clip shows",
+  "Magnétisme activé": "Snapping on",
+  "Magnétisme désactivé": "Snapping off",
+  "{s} s": "{s} s",
+  "Ce sous-titre n'a qu'un mot : il ne peut pas être coupé.": "This subtitle has a single word: it can't be cut.",
+  "Il faut au moins un élément d'arrière-plan.": "The background needs at least one item.",
+  "Clip supprimé : son voisin prend sa place (⌘Z pour annuler)": "Clip deleted: its neighbour takes its place (⌘Z to undo)",
+  "Clip {n} ({a} → {b}) : choisis le média qui prend sa place, aux mêmes horaires.": "Clip {n} ({a} → {b}): choose the media that takes its place, at the same times.",
+  "Remplacer aussi les {n} autres clips qui ont ce média": "Also replace the {n} other clips that have this media",
+  "Mettre à la place du clip à la tête de lecture": "Put in place of the clip at the playhead",
+  "Retirer de la réserve": "Remove from the reserve",
+  "Couper ici": "Cut here",
+  "Remplacer…": "Replace…",
+  "Copier": "Copy",
+  "Coller à la place": "Paste in its place",
+  "Coller l'apparence (cadrage, mouvement, couleur)": "Paste the look (framing, motion, colour)",
+  "Mettre dans la réserve": "Put in the reserve",
+  "Caler toutes les coupes sur les versets": "Put every cut on the verses",
+  "Supprimer": "Delete",
+  "Couper ici (au mot le plus proche)": "Cut here (at the nearest word)",
+  "Fusionner avec le suivant": "Merge with the next one",
+  "Modifier le texte": "Edit the text",
+  "Début de la vidéo ici": "Video starts here",
+  "Fin de la vidéo ici": "Video ends here",
+  "Tout garder (début et fin)": "Keep everything (start and end)",
+  "Seules tes vidéos ont un passage à choisir : une photo ou la vidéo d'origine restent en place.": "Only your videos have a part to choose: a photo or the original video stays as it is.",
+  "la vidéo commence à {s}": "the video starts at {s}",
 };
 
 // interface language: French (as written) or English
@@ -1156,7 +1306,8 @@ function t(s, vars) {
 const DYN = ["ed-badges", "saved", "new-formats", "surah", "a-surah", "lang", "e-lang", "new-style", "job-title", "job-stage", "job-error",
   "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes", "font-num", "font-tr", "intro-note", "logo-sugg", "e-trans", "verse-body", "basmala-note", "basmala-list",
   "font-title", "font-arabic", "font-text", "colors-title", "colors-ar", "colors-text", "colors-outline", "res", "r-done", "r-stage",
-  "r-pct", "r-error", "exports", "ed-formats", "still-t", "time", "safe", "tl-ruler", "tl-bg", "tl-subs", "fmt-name", "toasts", "src-name", "ui-lang"];
+  "r-pct", "r-error", "exports", "ed-formats", "still-t", "time", "safe", "tl-ruler", "tl-bg", "tl-subs", "fmt-name", "toasts", "src-name", "ui-lang",
+  "tl-hint", "spare-list", "replace-what", "replace-list", "replace-all-t"];
 const original = new WeakMap();
 function translateDom() {
   document.documentElement.lang = UI;
@@ -1209,6 +1360,7 @@ const INTRO_CARD = 2.6, INTRO_FADE = 0.45, INTRO_GAP = 0.3;
 const MOTION_ZOOM = 1.12;
 let surahs = [], langs = [], styles = [], fonts = [], settings = {}, projects = [], info = {}, basmalas = [];
 let P = null, saveTimer = null, overlayReady = false, tab = "subs", selClip = 0, wave = null;
+let selKind = "clip", selSeg = -1, selSpare = -1;  // what is chosen in the timeline: a background clip, a subtitle, a clip of the reserve
 
 async function api(path, opts = {}) {
   let r;
@@ -1470,7 +1622,7 @@ function loadState(p) {
   if (!P || P.id !== p.id) {
     for (const [src, L] of layers) if (src !== "original") { L.root.remove(); layers.delete(src); }
     $("filters").replaceChildren(); layers.get("original").adjKey = undefined;
-    selClip = 0;
+    selClip = 0; selKind = "clip"; selSeg = -1; selSpare = -1;
   }
   P = p;
   P.style = P.style || {};
@@ -1491,7 +1643,7 @@ function refreshAll() {
   $("e-lang").value = P.lang; renderEditions();
   $("ed-formats").innerHTML = formatTiles(P.format, "askFormat");
   renderResolutions(); renderNotice(); renderBlocks(); renderBgPanel(); renderStylePanel(); renderExports(); renderAnalysis();
-  refreshCtls(); layoutStage(); tlRender(); redraw();
+  refreshCtls(); layoutStage(); setTool(tool); tlRender(); redraw();
 }
 function setTab(t) {
   tab = t;
@@ -1543,6 +1695,7 @@ function redo() { if (!redoStack.length) return; undoStack.push(state()); applyS
 
 // ---------------------------------------------------------------- saving
 function changed(what = {}) {
+  if (what.cards && followVerses()) what.bg = true;
   if (what.cards) renderBlocks();
   if (what.bg) renderBgPanel();
   if (what.look) renderStylePanel();
@@ -1568,7 +1721,9 @@ async function serverEdit(path, body) {
   await save();
   const p = await api(`/api/projects/${pid()}/${path}`, body ? json(body) : { method: "POST" });
   undoStack.push(lastState); redoStack.length = 0; lastGroup = null;
-  loadState(p); lastState = state(); refreshAll();
+  loadState(p);
+  if (followVerses()) scheduleSave();
+  lastState = state(); refreshAll();
   return p;
 }
 
@@ -1687,18 +1842,45 @@ requestAnimationFrame(tick);
 function redraw() { lastShown = ""; lastHeader = ""; lastStyle = ""; lastLogo = null; draw(); }
 
 function togglePlay() { const v = $("video"); v.paused ? v.play() : v.pause(); }
-$("video").addEventListener("play", () => $("play").innerHTML = icon("pause", 18));
-$("video").addEventListener("pause", () => $("play").innerHTML = icon("play", 18));
+$("video").addEventListener("play", () => {
+  $("play").innerHTML = icon("pause", 18);
+  if (shuttleRate < 0) { shuttleRate = 0; cancelAnimationFrame(shuttleRaf); }
+});
+$("video").addEventListener("pause", () => {
+  $("play").innerHTML = icon("play", 18);
+  if (shuttleRate > 0) shuttleRate = 0;
+  $("video").playbackRate = 1;
+});
 document.addEventListener("keydown", (e) => {
   if (e.key === "?" && !e.target.matches("input, textarea")) { $("help").showModal(); return; }
   if ($("editor").classList.contains("hidden") || document.querySelector("dialog[open]")) return;
-  const mod = e.metaKey || e.ctrlKey;
-  if (mod && e.key.toLowerCase() === "z" && !e.target.matches("input, textarea")) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
-  if (mod && e.key.toLowerCase() === "y" && !e.target.matches("input, textarea")) { e.preventDefault(); redo(); return; }
-  if (e.target.matches("input, textarea, select")) return;
-  if (e.code === "Space") { e.preventDefault(); togglePlay(); }
-  if (e.code === "ArrowRight") step(1);
-  if (e.code === "ArrowLeft") step(-1);
+  if (e.key === "Escape") closeCtx();
+  const mod = e.metaKey || e.ctrlKey, typing = e.target.matches("input, textarea, select");
+  if (mod && e.key.toLowerCase() === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.key.toLowerCase() === "y" && !typing) { e.preventDefault(); redo(); return; }
+  if (typing) return;
+  // letters by their place on the keyboard (e.code): the same keys on AZERTY, and with ⌥ held
+  const c = e.code;
+  if (mod) {
+    if (c === "KeyK") { e.preventDefault(); splitAtPlayhead(); }
+    else if (c === "KeyC" && selKind === "clip" && !getSelection().toString()) { e.preventDefault(); copyClip(selClip); }
+    else if (c === "KeyV" && clipboard && selKind === "clip") { e.preventDefault(); pasteClip(selClip, e.altKey); }
+    return;
+  }
+  const keys = {
+    Space: togglePlay, KeyV: () => setTool("select"), KeyB: () => setTool("blade"), KeyY: () => setTool("slip"),
+    KeyN: toggleSnap, KeyS: splitAtPlayhead, KeyR: () => openReplace(), Delete: deleteSelected, Backspace: deleteSelected,
+    KeyI: () => setInOut("in"), KeyO: () => setInOut("out"), KeyJ: () => shuttle(-1), KeyK: () => shuttle(0), KeyL: () => shuttle(1),
+    ArrowRight: () => seek($("video").currentTime + (e.shiftKey ? 1 : FRAME)), ArrowLeft: () => seek($("video").currentTime - (e.shiftKey ? 1 : FRAME)),
+    ArrowDown: () => jumpEdit(1), ArrowUp: () => jumpEdit(-1), Home: () => seek(0), End: () => seek(P.duration),
+    Equal: () => tlZoom(1.5), NumpadAdd: () => tlZoom(1.5), Minus: () => tlZoom(1 / 1.5), NumpadSubtract: () => tlZoom(1 / 1.5),
+    Backslash: () => tlZoom(0),
+  };
+  if (c === "KeyX" && e.altKey) { e.preventDefault(); clearInOut(); return; }
+  if (e.key === "+" || e.key === "-") { e.preventDefault(); tlZoom(e.key === "+" ? 1.5 : 1 / 1.5); return; }  // wherever they are (AZERTY)
+  if (e.altKey || !keys[c]) return;
+  e.preventDefault();
+  keys[c]();
 });
 function seek(t) { $("video").currentTime = Math.max(0, Math.min(P.duration, t)); redraw(); }
 function playBlock(i) { seek(P.blocks[i].start); $("video").play(); }
@@ -1707,6 +1889,48 @@ function step(d) {
   const i = currentIndex($("video").currentTime);
   const j = Math.min(P.blocks.length - 1, Math.max(0, (i < 0 ? 0 : i) + d));
   seek(P.blocks[j].start + 0.01);
+}
+const FRAME = 1 / 30;
+// previous / next edit: a background cut, a subtitle starting or ending, the export's start and end
+function jumpEdit(d) {
+  const now = $("video").currentTime, r = P.render;
+  const pts = [0, P.duration, r.trim_start || 0, r.trim_end || P.duration, ...clipTimes().slice(1).map(x => x.s), ...P.blocks.flatMap(b => [b.start, b.end])];
+  const best = d > 0 ? Math.min(...pts.filter(x => x > now + 0.01)) : Math.max(...pts.filter(x => x < now - 0.01));
+  if (isFinite(best)) seek(best);
+}
+// J K L: backwards / stop / forwards, faster each time the same key is pressed again
+let shuttleRate = 0, shuttleRaf = 0;
+function shuttle(dir) {
+  const v = $("video");
+  cancelAnimationFrame(shuttleRaf);
+  if (!dir) { shuttleRate = 0; v.pause(); return; }
+  shuttleRate = Math.sign(shuttleRate) === dir ? Math.min(8, Math.abs(shuttleRate) * 2) * dir : dir;
+  if (dir > 0) { v.playbackRate = shuttleRate; v.play(); return; }
+  v.pause();
+  let last = performance.now();
+  const tick = (now) => {
+    if (shuttleRate >= 0) return;
+    seek(v.currentTime + shuttleRate * (now - last) / 1000); last = now;
+    if (v.currentTime > 0) shuttleRaf = requestAnimationFrame(tick); else shuttleRate = 0;
+  };
+  shuttleRaf = requestAnimationFrame(tick);
+}
+function setInOut(which, at = $("video").currentTime) {
+  const r = P.render, a = Math.round(at * 100) / 100;
+  if (which === "in") {
+    if (a > (r.trim_end || P.duration) - 1) { toast(t("Le début doit être au moins 1 s avant la fin."), "err"); return; }
+    r.trim_start = a;
+  } else {
+    if (a < (r.trim_start || 0) + 1) { toast(t("La fin doit être au moins 1 s après le début."), "err"); return; }
+    r.trim_end = a >= P.duration - 0.02 ? null : a;
+  }
+  $("r-trim-start").value = r.trim_start || ""; $("r-trim-end").value = r.trim_end || "";
+  changed({ tl: true });
+}
+function clearInOut() {
+  P.render.trim_start = 0; P.render.trim_end = null;
+  $("r-trim-start").value = ""; $("r-trim-end").value = "";
+  changed({ tl: true });
 }
 
 // zones covered by the TikTok / Reels / Shorts buttons and captions (approximate, in canvas pixels)
@@ -2213,7 +2437,9 @@ async function setVerse(i, surah, ayah, audio) {
     await follow(job, null, null);
     const p = await api(`/api/projects/${pid()}`);
     undoStack.push(lastState); redoStack.length = 0; lastGroup = null;
-    loadState(p); lastState = state(); refreshAll();
+    loadState(p);
+    if (followVerses()) scheduleSave();
+    lastState = state(); refreshAll();
     $("verse-dlg").close();
     toast(`${icon("check")} ${t("Verset {n} : sous-titres refaits", { n: ayah })}`, "ok");
   } catch (e) { $("verse-body").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
@@ -2605,7 +2831,8 @@ function renderBgPanel() {
   const clips = P.background.clips, onlyOrig = clips.length === 1 && clips[0].src === "original";
   $("mode-orig").classList.toggle("on", onlyOrig);
   $("mode-own").classList.toggle("on", clips.every(c => c.src !== "original"));
-  $("media-list").innerHTML = P.media.map(m => `<div class="media">
+  $("media-list").innerHTML = P.media.map(m => `<div class="media" draggable="true" title="${t("glisse-le sur un clip de la timeline pour le remplacer")}"
+      ondragstart="event.dataTransfer.setData('application/x-tilawa-media', '${m.file}'); event.dataTransfer.effectAllowed = 'copy'">
       <div class="th" style="${m.kind === "image" ? `background-image:url('${mediaURL(m.file)}')` : ""}">
         ${m.kind === "video" ? `<video src="${mediaURL(m.file)}#t=0.5" muted preload="metadata"></video>` : ""}
         <span class="kind">${m.kind === "video" ? "🎞 " + fmt(m.dur) : "🖼"}</span></div>
@@ -2617,15 +2844,26 @@ function renderBgPanel() {
   $("clip-list").innerHTML = clips.map((c, i) => {
     const x = times.find(y => y.i === i), last = i === clips.length - 1;
     const when = x ? `${fmt(x.s)} → ${fmt(x.e)}` : t("après la fin (non visible)");
-    return `<div class="cliprow ${i === selClip ? "sel" : ""}" onclick="selectClip(${i})">
+    return `<div class="cliprow ${selKind === "clip" && i === selClip ? "sel" : ""}" onclick="selectClip(${i})">
       <div class="th" style="${mediaThumb(c.src)}">${c.src === "original" ? "🎥" : P.media.find(m => m.file === c.src)?.kind === "video" ? "🎞" : ""}</div>
       <div class="meta"><b>${esc(clipName(c))}</b><small>${when}${last ? t(" · jusqu'à la fin") : ""}${c.motion !== "none" ? t(" · mouvement") : ""}${neutral(c.adjust) ? "" : t(" · couleur")}</small></div>
       <div class="row" style="gap:2px" onclick="event.stopPropagation()">
         <button class="small ghost" onclick="moveClip(${i},-1)" ${i ? "" : "disabled"} title="${t("monter")}">↑</button>
         <button class="small ghost" onclick="moveClip(${i},1)" ${last ? "disabled" : ""} title="${t("descendre")}">↓</button>
+        <button class="small ghost icon" onclick="openReplace(${i})" title="${t("remplacer ce média")}">${icon("swap", 13)}</button>
         <button class="small ghost icon" onclick="removeClip(${i})" ${clips.length > 1 ? "" : "disabled"} title="${t("retirer de la séquence")}">${icon("trash", 13)}</button>
       </div></div>`;
   }).join("");
+  const sp = spares();
+  $("spare-list").innerHTML = sp.length ? `<div class="sec" style="margin-top:12px">${t("Réserve")}
+      <span class="faint" style="font-weight:400">${t("— pas dans la vidéo : glisse-les sur un clip de la timeline")}</span></div>
+    <div class="clips">${sp.map((c, j) => `<div class="cliprow ${selKind === "spare" && j === selSpare ? "sel" : ""}" onclick="selectSpare(${j})">
+      <div class="th" style="${mediaThumb(c.src)}">${c.src === "original" ? "🎥" : P.media.find(m => m.file === c.src)?.kind === "video" ? "🎞" : ""}</div>
+      <div class="meta"><b>${esc(clipName(c))}</b><small>${t("en réserve")}</small></div>
+      <div class="row" style="gap:2px" onclick="event.stopPropagation()">
+        <button class="small ghost icon" onclick="placeSpare(${j}, selClip)" title="${t("mettre à la place du clip choisi")}">${icon("swap", 13)}</button>
+        <button class="small ghost icon" onclick="removeSpare(${j})" title="${t("retirer de la réserve")}">${icon("trash", 13)}</button>
+      </div></div>`).join("")}</div>` : "";
   $("bg-dim").value = P.background.dim || 0; $("bg-dim-v").textContent = Math.round((P.background.dim || 0) * 100) + " %";
   $("bg-fill").value = P.background.fill || "blur";
   $("bg-tr").value = String(P.background.transition ?? 0.5);
@@ -2681,11 +2919,17 @@ function adjustAll() {
   changed({ bg: true });
 }
 function setDur(v) { clipNow().dur = Math.max(0.3, v); P.background.auto = false; changed({ bg: true }); }
-function selectClip(i) {
-  selClip = i;
+function selectClip(i, seekInto = true) {
+  selClip = i; selKind = "clip";
   const x = clipTimes().find(y => y.i === i), t = $("video").currentTime;
-  if (x && (t < x.s || t >= x.e)) seek(x.s + Math.min(0.5, (x.e - x.s) / 2));
+  if (seekInto && x && (t < x.s || t >= x.e)) seek(x.s + Math.min(0.5, (x.e - x.s) / 2));
   renderBgPanel(); tlRender();
+}
+function selectSpare(j) { selSpare = j; selKind = "spare"; renderBgPanel(); tlRender(); }
+function selectSeg(i) {
+  selSeg = i; selKind = "seg";
+  if (tab === "subs") $("b" + i)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  tlRender();
 }
 function setClip(key, v) { P.background.clips[selClip][key] = v; changed({ bg: true }); }
 function setBg(key, v) { P.background[key] = v; if (key === "dim") $("bg-dim-v").textContent = Math.round(v * 100) + " %"; changed({ tl: true, group: "bg" + key }); }
@@ -2713,19 +2957,79 @@ function addOriginalClip() {
   changed({ bg: true }); selectClip(selClip);
 }
 function moveClip(i, d) {
-  const clips = P.background.clips, j = i + d;
-  if (j < 0 || j >= clips.length) return;
-  [clips[i], clips[j]] = [clips[j], clips[i]];
-  // durations stay with the positions, so the cuts do not move
-  [clips[i].dur, clips[j].dur] = [clips[j].dur, clips[i].dur];
-  selClip = j; changed({ bg: true });
+  const j = i + d;
+  if (j >= 0 && j < P.background.clips.length) swapClips(i, j);
 }
-function removeClip(i) {
+const r3 = (v) => Math.round(v * 1000) / 1000;
+const cloneClip = (c) => ({ ...c, adjust: { ...(c.adjust || {}) } });
+const spares = () => P.background.spare || [];  // set aside: shown after the end of the timeline, not in the video
+// takes clip i out of the sequence; its neighbour covers its time, so the other cuts stay where they are
+function takeOut(i) {
   const clips = P.background.clips;
-  if (clips.length < 2) return;
-  clips.splice(i, 1); selClip = Math.min(selClip, clips.length - 1);
-  if (P.background.auto) timeToVerses();
+  if (clips.length < 2 || !clips[i]) return null;
+  const [c] = clips.splice(i, 1), k = Math.max(0, i - 1);
+  clips[k].dur = r3((+clips[k].dur || 0) + (+c.dur || 0));
+  selKind = "clip"; selClip = Math.min(k, clips.length - 1); P.background.auto = false;
+  return c;
+}
+function removeClip(i) { if (takeOut(i)) changed({ bg: true }); }
+function toReserve(i) {
+  const c = takeOut(i);
+  if (!c) return;
+  (P.background.spare ||= []).push(c);
   changed({ bg: true });
+  toast(t("Mis dans la réserve, au bout de la timeline"));
+}
+function removeSpare(j) { spares().splice(j, 1); selKind = "clip"; selSpare = -1; changed({ bg: true }); }
+// a clip from the reserve takes the place of clip i; the one it replaces waits in the reserve
+function placeSpare(j, i) {
+  const sp = spares(), clips = P.background.clips, s = sp[j], c = clips[i];
+  if (!s || !c) return;
+  sp[j] = { ...c }; clips[i] = { ...s, dur: c.dur };
+  selKind = "clip"; selClip = i; changed({ bg: true });
+}
+// the media change places, the cuts stay: each verse keeps its timing
+function swapClips(i, j) {
+  const clips = P.background.clips;
+  [clips[i], clips[j]] = [clips[j], clips[i]];
+  [clips[i].dur, clips[j].dur] = [clips[j].dur, clips[i].dur];
+  selKind = "clip"; selClip = j; changed({ bg: true });
+}
+// another media in clip i (and, if asked, in every clip that had the same one), at the same times
+function replaceClip(i, src, all = false) {
+  const clips = P.background.clips, old = clips[i]?.src;
+  if (!old) return;
+  clips.forEach((c, k) => { if (k === i || (all && c.src === old)) clips[k] = { ...newClip(src), dur: c.dur }; });
+  selKind = "clip"; selClip = i; changed({ bg: true });
+}
+function splitClip(i, at) {
+  const x = clipTimes().find(y => y.i === i);
+  if (!x || at - x.s < 0.2 || x.e - at < 0.2) { toast(t("Trop près d'une coupe pour couper ici.")); return; }
+  const clips = P.background.clips, c = clips[i], second = cloneClip(c), m = P.media.find(y => y.file === c.src);
+  if (m?.kind === "video") {  // the second part goes on where the first stops
+    const off = (+c.offset || 0) + (at - x.s);
+    second.offset = Math.round((m.dur > 0.2 && off >= m.dur ? off % m.dur : off) * 100) / 100;
+  }
+  c.dur = r3(at - x.s); second.dur = r3(x.e - at);
+  clips.splice(i + 1, 0, second);
+  P.background.auto = false; selKind = "clip"; selClip = i + 1;
+  changed({ bg: true });
+}
+let clipboard = null;
+function copyClip(i) {
+  const c = P.background.clips[i];
+  if (!c) return;
+  clipboard = cloneClip(c);
+  toast(t("Clip copié : ⌘V le met à la place d'un autre, ⌥⌘V ne colle que son apparence"));
+}
+function pasteClip(i, lookOnly) {
+  const clips = P.background.clips, c = clips[i];
+  if (!clipboard || !c) return;
+  if (lookOnly) {
+    const { zoom, x, y, motion, adjust } = clipboard;
+    Object.assign(c, { zoom, x, y, motion, adjust: { ...(adjust || {}) } });
+  } else clips[i] = { ...cloneClip(clipboard), dur: c.dur };
+  selKind = "clip"; selClip = i; changed({ bg: true });
 }
 function spreadEvenly() {
   const clips = P.background.clips, t0 = P.render.trim_start || 0, t1 = P.render.trim_end || P.duration;
@@ -2734,31 +3038,72 @@ function spreadEvenly() {
   P.background.auto = false;
   changed({ bg: true });
 }
-// first on-screen moment of each verse, in order
+// where each verse starts on screen, in order; a verse read again later (repeats, another surah) starts again
 function verseStarts() {
-  const seen = new Set(), out = [];
-  for (const b of P.blocks) if (b.kind === "verse" && !seen.has(b.ayah)) { seen.add(b.ayah); out.push(b.start); }
+  const out = [];
+  let prev = null;
+  for (const b of P.blocks) {
+    if (b.kind !== "verse") continue;
+    const key = b.surah + ":" + b.ayah;
+    if (key !== prev) out.push(b.start);
+    prev = key;
+  }
   return out;
 }
-// one element per verse: the 2nd starts with the 2nd verse, etc.; the last runs to the end
+// the automatic sequence: one media per verse in their order, from the first again when there are
+// more verses than media; the media left over when there are fewer verses wait in the reserve
+function cycleOf(files) {
+  const n = verseStarts().length;
+  if (files.length <= 1 || !n) return { seq: files, spare: [] };
+  return { seq: Array.from({ length: n }, (_, i) => files[i % files.length]), spare: files.slice(n) };
+}
+// the sequence is still the automatic one (whatever the number of verses): new media can join it
+function isCycle() {
+  const bg = P.background, files = P.media.map(m => m.file), seq = bg.clips.map(c => c.src), sp = spares().map(c => c.src);
+  if (!bg.auto || !files.length) return false;
+  if (files.length === 1) return seq.length === 1 && seq[0] === files[0] && !sp.length;
+  return seq.length > 1 && seq.every((f, i) => f === files[i % files.length]) && sp.join() === files.slice(seq.length).join();
+}
+// one clip per verse, the last one to the end; clips beyond the verses go to the reserve
 function timeToVerses() {
-  const clips = P.background.clips, starts = verseStarts();
-  if (clips.length > starts.length) {
-    const d = Math.round(P.duration / clips.length * 10) / 10;
-    clips.forEach(c => c.dur = d);
+  const bg = P.background, starts = verseStarts();
+  if (!starts.length) {
+    const d = Math.round(P.duration / bg.clips.length * 10) / 10;
+    bg.clips.forEach(c => c.dur = d);
     return;
   }
-  let t = 0;
-  clips.forEach((c, i) => { if (i < clips.length - 1) { c.dur = Math.round((starts[i + 1] - t) * 1000) / 1000; t = starts[i + 1]; } });
+  if (bg.clips.length > starts.length) (bg.spare ||= []).unshift(...bg.clips.splice(starts.length));
+  let at = 0;
+  bg.clips.forEach((c, i) => { if (i < bg.clips.length - 1) { c.dur = r3(starts[i + 1] - at); at = starts[i + 1]; } });
+  selClip = Math.min(selClip, bg.clips.length - 1);
 }
 function syncToVerses() { timeToVerses(); P.background.auto = true; changed({ bg: true }); }
-// all imported media, in order, each on its own verse (settings kept for media already placed)
+// all imported media, as cycleOf places them (settings kept for media already placed)
 function buildOwnSequence() {
-  const old = new Map(P.background.clips.map(c => [c.src, c]));
-  P.background.clips = P.media.map(m => old.has(m.file) ? { ...old.get(m.file) } : newClip(m.file));
-  P.background.auto = true;
+  const bg = P.background, prev = bg.clips, pool = new Map([...prev, ...spares()].map(c => [c.src, c]));
+  const make = (f, i) => cloneClip(prev[i]?.src === f ? prev[i] : pool.get(f) || newClip(f));
+  const { seq, spare } = cycleOf(P.media.map(m => m.file));
+  bg.clips = seq.map(make); bg.spare = spare.map(f => make(f, -1));
+  bg.auto = true;
   timeToVerses();
-  selClip = 0;
+  selClip = Math.min(selClip, bg.clips.length - 1);
+}
+// cuts made on the verses follow the subtitles when they change (true: the background changed)
+function followVerses() {
+  const bg = P.background, before = JSON.stringify(bg);
+  if (!bg.auto || bg.clips.every(c => c.src === "original")) return false;
+  if (isCycle() && cycleOf(P.media.map(m => m.file)).seq.length !== bg.clips.length) buildOwnSequence();
+  else timeToVerses();
+  return JSON.stringify(bg) !== before;
+}
+function sequenceNote() {
+  const n = P.media.length, v = verseStarts().length;
+  if (n === 1) return t("Ton média remplit toute la vidéo.");
+  if (!v) return t("{n} médias, chacun la même durée.", { n });
+  if (n === v) return t("{n} médias, un par verset (le dernier jusqu'à la fin).", { n });
+  if (n < v) return t("{n} médias pour {v} versets : ils reviennent dans l'ordre. Ajoutes-en quand tu veux, ils prendront leur place.", { n, v });
+  if (n === v + 1) return t("{v} médias calés sur les {v} versets ; le dernier attend dans la réserve, au bout de la timeline.", { v });
+  return t("{v} médias calés sur les {v} versets ; les {x} autres attendent dans la réserve, au bout de la timeline.", { v, x: n - v });
 }
 async function useOriginal() {
   const clips = P.background.clips;
@@ -2772,39 +3117,51 @@ async function useOriginal() {
 let wantOwn = false;
 async function useOwnMedia() {
   if (!P.media.length) { wantOwn = true; $("media-file").click(); return; }
-  const custom = !P.background.auto && P.background.clips.some(c => c.src !== "original");
+  const custom = !isCycle() && P.background.clips.some(c => c.src !== "original");
   if (custom && !await ask(t("Recréer la séquence avec tous tes médias, un par verset ? (tes durées réglées à la main seront remplacées)"))) return;
-  buildOwnSequence(); changed({ bg: true });
+  buildOwnSequence(); $("media-status").textContent = sequenceNote(); changed({ bg: true });
 }
-async function importMedia(files) {
+// target: { clip: i, all } = in place of clip i, { spare: true } = into the reserve, null = as the sequence allows
+async function importMedia(files, target = null) {
   if (!files.length) return;
-  const status = $("media-status");
-  let ok = 0;
+  const status = $("media-status"), wasCycle = isCycle(), added = [];
   for (const [k, f] of files.entries()) {
     status.textContent = t("Import de « {name} » ({k}/{n})…", { name: f.name, k: k + 1, n: files.length });
     const fd = new FormData(); fd.append("file", f);
-    try { P.media.push(await api(`/api/projects/${pid()}/media`, { method: "POST", body: fd })); ok++; }
+    try { const m = await api(`/api/projects/${pid()}/media`, { method: "POST", body: fd }); P.media.push(m); added.push(m); }
     catch (e) { toast(`${esc(f.name)} : ${esc(e.message)}`, "err"); }
   }
   $("media-file").value = "";
+  const own = wantOwn; wantOwn = false;
+  if (!added.length) { status.textContent = ""; return; }
+  const toSpare = (list) => (P.background.spare ||= []).push(...list.map(m => newClip(m.file)));
+  if (target?.clip != null) {
+    toSpare(added.slice(1));
+    replaceClip(target.clip, added[0].file, target.all);
+    status.textContent = added.length > 1 ? t("Clip remplacé ; les autres médias attendent dans la réserve.") : t("Clip remplacé.");
+    return;
+  }
   const onlyOrig = P.background.clips.every(c => c.src === "original");
-  // photos/videos replace the original background, one per verse, unless the
-  // sequence was arranged by hand (then « + Ajouter » places them)
-  if (ok && (wantOwn || onlyOrig || P.background.auto)) {
-    buildOwnSequence();
-    status.textContent = P.media.length === 1 ? t("Ton média remplit toute la vidéo.") :
-      t("{n} médias, un par verset (le dernier jusqu'à la fin).", { n: P.media.length });
-  } else status.textContent = ok ? t("{n} média(s) importé(s) : « + Ajouter » pour les placer.", { n: ok }) : "";
-  wantOwn = false;
+  // new media join the automatic sequence (one per verse, repeated in order); a sequence
+  // arranged by hand stays as it is and they wait in the reserve
+  if (!target?.spare && (own || onlyOrig || wasCycle)) { buildOwnSequence(); status.textContent = sequenceNote(); }
+  else {
+    toSpare(added);
+    status.innerHTML = t("{n} média(s) dans la réserve, au bout de la timeline : glisse-les sur un clip.", { n: added.length })
+      + ` <button class="small" onclick="useOwnMedia()">${t("Tout répartir sur les versets")}</button>`;
+  }
   changed({ bg: true });
 }
 async function deleteMedia(file) {
   if (!await ask(t("Retirer ce média du projet ?"))) return;
   await save();
+  const wasCycle = isCycle();
   const p = await api(`/api/projects/${pid()}/media/${encodeURIComponent(file)}`, { method: "DELETE" });
   for (const k of [file, file + "#pp"]) { layers.get(k)?.root.remove(); layers.delete(k); }
   undoStack.length = 0; redoStack.length = 0;  // older states may point to the deleted file
-  loadState(p); lastState = state(); refreshAll();
+  loadState(p);
+  if (wasCycle && P.media.length) { buildOwnSequence(); scheduleSave(); }  // the others close up
+  lastState = state(); refreshAll();
 }
 
 // ---------------------------------------------------------------- audio
@@ -3055,13 +3412,23 @@ function renderExports() {
 
 // ---------------------------------------------------------------- timeline
 let tlPps = 0;  // pixels per second; 0 = whole video visible
-function pps() {
-  const W = $("tl-scroll").clientWidth - 4;
-  return tlPps || Math.max(0.5, W / Math.max(1, P.duration));
+// the reserve, after the end of the video: clips set aside
+const RES_GAP = 16;
+const spareW = (k) => Math.max(64, 3 * k);
+function reserveW(k) {
+  const n = spares().length;
+  return P.media.length || n ? RES_GAP + Math.max(130, n * (spareW(k) + 4) + 12) : 0;
 }
+function fitPps() {
+  const W = $("tl-scroll").clientWidth - 4, D = Math.max(1, P.duration);
+  let k = W / D;
+  for (let n = 0; n < 3; n++) k = (W - reserveW(k)) / D;
+  return Math.max(0.5, k);
+}
+function pps() { return tlPps || fitPps(); }
 function tlZoom(f) {
   const sc = $("tl-scroll"), t = $("video").currentTime, before = pps();
-  tlPps = f ? Math.min(400, Math.max(($("tl-scroll").clientWidth - 4) / P.duration, before * f)) : 0;
+  tlPps = f ? Math.min(400, Math.max(fitPps(), before * f)) : 0;
   tlRender();
   sc.scrollLeft = t * pps() - sc.clientWidth / 2;
 }
@@ -3070,23 +3437,26 @@ $("tl-scroll").addEventListener("wheel", (e) => {
   e.preventDefault();
   const sc = $("tl-scroll"), r = sc.getBoundingClientRect(), x = e.clientX - r.left;
   const t = (sc.scrollLeft + x) / pps();
-  tlPps = Math.min(400, Math.max((sc.clientWidth - 4) / P.duration, pps() * Math.exp(-e.deltaY * 0.01)));
+  tlPps = Math.min(400, Math.max(fitPps(), pps() * Math.exp(-e.deltaY * 0.01)));
   tlRender();
   sc.scrollLeft = t * pps() - x;
 }, { passive: false });
 function tlRender() {
   if (!P || $("editor").classList.contains("hidden")) return;
-  const k = pps(), D = P.duration;
-  $("tl-content").style.width = Math.ceil(D * k) + "px";
+  const k = pps(), D = P.duration, rw = reserveW(k);
+  $("tl-content").style.width = Math.ceil(D * k + rw) + "px";
   const step = [0.5, 1, 2, 5, 10, 15, 30, 60, 120].find(s => s * k >= 56) || 300;
   let ticks = "";
   for (let s = 0; s <= D; s += step) ticks += `<div class="tick" style="left:${s * k}px">${fmt(s).replace(/\.0$/, "")}</div>`;
   $("tl-ruler").innerHTML = ticks;
-  const times = clipTimes(), lastI = P.background.clips.length - 1;
-  $("tl-bg").innerHTML = times.map(x => `<div class="clip ${x.c.src === "original" ? "original" : ""} ${x.i === selClip ? "sel" : ""}"
-      data-i="${x.i}" style="left:${x.s * k}px;width:${Math.max(2, (x.e - x.s) * k)}px;${mediaThumb(x.c.src)}">
-      ${x.c.src === "original" ? "🎥 " : ""}${esc(clipName(x.c))}${x.i < lastI ? `<div class="h r" data-edge="clip"></div>` : ""}</div>`).join("");
-  $("tl-subs").innerHTML = P.blocks.map((b, i) => `<div class="seg ${b.highlight ? "hl" : ""}" data-i="${i}"
+  const times = clipTimes(), lastI = P.background.clips.length - 1, sw = spareW(k), x0 = D * k + RES_GAP;
+  $("tl-bg").innerHTML = times.map(x => `<div class="clip ${x.c.src === "original" ? "original" : ""} ${selKind === "clip" && x.i === selClip ? "sel" : ""}"
+      data-i="${x.i}" style="left:${x.s * k}px;width:${Math.max(2, (x.e - x.s) * k)}px;${mediaThumb(x.c.src)}" title="${esc(clipName(x.c))} · ${fmt(x.s)} → ${fmt(x.e)}">
+      ${x.i > 0 ? `<div class="h l" data-edge="l"></div>` : ""}${x.c.src === "original" ? "🎥 " : ""}${esc(clipName(x.c))}${x.i < lastI ? `<div class="h r" data-edge="r"></div>` : ""}</div>`).join("")
+    + spares().map((c, j) => `<div class="clip spare ${c.src === "original" ? "original" : ""} ${selKind === "spare" && j === selSpare ? "sel" : ""}" data-spare="${j}"
+      style="left:${x0 + 6 + j * (sw + 4)}px;width:${sw}px;${mediaThumb(c.src)}" title="${esc(clipName(c))} · ${t("en réserve")}">${esc(clipName(c))}</div>`).join("");
+  $("tl-reserve").style.cssText = rw ? `left:${x0 - RES_GAP / 2}px;width:${rw - RES_GAP / 2}px` : "display:none";
+  $("tl-subs").innerHTML = P.blocks.map((b, i) => `<div class="seg ${b.highlight ? "hl" : ""} ${selKind === "seg" && i === selSeg ? "sel" : ""}" data-i="${i}"
       style="left:${b.start * k}px;width:${Math.max(2, (b.end - b.start) * k)}px" title="${esc(b.fr)}">
       <div class="h l" data-edge="start"></div>${b.kind === "verse" ? b.ayah : "★"}<div class="h r" data-edge="end"></div></div>`).join("");
   const t0 = P.render.trim_start || 0, t1 = P.render.trim_end || D;
@@ -3118,62 +3488,336 @@ function tlHead(t) {
   $("tl-head").style.left = x + "px";
   if (!$("video").paused && !tlDrag && (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth - 30)) sc.scrollLeft = x - 40;
 }
-let tlDrag = null;
+
+// ---------------------------------------------------------------- timeline tools (as in Premiere and DaVinci)
+let tool = "select", snapOn = true, snapped = false, tlDrag = null;
+const HINTS = {
+  select: "glisser un clip sur un autre = les échanger · bords = déplacer la coupe (Maj : décaler la suite) · clic droit = tous les outils",
+  blade: "clic = couper ici (un sous-titre : au mot le plus proche)",
+  slip: "glisse une vidéo pour choisir le passage montré dans son clip",
+};
+function setTool(name) {
+  tool = name;
+  for (const k of ["select", "blade", "slip"]) $("tool-" + k).classList.toggle("on", k === name);
+  $("tl-content").classList.toggle("blade", name === "blade");
+  $("tl-content").classList.toggle("slip", name === "slip");
+  $("tl-hint").textContent = t(HINTS[name]);
+  hideLine();
+}
+function toggleSnap() {
+  snapOn = !snapOn;
+  $("tool-snap").classList.toggle("on", snapOn);
+  toast(t(snapOn ? "Magnétisme activé" : "Magnétisme désactivé"));
+}
 function tlTime(e) { const r = $("tl-content").getBoundingClientRect(); return Math.max(0, Math.min(P.duration, (e.clientX - r.left) / pps())); }
-function snapTime(t) {
-  // background cuts snap to subtitle changes and to the playhead
-  const k = pps(), cands = [$("video").currentTime, ...P.blocks.flatMap(b => [b.start, b.end])];
-  let best = t;
-  for (const c of cands) if (Math.abs(c - t) * k < 8 && Math.abs(c - t) < Math.abs(best - t) + 1e-9) best = c;
+// snaps to verses and subtitles, background cuts, the export's start and end, and the playhead
+// (where it was when the drag began: it follows the drag); skip: what is being moved
+function snapTime(at, head = $("video").currentTime, skip = {}) {
+  snapped = false;
+  if (!snapOn) return at;
+  const r = P.render, cands = [head, r.trim_start || 0, r.trim_end || P.duration,
+    ...clipTimes().slice(1).filter(x => x.i - 1 !== skip.cut).map(x => x.s),
+    ...P.blocks.flatMap((b, i) => i === skip.seg ? [] : [b.start, b.end])];
+  let best = at, bd = 8 / pps();
+  for (const c of cands) { const d = Math.abs(c - at); if (d < bd) { best = c; bd = d; snapped = true; } }
   return best;
 }
-$("tl-content").addEventListener("pointerdown", (e) => {
+function showLine(at, label) {
+  let ln = $("tl-line"), tip = $("tl-tip");
+  if (!ln) {
+    ln = Object.assign(document.createElement("div"), { id: "tl-line", className: "tl-line" });
+    tip = Object.assign(document.createElement("div"), { id: "tl-tip", className: "tl-tip" });
+    $("tl-content").append(ln, tip);
+  }
+  const x = at * pps() + "px";
+  ln.style.left = x; ln.classList.toggle("snap", snapped); ln.hidden = false;
+  tip.style.left = x; tip.textContent = label ?? fmt(at); tip.hidden = false;
+}
+function hideLine() { if ($("tl-line")) { $("tl-line").hidden = true; $("tl-tip").hidden = true; } }
+const secs = (v) => t("{s} s", { s: v.toFixed(2) });
+
+// cuts the chosen subtitle if the playhead is in it, else the background clip under the playhead
+function splitAtPlayhead() {
+  const at = $("video").currentTime, b = P.blocks[selSeg];
+  if (selKind === "seg" && b && at > b.start && at < b.end) return splitSegAt(selSeg, at);
+  const x = clipTimes().find(y => at >= y.s && at < y.e);
+  if (x) splitClip(x.i, at);
+}
+// subtitles are cut between two words: the one nearest to the place chosen
+async function splitSegAt(i, at) {
+  const b = P.blocks[i], w = b?.words || [];
+  if (b?.kind !== "verse" || w.length < 2) { toast(t("Ce sous-titre n'a qu'un mot : il ne peut pas être coupé."), "err"); return; }
+  let best = 1;
+  for (let k = 2; k < w.length; k++) if (Math.abs(w[k].t0 - at) < Math.abs(w[best].t0 - at)) best = k;
+  await splitAt(i, best);
+}
+function canMergeAt(i) {
+  const b = P.blocks[i], next = P.blocks[i + 1];
+  return next && next.kind === b.kind && next.ayah === b.ayah && next.a0 === b.a1;
+}
+function editSeg(i) { setTab("subs"); setTimeout(() => { $("b" + i)?.scrollIntoView({ block: "center" }); $("b" + i)?.querySelector("textarea.fr")?.focus(); }, 50); }
+function deleteSelected() {
+  if (selKind === "seg" && P.blocks[selSeg]) return removeBlock(selSeg);
+  if (selKind === "spare" && spares()[selSpare]) return removeSpare(selSpare);
+  if (P.background.clips.length < 2) { toast(t("Il faut au moins un élément d'arrière-plan.")); return; }
+  removeClip(selClip);
+  toast(t("Clip supprimé : son voisin prend sa place (⌘Z pour annuler)"));
+}
+let replaceAt = 0;
+function openReplace(i) {
+  i = i ?? (selKind === "clip" ? selClip : currentClip());
+  const c = P.background.clips[i], x = clipTimes().find(y => y.i === i);
+  if (!c) return;
+  replaceAt = i;
+  $("replace-what").textContent = t("Clip {n} ({a} → {b}) : choisis le média qui prend sa place, aux mêmes horaires.",
+    { n: i + 1, a: fmt(x ? x.s : 0), b: fmt(x ? x.e : P.duration) });
+  const items = [{ file: "original", name: t("Vidéo d'origine"), kind: "original" }, ...P.media];
+  $("replace-list").innerHTML = items.map(m => `<div class="media ${m.file === c.src ? "cur" : ""}" onclick="chooseReplace('${m.file}')">
+      <div class="th" style="${m.kind === "image" ? `background-image:url('${mediaURL(m.file)}')` : ""}">
+        ${m.kind === "video" ? `<video src="${mediaURL(m.file)}#t=0.5" muted preload="metadata"></video><span class="kind">🎞 ${fmt(m.dur)}</span>` : ""}
+        ${m.kind === "original" ? `<span class="kind">🎥</span>` : ""}</div>
+      <div class="nm" title="${esc(m.name)}">${m.file === c.src ? "✓ " : ""}${esc(m.name)}</div></div>`).join("");
+  const n = P.background.clips.filter((y, k) => k !== i && y.src === c.src).length;
+  $("replace-all-box").classList.toggle("hidden", !n);
+  $("replace-all").checked = false;
+  $("replace-all-t").textContent = t("Remplacer aussi les {n} autres clips qui ont ce média", { n });
+  $("replace-dlg").showModal();
+}
+function chooseReplace(src) { $("replace-dlg").close(); replaceClip(replaceAt, src, $("replace-all").checked); }
+$("replace-file").onchange = async () => {
+  const files = [...$("replace-file").files], all = $("replace-all").checked;
+  $("replace-file").value = "";
+  if (!files.length) return;
+  $("replace-dlg").close();
+  await importMedia(files, { clip: replaceAt, all });
+};
+
+// right click: the tools for what is under the pointer
+function closeCtx() { $("ctx")?.remove(); }
+function openCtx(x, y, items) {
+  closeCtx();
+  const m = document.createElement("div");
+  m.className = "ctx"; m.id = "ctx";
+  m.innerHTML = items.map((it, k) => it ? `<button data-k="${k}" ${it[3] ? "disabled" : ""}><span>${esc(it[0])}</span>${it[1] ? `<kbd>${esc(it[1])}</kbd>` : ""}</button>` : "<hr>").join("");
+  m.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; closeCtx(); items[+b.dataset.k][2](); };
+  document.body.append(m);
+  m.style.left = Math.min(x, innerWidth - m.offsetWidth - 8) + "px";
+  m.style.top = Math.min(y, innerHeight - m.offsetHeight - 8) + "px";
+}
+addEventListener("pointerdown", (e) => { if (!e.target.closest(".ctx")) closeCtx(); }, true);
+addEventListener("blur", closeCtx);
+$("tl-content").addEventListener("contextmenu", (e) => {
   if (!P) return;
-  const el = e.target, seg = el.closest(".seg"), clip = el.closest(".clip");
+  e.preventDefault();
+  const el = e.target, seg = el.closest(".seg"), clip = el.closest(".clip"), at = tlTime(e), head = $("video").currentTime;
+  let items;
+  if (clip?.classList.contains("spare")) {
+    const j = +clip.dataset.spare;
+    selectSpare(j);
+    items = [[t("Mettre à la place du clip à la tête de lecture"), "", () => placeSpare(j, currentClip())],
+             [t("Retirer de la réserve"), t("Suppr"), () => removeSpare(j)]];
+  } else if (clip) {
+    const i = +clip.dataset.i, x = clipTimes().find(y => y.i === i), one = P.background.clips.length < 2;
+    selectClip(i, false);
+    items = [[t("Couper ici"), "B", () => splitClip(i, snapTime(at))],
+             [t("Couper à la tête de lecture"), "S", () => splitClip(i, head), !(x && head > x.s && head < x.e)],
+             null,
+             [t("Remplacer…"), "R", () => openReplace(i)],
+             [t("Copier"), "⌘C", () => copyClip(i)],
+             [t("Coller à la place"), "⌘V", () => pasteClip(i, false), !clipboard],
+             [t("Coller l'apparence (cadrage, mouvement, couleur)"), "⌥⌘V", () => pasteClip(i, true), !clipboard],
+             null,
+             [t("Mettre dans la réserve"), "", () => toReserve(i), one],
+             [t("Caler toutes les coupes sur les versets"), "", syncToVerses],
+             [t("Supprimer"), t("Suppr"), () => removeClip(i), one]];
+  } else if (seg) {
+    const i = +seg.dataset.i, b = P.blocks[i];
+    selectSeg(i);
+    items = [[t("Couper ici (au mot le plus proche)"), "B", () => splitSegAt(i, at), b.kind !== "verse" || (b.words || []).length < 2],
+             [t("Fusionner avec le suivant"), "", () => mergeNext(i), !canMergeAt(i)],
+             [t("Modifier le texte"), "", () => editSeg(i)],
+             null,
+             [t("Supprimer"), t("Suppr"), () => removeBlock(i)]];
+  } else {
+    items = [[t("Début de la vidéo ici"), "I", () => setInOut("in", at)],
+             [t("Fin de la vidéo ici"), "O", () => setInOut("out", at)],
+             [t("Tout garder (début et fin)"), "⌥X", clearInOut]];
+  }
+  openCtx(e.clientX, e.clientY, items);
+});
+
+// what a dragged clip or media would land on
+function dropTarget(e) {
+  const under = document.elementsFromPoint(e.clientX, e.clientY);  // through the export handles above the clips
+  const clip = under.find(x => x.matches("#tl-bg .clip:not(.spare)"));
+  if (clip) return { clip: +clip.dataset.i, el: clip };
+  return under.some(x => x.matches("#tl-reserve, #tl-bg .clip.spare")) ? { reserve: true, el: $("tl-reserve") } : null;
+}
+function markDrop(target) {
+  document.querySelectorAll("#tl-bg .drop, #tl-reserve.drop").forEach(x => x.classList.remove("drop"));
+  target?.el.classList.add("drop");
+}
+$("tl-content").addEventListener("pointerdown", (e) => {
+  if (!P || e.button !== 0) return;
+  const el = e.target, seg = el.closest(".seg"), clip = el.closest(".clip"), at = tlTime(e), head = $("video").currentTime;
   $("tl-content").setPointerCapture(e.pointerId);
-  if (el.dataset.trim) tlDrag = { kind: "trim", which: el.dataset.trim };
-  else if (seg && el.dataset.edge) {
+  tlDrag = null;
+  if (el.dataset.trim) { tlDrag = { kind: "trim", which: el.dataset.trim }; return; }
+  if (clip?.classList.contains("spare")) {
+    const j = +clip.dataset.spare;
+    selectSpare(j);
+    tlDrag = { kind: "press", spare: j, x0: e.clientX, y0: e.clientY, el: clip };
+    return;
+  }
+  if (tool === "blade" && (clip || seg)) {
+    const v = snapTime(at);
+    if (clip) splitClip(+clip.dataset.i, v); else splitSegAt(+seg.dataset.i, v);
+    return;
+  }
+  if (clip && el.dataset.edge) {  // a cut between two clips (the left edge of a clip is the right edge of the one before)
+    const i = +clip.dataset.i - (el.dataset.edge === "l" ? 1 : 0), times = clipTimes();
+    const x = times.find(y => y.i === i), nx = times.find(y => y.i === i + 1);
+    selectClip(i, false);
+    tlDrag = { kind: "cut", i, s: x.s, e2: nx ? nx.e : P.duration, last: i + 1 === P.background.clips.length - 1, ripple: e.shiftKey, head };
+    return;
+  }
+  if (clip) {
+    const i = +clip.dataset.i, c = P.background.clips[i];
+    if (tab !== "bg") setTab("bg");
+    selectClip(i, false); seek(at);
+    if (tool === "slip" || e.altKey) {
+      const m = P.media.find(y => y.file === c.src);
+      if (m?.kind === "video") tlDrag = { kind: "slip", i, x0: e.clientX, off0: +c.offset || 0, m };
+      else toast(t("Seules tes vidéos ont un passage à choisir : une photo ou la vidéo d'origine restent en place."));
+      return;
+    }
+    tlDrag = { kind: "press", i, x0: e.clientX, y0: e.clientY, el: $("tl-bg").querySelector(`.clip[data-i="${i}"]`) };
+    return;
+  }
+  if (seg && el.dataset.edge) {
     const i = +seg.dataset.i, b = P.blocks[i], edge = el.dataset.edge;
     const nb = edge === "start" ? P.blocks[i - 1] : P.blocks[i + 1];
     const linked = nb && Math.abs(edge === "start" ? nb.end - b.start : nb.start - b.end) < 0.01;
-    tlDrag = { kind: "edge", i, edge, linked };
-  } else if (clip && el.dataset.edge) tlDrag = { kind: "clip", i: +clip.dataset.i, s: clipTimes().find(x => x.i === +clip.dataset.i).s };
-  else if (clip) { selClip = +clip.dataset.i; if (tab !== "bg") setTab("bg"); renderBgPanel(); tlRender(); seek(tlTime(e)); tlDrag = { kind: "scrub" }; }
-  else if (seg) { const i = +seg.dataset.i; seek(tlTime(e)); if (tab === "subs") $("b" + i)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); tlDrag = { kind: "scrub" }; }
-  else { seek(tlTime(e)); tlDrag = { kind: "scrub" }; }
+    selectSeg(i);
+    tlDrag = { kind: "edge", i, edge, linked, head };
+    return;
+  }
+  if (seg) {
+    const i = +seg.dataset.i, b = P.blocks[i], prev = P.blocks[i - 1], next = P.blocks[i + 1];
+    selectSeg(i); seek(at);
+    tlDrag = { kind: "pressSeg", i, x0: e.clientX, y0: e.clientY, at0: at, s0: b.start, e0: b.end, head,
+               lp: prev && Math.abs(prev.end - b.start) < 0.01, ln: next && Math.abs(next.start - b.end) < 0.01 };
+    return;
+  }
+  seek(at); tlDrag = { kind: "scrub" };
 });
 $("tl-content").addEventListener("pointermove", (e) => {
-  if (!tlDrag) return;
-  const t = tlTime(e), d = tlDrag;
+  const d = tlDrag;
+  if (!d) {  // the blade shows where it would cut
+    const over = e.target.closest?.(".clip:not(.spare), .seg");
+    if (tool === "blade" && over && P) showLine(snapTime(tlTime(e))); else if (tool === "blade") hideLine();
+    return;
+  }
+  const at = tlTime(e), clips = P.background.clips;
+  if (d.kind === "press" || d.kind === "pressSeg") {
+    if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 5) return;
+    if (d.kind === "pressSeg") d.kind = "slide";
+    else {
+      d.kind = "move";
+      const c = d.spare != null ? spares()[d.spare] : clips[d.i];
+      d.ghost = Object.assign(document.createElement("div"), { className: "tl-ghost", textContent: clipName(c) });
+      d.ghost.style.cssText = mediaThumb(c.src);
+      document.body.append(d.ghost);
+      d.el?.classList.add("moving");
+    }
+  }
   d.moved = true;
-  if (d.kind === "scrub") { seek(t); return; }
+  if (d.kind === "scrub") { seek(at); return; }
+  if (d.kind === "move") {
+    d.ghost.style.left = e.clientX + 10 + "px"; d.ghost.style.top = e.clientY - 34 + "px";
+    d.target = dropTarget(e);
+    if (d.target?.clip === d.i && d.spare == null) d.target = null;
+    if (d.target?.reserve && d.spare != null) d.target = null;
+    markDrop(d.target);
+    return;
+  }
   if (d.kind === "trim") {
-    if (d.which === "start") P.render.trim_start = Math.round(Math.min(t, (P.render.trim_end || P.duration) - 1) * 100) / 100;
-    else { const v = Math.round(Math.max(t, (P.render.trim_start || 0) + 1) * 100) / 100; P.render.trim_end = v >= P.duration - 0.02 ? null : v; }
+    if (d.which === "start") P.render.trim_start = Math.round(Math.min(at, (P.render.trim_end || P.duration) - 1) * 100) / 100;
+    else { const v = Math.round(Math.max(at, (P.render.trim_start || 0) + 1) * 100) / 100; P.render.trim_end = v >= P.duration - 0.02 ? null : v; }
     seek(d.which === "start" ? P.render.trim_start : (P.render.trim_end || P.duration) - 0.05);
   } else if (d.kind === "edge") {
-    const b = P.blocks[d.i], prev = P.blocks[d.i - 1], next = P.blocks[d.i + 1], v = Math.round(t * 1000) / 1000;
+    const b = P.blocks[d.i], prev = P.blocks[d.i - 1], next = P.blocks[d.i + 1], v = Math.round(snapTime(at, d.head, { seg: d.i }) * 1000) / 1000;
     if (d.edge === "start") {
       b.start = Math.max(d.linked ? prev.start + 0.1 : prev ? prev.end : 0, Math.min(b.end - 0.1, v));
       if (d.linked) prev.end = b.start;
-      seek(b.start);
+      seek(b.start); showLine(b.start);
     } else {
       b.end = Math.min(d.linked ? next.end - 0.1 : next ? next.start : P.duration, Math.max(b.start + 0.1, v));
       if (d.linked) next.start = b.end;
-      seek(Math.max(b.start, b.end - 0.05));
+      seek(Math.max(b.start, b.end - 0.05)); showLine(b.end);
     }
-  } else if (d.kind === "clip") {
-    P.background.clips[d.i].dur = Math.round(Math.max(0.3, snapTime(t) - d.s) * 1000) / 1000;
+  } else if (d.kind === "slide") {  // the subtitle moves, touching neighbours give or take the time
+    const b = P.blocks[d.i], prev = P.blocks[d.i - 1], next = P.blocks[d.i + 1];
+    const lo = d.lp ? prev.start + 0.1 : prev ? prev.end : 0, hi = d.ln ? next.end - 0.1 : next ? next.start : P.duration;
+    let s0 = snapTime(d.s0 + at - d.at0, d.head, { seg: d.i });
+    s0 = Math.max(lo, Math.min(hi - (d.e0 - d.s0), s0));
+    b.start = r3(s0); b.end = r3(s0 + d.e0 - d.s0);
+    if (d.lp) prev.end = b.start;
+    if (d.ln) next.start = b.end;
+    seek(b.start); showLine(b.start);
+  } else if (d.kind === "cut") {
+    const c = clips[d.i], n = clips[d.i + 1], v = snapTime(at, d.head, { cut: d.i });
+    if (d.ripple) c.dur = r3(Math.max(0.3, v - d.s));  // Maj: what follows moves with it
+    else {  // rolling edit: only this cut moves
+      const w = Math.min(d.e2 - 0.3, Math.max(d.s + 0.3, v));
+      c.dur = r3(w - d.s);
+      if (!d.last) n.dur = r3(d.e2 - w);
+    }
     P.background.auto = false;
-    seek(d.s + P.background.clips[d.i].dur);
+    seek(d.s + c.dur); showLine(d.s + c.dur, `${fmt(d.s + c.dur)} · ${secs(c.dur)}`);
+  } else if (d.kind === "slip") {
+    const c = clips[d.i], off = Math.max(0, Math.min(Math.max(0, d.m.dur - 0.1), d.off0 - (e.clientX - d.x0) / pps()));
+    c.offset = Math.round(off * 100) / 100;
+    showLine(at, t("la vidéo commence à {s}", { s: secs(c.offset) }));
+    redraw();
+    return;
   }
   tlRender();
 });
 $("tl-content").addEventListener("pointerup", () => {
   const d = tlDrag; tlDrag = null;
-  if (!d || !d.moved || d.kind === "scrub") return;
+  if (tool !== "blade") hideLine();
+  if (!d) return;
+  d.ghost?.remove(); d.el?.classList.remove("moving"); markDrop(null);
+  if (!d.moved || d.kind === "scrub") return;
+  if (d.kind === "move") {
+    const tg = d.target;
+    if (!tg) return;
+    if (d.spare != null) placeSpare(d.spare, tg.clip);
+    else if (tg.reserve) toReserve(d.i);
+    else swapClips(d.i, tg.clip);
+    return;
+  }
   if (d.kind === "trim") { $("r-trim-start").value = P.render.trim_start || ""; $("r-trim-end").value = P.render.trim_end || ""; }
-  changed({ cards: d.kind === "edge", bg: d.kind === "clip", tl: true });
+  changed({ cards: d.kind === "edge" || d.kind === "slide", bg: d.kind === "cut" || d.kind === "slip", tl: true });
+});
+// media from the library (or files from the computer) dropped on a clip replace it; on the reserve, wait there
+$("tl-content").addEventListener("dragover", (e) => {
+  const ty = e.dataTransfer.types;
+  if (!P || !(ty.includes("Files") || ty.includes("application/x-tilawa-media"))) return;
+  e.preventDefault();
+  markDrop(dropTarget(e));
+});
+$("tl-content").addEventListener("dragleave", (e) => { if (!$("tl-content").contains(e.relatedTarget)) markDrop(null); });
+$("tl-content").addEventListener("drop", (e) => {
+  if (!P) return;
+  e.preventDefault();
+  const tg = dropTarget(e), file = e.dataTransfer.getData("application/x-tilawa-media"), files = [...e.dataTransfer.files];
+  markDrop(null);
+  if (file) {
+    if (tg?.clip != null) replaceClip(tg.clip, file);
+    else if (tg?.reserve) { (P.background.spare ||= []).push(newClip(file)); changed({ bg: true }); }
+  } else if (files.length) importMedia(files, tg?.clip != null ? { clip: tg.clip } : tg?.reserve ? { spare: true } : null);
 });
 
 translateDom();

@@ -75,7 +75,9 @@ downloaded in a browser.
    - **Background**: keep the original video, or import **your own photos and videos**
      (jpg, png, iPhone heic, mp4, mov…); the sound stays the recitation's.
      - **1 item**: it fills the whole video. **Several**: one per verse (the 2nd comes with the 2nd verse…),
-       the last until the end. *Match the verses* / *Spread evenly* to redo the timing.
+       the last until the end. **Fewer items than verses**: they come back in order (lava, rain, snow, lava…);
+       items added later join that order. **More items than verses**: one per verse, the others wait in the
+       **reserve**, at the end of the timeline. *Match the verses* / *Spread evenly* to redo the timing.
      - A video shorter than its slot plays **back and forth** (forward, then reversed): a loop with no jump.
      - For each item: X/Y position and scale (like in Premiere), *Fill the screen* / *Whole picture*,
        slow zoom, and **colour**: exposure, contrast, highlights, shadows, saturation, temperature, tint.
@@ -119,8 +121,17 @@ downloaded in a browser.
      full-resolution **image** (for a YouTube thumbnail), list of files already exported.
      Horizontal videos can be **repeated** (10 times by default, or any number): the recitation
      plays again and again to learn it by heart, the title cards and added basmala only once, at the start.
-   - **Timeline** (bottom): drag the edges of a subtitle to change its timing, the edge of a
-     background item to change its length; the **pink handles** cut the start and the end.
+   - **Timeline** (bottom), with the tools of Premiere and DaVinci:
+     - **Selection** (V): drag a clip onto another to swap them, a clip of the reserve or a media of the
+       library onto a clip to put it there; drag an edge to move the cut (Shift: what follows moves too),
+       a subtitle to move it, its edges to change its timing.
+     - **Blade** (B) cuts where you click (a subtitle: between the nearest words); **S** or **⌘K** at the playhead.
+     - **Slip** (Y, or ⌥ + drag): which part of a video its clip shows.
+     - **Replace** (R): another media from the library, or a new file, in place of a clip (and its repeats if you like).
+     - ⌘C / ⌘V a clip in place of another (⌥⌘V: its look only), **Delete**, **snapping** (N) to verses,
+       cuts and the playhead, **right click** for every tool.
+     - J K L to play backwards / pause / forwards, ← → one frame, ↑ ↓ previous / next cut,
+       I / O for the start and end of the exported video (the **pink handles**), + − \ to zoom.
    - **App safe zones** (below the preview): shows where TikTok, Reels and Shorts put their buttons.
    - ↶ *Undo* (⌘Z / Ctrl+Z) undoes the last change. Everything is saved automatically.
 5. **Create the video**. Videos are saved in the `Tilawa Studio/Videos` folder

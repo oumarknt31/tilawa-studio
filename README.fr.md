@@ -76,7 +76,10 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
    - **Arrière-plan** : garde la vidéo d'origine, ou importe **tes photos et vidéos**
      (jpg, png, heic de l'iPhone, mp4, mov…) ; le son reste celui de la récitation.
      - **1 média** : il remplit toute la vidéo. **Plusieurs** : un par verset (le 2e arrive avec le 2e verset…),
-       le dernier jusqu'à la fin. *Caler sur les versets* / *Répartir également* pour refaire le minutage.
+       le dernier jusqu'à la fin. **Moins de médias que de versets** : ils reviennent dans l'ordre (lave, pluie,
+       neige, lave…) ; ceux ajoutés plus tard prennent leur place dans la suite. **Plus de médias que de versets** :
+       un par verset, les autres attendent dans la **réserve**, au bout de la timeline.
+       *Caler sur les versets* / *Répartir également* pour refaire le minutage.
      - Une vidéo plus courte que sa place est jouée en **aller-retour** (avant puis à l'envers) : boucle sans saut.
      - Pour chaque élément : position X/Y et échelle (comme dans Premiere), *Remplir l'écran* / *Image entière*,
        zoom lent, et **couleur** : exposition, contraste, hautes lumières, ombres, saturation, température, teinte.
@@ -120,8 +123,17 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
      **image** pleine résolution (pour une miniature YouTube), liste des fichiers déjà exportés.
      Les vidéos horizontales peuvent être **répétées** (10 fois par défaut, ou le nombre choisi) : la récitation
      revient encore et encore pour l'apprendre par cœur, les cartes de titre et la basmala ajoutée une seule fois, au début.
-   - **Timeline** (en bas) : tire les bords d'un sous-titre pour changer son horaire, le bord d'un
-     élément d'arrière-plan pour changer sa durée ; les **poignées roses** coupent le début et la fin.
+   - **Timeline** (en bas), avec les outils de Premiere et DaVinci :
+     - **Sélection** (V) : glisse un clip sur un autre pour les échanger, un clip de la réserve ou un média de la
+       bibliothèque sur un clip pour l'y mettre ; tire un bord pour déplacer la coupe (Maj : la suite se décale),
+       un sous-titre pour le déplacer, ses bords pour changer son horaire.
+     - **Lame** (B) : coupe là où tu cliques (un sous-titre : entre les mots les plus proches) ; **S** ou **⌘K** à la tête de lecture.
+     - **Décaler** (Y, ou ⌥ + glisser) : le passage d'une vidéo montré dans son clip.
+     - **Remplacer** (R) : un autre média de la bibliothèque, ou un nouveau fichier, à la place d'un clip (et de ses répétitions si tu veux).
+     - ⌘C / ⌘V un clip à la place d'un autre (⌥⌘V : son apparence seulement), **Suppr**, **magnétisme** (N) sur les versets,
+       les coupes et la tête de lecture, **clic droit** pour tous les outils.
+     - J K L pour lire en arrière / pause / en avant, ← → une image, ↑ ↓ coupe précédente / suivante,
+       I / O pour le début et la fin de la vidéo exportée (les **poignées roses**), + − \ pour zoomer.
    - **Zones des applis** (sous l'aperçu) : montre où TikTok, Reels et Shorts posent leurs boutons.
    - ↶ *Annuler* (⌘Z / Ctrl+Z) annule la dernière modification. Tout est enregistré automatiquement.
 5. **Créer la vidéo**. Les vidéos sont enregistrées dans le dossier `Tilawa Studio/Videos`

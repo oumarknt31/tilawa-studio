@@ -251,6 +251,7 @@ def save_project(pid: str, body: dict):
         known = {m["file"] for m in p.media} | {"original"}
         bg = body["background"]
         bg["clips"] = [c for c in bg.get("clips", []) if c.get("src") in known] or p.get_background()["clips"]
+        bg["spare"] = [c for c in bg.get("spare", []) if c.get("src") in known]  # set aside, not in the video
         p.background = bg
     p.save()
     return _public(p)
@@ -450,6 +451,7 @@ def delete_media(pid: str, name: str):
     p.media = [m for m in p.media if m["file"] != name]
     if p.background:
         p.background["clips"] = [c for c in p.background["clips"] if c["src"] != name] or None
+        p.background["spare"] = [c for c in p.background.get("spare", []) if c["src"] != name]
         if p.background["clips"] is None:
             p.background = None
     p.save()

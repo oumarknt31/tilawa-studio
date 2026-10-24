@@ -43,3 +43,21 @@ def test_default_background_matches_old_fit_modes():
     assert landscape["clips"][0]["zoom"] == 1.0 and landscape["fill"] == "blur"
     assert render.default_background(1920, 1080, "crop")["clips"][0]["zoom"] > 3
     assert render.default_background(1920, 1080, "pad")["fill"] == "black"
+
+
+def test_the_reserve_is_kept_and_follows_the_media(tmp_path, monkeypatch):
+    from tilawa import project, server
+
+    folder = tmp_path / "p"
+    folder.mkdir()
+    media = [{"file": f, "name": f, "kind": "image", "w": 1080, "h": 1920, "dur": 0.0} for f in ("a.png", "b.png", "c.png")]
+    project.Project(folder=folder, video="v.mp4", surah=1, first_verse=1, width=1080, height=1920, media=media).save()
+    monkeypatch.setattr(server, "PROJECTS", tmp_path)
+    monkeypatch.setattr(server, "_public", lambda p: p)
+    clip = lambda src: {"src": src, "dur": 5}
+    # clips set aside (not in the video) are saved, except those of unknown media
+    server.save_project("p", {"background": {"clips": [clip("a.png")], "spare": [clip("b.png"), clip("x.png")]}})
+    assert [c["src"] for c in project.Project.load(folder).background["spare"]] == ["b.png"]
+    # a media removed from the project leaves the reserve too
+    server.delete_media("p", "b.png")
+    assert project.Project.load(folder).background["spare"] == []

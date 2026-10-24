@@ -298,7 +298,7 @@ def convert_format(p: Project, fmt: str) -> None:
     if p.style.get("--logo-pos") == "custom":  # dragged by hand: the new format's best corner
         del p.style["--logo-pos"]
     if p.background:
-        for c in p.background["clips"]:
+        for c in p.background["clips"] + p.background.get("spare", []):
             if c["src"] == "original":
                 sw, sh = p.width, p.height
             else:
