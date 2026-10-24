@@ -47,7 +47,7 @@ def make(args) -> int:
                        args.format, args.lang, lib.style(args.style), args.translit, args.translation or "")
     p.render.update({k: v for k, v in (("size", args.size), ("quality", args.quality), ("fit", args.fit)) if v})
     project.analyze(p, _bar)
-    print(f"Surah {p.surah}, verses {project.found_verses(p)}")
+    print(" + ".join(f"Surah {s}, verses {a}-{b}" for s, a, b in project.passages(p)))
     for b in p.blocks:
         label = f"{b['ayah']:>3}" if b["kind"] == "verse" else b["kind"][:3]
         print(f"  {b['start']:6.2f}-{b['end']:6.2f}  [{label}] {b['fr'][:70]}")

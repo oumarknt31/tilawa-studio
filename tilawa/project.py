@@ -14,7 +14,7 @@ from typing import Callable
 
 import numpy as np
 
-from . import align, basmala, identify, media, quran, render, segment, translit
+from . import align, basmala, detect, identify, media, quran, render, segment, translit
 from .i18n import UserError
 
 Progress = Callable[[str, float], None]
@@ -40,7 +40,8 @@ class Project:
     media: list[dict] = field(default_factory=list)  # imported photos/videos: {file, name, kind, w, h, dur}
     format: str = "9:16"  # render.FORMATS
     lang: str = "fr"  # translation language (quran.LANGS)
-    detected: dict | None = None  # what identify.py heard: {"matches": [...]}
+    detected: dict | None = None  # the passages heard (detect.py): {"matches": [...]}
+    surahs: list[int] = field(default_factory=list)  # every surah recited, in order (several: a prayer...)
     audio_only: bool = False  # made from a sound file: the picture is a plain frame
 
     @property
@@ -147,38 +148,65 @@ def analyze(p: Project, progress: Progress | None = None) -> Project:
         em = model.emissions(audio)
         np.save(cache, em)
     progress("identify", 0.65)
-    matches = identify.identify(em, model)
-    p.detected = {"matches": [m.to_dict() for m in matches]}
-    found_range = None
-    if not p.surah:
-        if not matches:
-            raise UserError("not_recognized")
-        best = matches[0]
-        p.surah, p.first_verse = best.surah, best.first
-        found_range = (best.first, best.last)
-        if not p.title:
-            p.title = render.surah_title(p.surah, p.lang)
-    elif matches and matches[0].surah == p.surah and abs(matches[0].first - p.first_verse) <= 6:
-        found_range = (matches[0].first, matches[0].last)
-    progress("aligning", 0.7)
-    total = quran.surah(p.surah)["verses"]
-    if found_range and not p.last_verse:
-        last = min(total, found_range[1] + 1)
-    else:
-        last = p.last_verse or min(total, p.first_verse - 1 + align.max_verses_for(len(audio) / align.SR, total))
-    # the starting verse is a hint: a few earlier verses are considered too
-    first = max(1, p.first_verse - align.LOOKBACK_VERSES)
-    verses = quran.verses(p.surah, first, last)
-    occ = align.align(em, model, verses, hint=p.first_verse - first)
-    if not any(o.word.unit == "verse" for o in occ):
-        raise UserError("no_verse")
     opt = segment.Options(**{k: v for k, v in p.segment.items() if k in segment.Options.__dataclass_fields__})
     opt.lang = p.lang
-    blocks = segment.build_blocks(occ, verses, audio, len(audio) / align.SR, opt)
+    blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse)
+    p.detected = {"matches": found}
+    if not blocks or not any(b.kind == "verse" for b in blocks):
+        raise UserError("no_verse" if p.surah else "not_recognized")
+    auto_title = not p.title or p.title in (titles(p.lang, [p.surah] if p.surah else []), titles(p.lang, p.surahs))
     p.blocks = [b.to_dict() for b in blocks]
+    p.surahs = surahs_of(p.blocks)
+    if p.surah not in p.surahs:
+        p.surah = p.surahs[0]
+        p.first_verse = next(b["ayah"] for b in p.blocks if b["kind"] == "verse" and b["surah"] == p.surah)
+    if auto_title:
+        p.title = titles(p.lang, p.surahs)
     p.save()
     progress("done", 1.0)
     return p
+
+
+def surahs_of(blocks: list[dict]) -> list[int]:
+    """The surahs of the verse blocks, in the order recited."""
+    out = []
+    for b in blocks:
+        if b["kind"] == "verse" and b["surah"] not in out:
+            out.append(b["surah"])
+    return out
+
+
+def titles(lang: str, surahs: list[int]) -> str:
+    """The title of a recitation of one surah or several."""
+    if len(surahs) <= 1:
+        return render.surah_title(surahs[0], lang) if surahs else ""
+    return render.surahs_title(surahs, lang)
+
+
+def header_titles(p: Project) -> list[tuple[float, str]] | None:
+    """A recitation of several surahs whose title is the automatic one: each surah's own title,
+    from its first subtitle (its basmala, if said) on. (Same as headerTitles() in index.html.)"""
+    surahs = surahs_of(p.blocks)
+    if len(surahs) < 2 or p.title != titles(p.lang, surahs):
+        return None
+    out, before = [], None  # before: a basmala / isti'adha said just before the next verse
+    for b in p.blocks:
+        if b["kind"] != "verse":
+            before = b["start"] if before is None else before
+            continue
+        if not out or out[-1][1] != b["surah"]:
+            out.append((0.0 if not out else before if before is not None else b["start"], b["surah"]))
+        before = None
+    return [(t, render.surah_title(s, p.lang)) for t, s in out]
+
+
+def passages(p: Project) -> list[tuple[int, int, int]]:
+    """(surah, first verse, last verse) of each surah recited, in order."""
+    out = []
+    for s in surahs_of(p.blocks):
+        ayahs = [b["ayah"] for b in p.blocks if b["kind"] == "verse" and b["surah"] == s]
+        out.append((s, min(ayahs), max(ayahs)))
+    return out
 
 
 def found_verses(p: Project) -> tuple[int, int] | None:
@@ -187,11 +215,11 @@ def found_verses(p: Project) -> tuple[int, int] | None:
 
 
 def output_name(p: Project) -> str:
-    rng = found_verses(p)
-    name = quran.surah(p.surah)["name"].replace("'", "").replace(" ", "-")
-    verses = f"{rng[0]}-{rng[1]}" if rng and rng[0] != rng[1] else f"{rng[0]}" if rng else ""
+    parts = []
+    for s, lo, hi in passages(p) or [(p.surah, 0, 0)]:
+        parts += [quran.surah(s)["name"].replace("'", "").replace(" ", "-"), f"{lo}-{hi}" if lo != hi else f"{lo}" if lo else ""]
     reciter = re.sub(r"[^\w-]+", "-", p.reciter).strip("-")  # also keeps "/" and ".." out of the file name
-    return "_".join(x for x in (name, verses, reciter) if x)
+    return "_".join(x for x in (*parts, reciter) if x)
 
 
 def youtube_style(p: Project) -> bool:
@@ -237,7 +265,7 @@ def make_video(p: Project, out_dir: Path | None = None, progress: Progress | Non
             progress("prepare", 0.0)
         extra = {"file": basmala.ensure(basmala.HOME, opt.basmala), "payload": basmala_payload(p)}
     return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / output_name(p), opt, p.style, progress,
-                         p.get_background(), p.media_dir, p.format, p.lang, p.surah, extra)
+                         p.get_background(), p.media_dir, p.format, p.lang, p.surah, extra, header_titles(p))
 
 
 def make_still(p: Project, t: float, out_dir: Path, progress: Progress | None = None) -> Path:
@@ -247,7 +275,7 @@ def make_still(p: Project, t: float, out_dir: Path, progress: Progress | None = 
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     name = f"{output_name(p)}_{t:.1f}s"
     return render.render(p.video_path, blocks, p.title, p.reciter, out_dir / name, opt, p.style, progress,
-                         p.get_background(), p.media_dir, p.format, p.lang, p.surah)
+                         p.get_background(), p.media_dir, p.format, p.lang, p.surah, titles=header_titles(p))
 
 
 POSITION_KEYS = ("--header-top", "--header-x", "--block-top", "--block-x", "--band-top", "--logo-x", "--logo-y")
@@ -284,8 +312,9 @@ def set_language(p: Project, lang: str, chosen: str | None = None) -> None:
     edition = quran.edition(lang, chosen) or ""
     blocks = [segment.Block.from_dict(b) for b in p.blocks]
     segment.retranslate(blocks, lang, edition)
-    if p.surah and p.title == render.surah_title(p.surah, p.lang):
-        p.title = render.surah_title(p.surah, lang)
+    surahs = surahs_of(p.blocks) or ([p.surah] if p.surah else [])
+    if surahs and p.title == titles(p.lang, surahs):
+        p.title = titles(lang, surahs)
     p.lang = lang
     p.segment["lang"], p.segment["translation"] = lang, edition
     p.blocks = [b.to_dict() for b in blocks]

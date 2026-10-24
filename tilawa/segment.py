@@ -28,6 +28,8 @@ from .align import WordTiming
 
 ISTIADHA_TR = "AAoothu biAllahi mina alshshaytani alrrajeemi"  # in the Tanzil convention
 ISTIADHA_UTHMANI = "أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَـٰنِ ٱلرَّجِيمِ"
+CUT_START_S = 1.5  # a recording whose first verse starts mid-verse this early was cut there
+MISSED_WORDS = 2  # words at the start or end of a verse the aligner may miss (shown anyway)
 
 
 @dataclass
@@ -442,6 +444,19 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
             if (i + len(group) == len(raw) and missing > 0 and group[-1][-1].end >= duration - 0.6
                     and (missing <= 4 or len(v.align) - bounds[-2] <= opt.max_words + 3)):
                 bounds[-1] = len(v.align)
+            # and the same when it starts mid-verse (the clip was cut): the verse from its start
+            if (i == 0 and 0 < bounds[0] and group[0][0].start <= CUT_START_S
+                    and (bounds[0] <= 4 or bounds[1] <= opt.max_words + 3)):
+                bounds[0] = 0
+            # a word or two the model barely heard (a voice fading on the last madd, a soft
+            # first word): a verse is recited whole unless the reciter goes back inside it
+            prev = raw[i - 1][0] if i else None
+            nxt = raw[i + len(group)][0] if i + len(group) < len(raw) else None
+            same = lambda q: q is not None and q.kind == "verse" and q.verse_index == p.verse_index
+            if 0 < missing <= MISSED_WORDS and nxt is not None and not same(nxt):
+                bounds[-1] = len(v.align)
+            if 0 < bounds[0] <= MISSED_WORDS and prev is not None and not same(prev):
+                bounds[0] = 0
             fracs = [_arabic_weight(v, 0, b) / total for b in bounds]
             # cut the whole verse translation, then keep the slices this run covers
             # (a run may start or stop mid-verse, e.g. when the clip is cut)
@@ -481,7 +496,8 @@ def retime(blocks: list[Block], duration: float, opt: Options | None = None) -> 
     """Set on-screen start/end from the voice timings."""
     opt = opt or Options()
     for i, b in enumerate(blocks):
-        b.start = max(0.0, b.voice_start - opt.lead_s) if i == 0 else b.start
+        if i == 0:  # the voice starts right away (a cut clip): the subtitle is there from the first frame
+            b.start = 0.0 if b.voice_start <= CUT_START_S else max(0.0, b.voice_start - opt.lead_s)
         if i + 1 < len(blocks):
             nxt = blocks[i + 1]
             gap = nxt.voice_start - b.voice_end

@@ -67,6 +67,14 @@ def surah_title(n: int, lang: str = "fr") -> str:
     return TITLE.get(lang, TITLE["fr"]).format(info["name"].upper().replace("-", " "))
 
 
+def surahs_title(surahs: list[int], lang: str = "fr") -> str:
+    """Title of a recitation of several surahs: "SOURATE AL FATIHAH · AL BAQARAH"."""
+    first = surah_title(surahs[0], lang)
+    if lang in ("ur", "none"):
+        return " · ".join([first] + [quran.surah(n)["ar"] for n in surahs[1:]])
+    return " · ".join([first] + [quran.surah(n)["name"].upper().replace("-", " ") for n in surahs[1:]])
+
+
 def ends_verse(b: Block) -> bool:
     return b.kind == "verse" and b.a1 >= len(quran.verse(b.surah, b.ayah).align)
 
@@ -541,9 +549,12 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
            opt: RenderOptions | None = None, style: dict | None = None,
            progress: Callable[[str, float], None] | None = None,
            background: dict | None = None, media_dir: Path | None = None,
-           fmt: str = "9:16", lang: str = "fr", surah: int = 0, basmala: dict | None = None) -> Path:
+           fmt: str = "9:16", lang: str = "fr", surah: int = 0, basmala: dict | None = None,
+           titles: list[tuple[float, str]] | None = None) -> Path:
     """Make the video (or, with quality "png", a still image of its first frame).
-    basmala: {"file": recording, "payload": its subtitle}, said after the title cards, before the recitation."""
+    basmala: {"file": recording, "payload": its subtitle}, said after the title cards, before the recitation.
+    titles: a recitation of several surahs: [(time in the source, header title)], each surah's name while
+    it is recited (the header shows `title` otherwise)."""
     opt = opt or RenderOptions()
     progress = progress or (lambda stage, f: None)
     # absolute paths: ffmpeg runs inside the work folder
@@ -566,8 +577,13 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         intro = header_mode(style) == "intro" and opt.show_header and not still_image
         cards = renderer.cards(title, reciter, surah, lang) if intro else []
         # what stays all along: the header (unless shown as cards), the logo, the band
-        header = renderer.png(work / "header.png", style, {"title": title, "reciter": reciter, "visible": opt.show_header},
-                              frame=True)
+        titles = titles or [(0.0, title)]
+        titles = [x for k, x in enumerate(titles) if k + 1 == len(titles) or titles[k + 1][0] > t0]  # shown after the trim
+        if still_image:
+            titles = titles[:1]
+        headers = [(ts, renderer.png(work / f"header{k}.png", style, {"title": tt, "reciter": reciter,
+                                                                     "visible": opt.show_header}, frame=True))
+                   for k, (ts, tt) in enumerate(titles)]
         card_pngs = [renderer.png(work / f"intro{k}.png", style, intro=c) for k, c in enumerate(cards)]
         basmala = basmala if basmala and not still_image else None
         if basmala:
@@ -612,14 +628,17 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     graph: list[str] = []
     base = _background_graph(background or default_background(info.width, info.height, opt.fit, fmt),
                              info, video, media_dir, t0, t1, w, h, inputs, graph, work, progress, fmt, pix, lead)
-    hdr = inputs.add("-i", str(header[0]))
     frame_at = cards_end if basmala else lead  # the logo and the band come with the basmala, else with the recitation
-    if frame_at:  # after the cards
-        graph.append(f"{still(hdr, total - frame_at)},fade=t=in:st=0:d={INTRO_FADE}:alpha=1,setpts=PTS+{frame_at:.3f}/TB[hdr]")
-    else:
-        graph.append(f"{still(hdr, total)}[hdr]")
-    graph.append(f"[{base}][hdr]overlay=x=0:y={header[1]}:format={ov}:eof_action=pass[v0]")
-    last = "v0"
+    last = base
+    for k, (ts, (png, y)) in enumerate(headers):  # one per surah recited (usually one)
+        hdr = inputs.add("-i", str(png))
+        start = frame_at if k == 0 else max(frame_at, ts - t0 + lead)
+        end = total if k + 1 == len(headers) else max(start, headers[k + 1][0] - t0 + lead)
+        fade = f",fade=t=in:st=0:d={INTRO_FADE}:alpha=1" if k == 0 and frame_at else ""
+        cut = f",trim=duration={end - start:.3f}" if k + 1 < len(headers) else ""
+        graph.append(f"{still(hdr, end - start)}{fade}{cut},setpts=PTS+{start:.3f}/TB[hdr{k}]")
+        graph.append(f"[{last}][hdr{k}]overlay=x=0:y={y}:format={ov}:eof_action=pass[vh{k}]")
+        last = f"vh{k}"
     for k, (png, y) in enumerate(card_pngs):
         c = inputs.add("-i", str(png))
         graph.append(f"{still(c, INTRO_CARD)},fade=t=in:st=0:d={INTRO_FADE}:alpha=1,"

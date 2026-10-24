@@ -142,6 +142,9 @@ def _public(p: project.Project) -> dict:
     d["folder"] = None
     d["id"] = p.folder.name
     d["surah_info"] = quran.surah(p.surah) if p.surah else None
+    d["surahs"] = project.surahs_of(p.blocks)
+    d["auto_title"] = project.titles(p.lang, d["surahs"])  # the title made from the surahs (headerTitles)
+    d["surah_titles"] = {s: render.surah_title(s, p.lang) for s in d["surahs"]}
     d["background"] = p.get_background()
     d["width"], d["height"] = p.width, p.height
     for b, raw in zip(d["blocks"], p.blocks):  # for the verse ornament in the preview
@@ -175,7 +178,7 @@ def list_projects():
             rng = project.found_verses(p)
             out.append({"id": f.parent.name, "title": p.title, "reciter": p.reciter, "surah": p.surah,
                         "surah_name": quran.surah(p.surah)["name"] if p.surah else "",
-                        "verses": list(rng) if rng else None, "first_verse": p.first_verse, "blocks": len(p.blocks),
+                        "verses": list(rng) if rng else None, "passages": project.passages(p), "first_verse": p.first_verse, "blocks": len(p.blocks),
                         "format": p.format, "lang": p.lang, "duration": p.duration,
                         "thumb": (f.parent / "preview.mp4").exists(), "modified": f.stat().st_mtime})
         except Exception:

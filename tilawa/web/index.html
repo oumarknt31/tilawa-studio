@@ -1049,8 +1049,6 @@ const EN = {
   "{p} % de ce que j'entends": "{p} % of what I hear", "déjà choisi": "already chosen", "C'est celui-là": "This one", "Un autre verset": "Another verse",
   "Ce verset ne correspond pas bien à ce que j'entends ({p} %). Le choisir quand même ?": "This verse doesn't match what I hear well ({p} %). Choose it anyway?",
   "Je recale ce passage sur le verset {n}…": "Aligning this passage with verse {n}…", "Verset {n} : sous-titres refaits": "Verse {n}: subtitles redone",
-  "Pas le bon passage ? J'ai aussi reconnu :": "Wrong passage? I also recognised:",
-  "Un seul verset mal reconnu : « Pas le bon verset ? » sous ce sous-titre.": "Only one verse recognised wrongly: « Wrong verse? » under that subtitle.",
   "Basmala avant la récitation": "Basmala before the recitation",
   "Enregistrements d'EveryAyah.com, téléchargés quand tu en choisis un.": "Recordings from EveryAyah.com, downloaded when you choose one.",
   "✓ Le récitateur dit déjà la basmala : c'est la sienne qui est utilisée.": "✓ The reciter already says the basmala: his own is used.",
@@ -1382,11 +1380,13 @@ function renderProjects() {
   const q = $("search").value.trim().toLowerCase();
   const list = projects.filter(p => !q || [p.title, p.reciter, p.surah_name].join(" ").toLowerCase().includes(q));
   $("projects").innerHTML = list.length ? list.map(p => {
-    const vs = p.verses ? `v. ${p.verses[0]}${p.verses[1] !== p.verses[0] ? "–" + p.verses[1] : ""}` : t("à terminer");
+    const range = ([, a, b]) => `${a}${b !== a ? "–" + b : ""}`;
+    const vs = p.passages?.length > 1 ? p.passages.map(x => `${surahs[x[0] - 1]?.name || x[0]} ${range(x)}`).join(" · ")
+      : p.verses ? `v. ${range([0, ...p.verses])}` : t("à terminer");
     return `<div class="proj" onclick="go('p/${encodeURIComponent(p.id)}')">
       <div class="th" style="${p.thumb ? `background-image:url('/api/projects/${encodeURIComponent(p.id)}/thumb')` : ""}">
         <div class="tags"><span class="badge">${p.format}</span><span class="badge">${(p.lang || "fr").toUpperCase()}</span>${p.duration ? `<span class="badge">${fmt(p.duration).replace(/\.\d$/, "")}</span>` : ""}</div></div>
-      <div class="info"><b>${esc(p.title || t("Récitation"))}</b><small>${esc(p.surah_name)} · ${vs}${p.reciter ? " · " + esc(p.reciter) : ""}</small>
+      <div class="info"><b>${esc(p.title || t("Récitation"))}</b><small>${p.passages?.length > 1 ? "" : esc(p.surah_name) + " · "}${esc(vs)}${p.reciter ? " · " + esc(p.reciter) : ""}</small>
         <small>${new Date(p.modified * 1000).toLocaleString(UI === "fr" ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" })}</small></div>
       <button class="del icon small" onclick="event.stopPropagation(); delProject('${p.id}')" title="${t("supprimer")}">${icon("trash", 15)}</button>
     </div>`;
@@ -1430,7 +1430,7 @@ function refreshAll() {
   $("ed-title").value = P.title; $("e-title").value = P.title; $("e-reciter").value = P.reciter;
   const lang = langs.find(l => l.code === P.lang);
   $("ed-badges").innerHTML = `<span class="badge">${P.format}</span><span class="badge">${esc(lang ? t(lang.name) : P.lang)}</span>`
-    + (P.surah_info ? `<span class="badge gold">${esc(P.surah_info.name)}</span>` : "");
+    + (P.surahs?.length ? P.surahs : P.surah ? [P.surah] : []).map(n => `<span class="badge gold">${esc(surahs[n - 1]?.name || n)}</span>`).join("");
   const r = P.render;
   $("r-quality").value = r.quality === "png" ? "max" : r.quality;
   $("r-fade").value = r.fade_in; $("r-trim-start").value = r.trim_start || ""; $("r-trim-end").value = r.trim_end || "";
@@ -1546,8 +1546,9 @@ function draw() {
     w.setStyle(shownStyle()); lastStyle = st; lastShown = "";
     w.settle().then(() => { lastShown = ""; lastHeader = ""; });  // new fonts: lay the texts out again once loaded
   }
-  const hd = JSON.stringify([P.title, P.reciter, P.render.show_header]);
-  if (hd !== lastHeader) { w.setHeader({ title: P.title, reciter: P.reciter, visible: P.render.show_header }); lastHeader = hd; }
+  const title = headerTitle(t);
+  const hd = JSON.stringify([title, P.reciter, P.render.show_header]);
+  if (hd !== lastHeader) { w.setHeader({ title, reciter: P.reciter, visible: P.render.show_header }); lastHeader = hd; }
   const lg = logoURL() + (settings.logo_auto !== false);
   if (lg !== lastLogo) { lastLogo = lg; w.setLogo(logoURL(), settings.logo_auto !== false); }
   if (introPlay && drawIntro(w)) return;
@@ -1571,6 +1572,26 @@ function draw() {
   }
 }
 // the title cards, played over the paused video (the final video shows them before the recitation)
+// a recitation of several surahs with the automatic title: each surah's title from its
+// first subtitle (its basmala, if said) on (same as header_titles() in project.py)
+function headerTitles() {
+  const ss = [...new Set(P.blocks.filter(b => b.kind === "verse").map(b => b.surah))];
+  if (ss.length < 2 || P.title !== P.auto_title) return null;
+  const out = []; let before = null;
+  for (const b of P.blocks) {
+    if (b.kind !== "verse") { if (before === null) before = b.start; continue; }
+    if (!out.length || out[out.length - 1].surah !== b.surah)
+      out.push({ t: !out.length ? 0 : before !== null ? before : b.start, surah: b.surah });
+    before = null;
+  }
+  return out;
+}
+function headerTitle(t) {
+  const hs = headerTitles();
+  if (!hs) return P.title;
+  const cur = hs.filter(h => h.t <= t).pop() || hs[0];
+  return P.surah_titles?.[cur.surah] || P.title;
+}
 function introCards() { return ow().introCards(P.title, P.reciter, P.surah_info, P.lang); }
 function previewIntro() {
   const cards = lookOf("--header-mode", "top") === "intro" ? introCards() : [];
@@ -2031,19 +2052,19 @@ function renderNotice() {
   if (!P.surah || !ayahs.length) {
     html = `<div class="notice warn">${t("Aucun verset trouvé. Choisis la sourate et le premier verset ci-dessous, puis « Analyser ».")}</div>`;
   } else {
-    const range = `${Math.min(...ayahs)}${Math.max(...ayahs) !== Math.min(...ayahs) ? "–" + Math.max(...ayahs) : ""}`;
-    const auto = m.length && m[0].surah === P.surah;
-    html = `<div class="notice ${auto ? "teal" : "gold"}">${auto ? icon("spark", 14) + " " + t("Reconnu automatiquement :") + " " : ""}<b>${t("Sourate {name}", { name: esc(name(P.surah)) })}</b>, ${t("versets {range}", { range })}.</div>`;
-    if (m.length && m[0].surah !== P.surah && m[0].coverage > 0.7)
-      html += `<div class="notice warn">${t("J'entends plutôt la sourate {name} (versets {range}).", { name: `<b>${esc(name(m[0].surah))}</b>`, range: `${m[0].first}–${m[0].last}` })}
+    // each surah recited, with its verses (a prayer: Al-Fatiha, then another surah)
+    const ss = [...new Set(P.blocks.filter(b => b.kind === "verse").map(b => b.surah))];
+    const found = ss.map(s => {
+      const a = P.blocks.filter(b => b.kind === "verse" && b.surah === s).map(b => b.ayah);
+      const lo = Math.min(...a), hi = Math.max(...a);
+      return `<b>${t("Sourate {name}", { name: esc(name(s)) })}</b>, ${t("versets {range}", { range: lo === hi ? lo : `${lo}–${hi}` })}`;
+    });
+    const auto = m.length && ss.every(s => m.some(x => x.surah === s));
+    html = `<div class="notice ${auto ? "teal" : "gold"}">${auto ? icon("spark", 14) + " " + t("Reconnu automatiquement :") + " " : ""}${found.join(" · ")}.</div>`;
+    const heard = m.filter(x => !ss.includes(x.surah) && x.coverage > 0.7);
+    if (heard.length)
+      html += `<div class="notice warn">${t("J'entends plutôt la sourate {name} (versets {range}).", { name: `<b>${esc(name(heard[0].surah))}</b>`, range: `${heard[0].first}–${heard[0].last}` })}
         <button class="small" style="margin-left:6px" onclick="useDetected()">${t("Utiliser la détection")}</button></div>`;
-    // the same words are in other places of the Quran: the other passages heard, one click away
-    const others = m.filter(x => !(x.surah === P.surah && x.first <= Math.max(...ayahs) && x.last >= Math.min(...ayahs)) && x.coverage > 0.5);
-    if (others.length)
-      html += `<div class="notice">${t("Pas le bon passage ? J'ai aussi reconnu :")} ${others.map(x => `<button class="small" style="margin:3px 4px 0 0"
-        onclick="reanalyze({ surah: ${x.surah}, first_verse: ${x.first}, last_verse: ${x.last} })">${esc(name(x.surah))} ${x.first}–${x.last}
-        <span class="faint">· ${Math.round(x.coverage * 100)} %</span></button>`).join("")}
-        <div class="small muted" style="margin-top:4px">${t("Un seul verset mal reconnu : « Pas le bon verset ? » sous ce sous-titre.")}</div></div>`;
   }
   $("notice").innerHTML = html;
   const pick = $("pick-surah");
@@ -2182,7 +2203,7 @@ async function retimeAll() {
   if (!await ask(t("Recalculer tous les horaires automatiquement ? (tes modifications d'horaires seront perdues)"))) return;
   await serverEdit("retime");
 }
-function useDetected() { const m = P.detected.matches[0]; reanalyze({ surah: m.surah, first_verse: m.first, last_verse: null }, true); }
+function useDetected() { reanalyze({ auto: true }, true); }
 let raAuto = true;
 function raMode(a) {
   raAuto = a;

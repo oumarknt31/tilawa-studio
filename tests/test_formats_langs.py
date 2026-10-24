@@ -56,16 +56,31 @@ def _emissions_of(text, model):
     return em
 
 
-def test_identify_finds_surah_and_verses():
+def test_track_finds_surah_and_verses():
     align = quran._sources()[1]
     model = _FakeModel({c for t in align.values() for c in t if c != " "})
     heard = " ".join(align[(67, a)] for a in range(3, 7))  # Al-Mulk 3-6
-    best = identify.identify(_emissions_of(heard, model), model)[0]
-    assert (best.surah, best.first, best.last) == (67, 3, 6)
+    (p,) = identify.track(_emissions_of(heard, model), model)
+    assert (p.surah, p.first, p.last) == (67, 3, 6)
     # starting in the middle of a verse still points to it
     heard = " ".join(align[(18, 10)].split()[3:] + [align[(18, 11)], align[(18, 12)]])
-    best = identify.identify(_emissions_of(heard, model), model)[0]
-    assert (best.surah, best.first, best.last) == (18, 10, 12)
+    (p,) = identify.track(_emissions_of(heard, model), model)
+    assert (p.surah, p.first, p.last) == (18, 10, 12)
+
+
+def test_track_follows_several_passages():
+    align = quran._sources()[1]
+    model = _FakeModel({c for t in align.values() for c in t if c != " "})
+    surah = lambda n: " ".join(align[(n, a)] for a in range(1, quran.surah(n)["verses"] + 1))
+    found = lambda heard: [(p.surah, p.first, p.last) for p in identify.track(_emissions_of(heard, model), model)]
+    # a prayer: Al-Fatiha, then other verses
+    assert found(surah(1) + " " + " ".join(align[(2, a)] for a in range(255, 258))) == [(1, 1, 7), (2, 255, 257)]
+    # the last surahs, with the basmala before each, in reverse order, then one again
+    bas = quran.BASMALA
+    assert found(f"{bas} {surah(114)} {bas} {surah(113)} {bas} {surah(112)} {bas} {surah(114)}") == \
+        [(114, 1, 6), (113, 1, 5), (112, 1, 4), (114, 1, 6)]
+    # Ad-Duha after its basmala is not the end of Al-Layl (which comes before it in the Quran)
+    assert found(f"{bas} {surah(93)}") == [(93, 1, 11)]
 
 
 def test_imported_font_names_cannot_inject_css(tmp_path):

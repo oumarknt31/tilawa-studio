@@ -5,7 +5,8 @@
 Transforme une récitation du Coran (vidéo, lien ou simple fichier audio) en vidéo sous-titrée :
 **nom de la sourate et du récitateur en haut, numéro du verset, traduction, texte arabe et phonétique**,
 chaque morceau apparaissant exactement quand le récitateur le prononce. Le logiciel **reconnaît tout seul
-la sourate et les versets** récités. Pas besoin de lire l'arabe.
+la sourate et les versets** récités, même plusieurs sourates dans une vidéo (une prière : Al-Fatiha puis une
+autre sourate ; les trois dernières sourates à la suite). Pas besoin de lire l'arabe.
 
 Formats : vertical 9:16 (Shorts, Reels, TikTok), horizontal 16:9 (YouTube), carré 1:1 et portrait 4:5,
 de la Full HD à la 4K. Traductions : français (Hamidullah, Rachid Maach ou Centre international Noor), anglais
@@ -62,7 +63,7 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
      - **Pas le bon verset ?** sous un sous-titre : beaucoup de versets se répètent mot pour mot ou presque (le refrain
        d'Ar-Rahman, des versets proches dans d'autres sourates). L'appli liste ceux qui se lisent pareil, dit à quel
        point chacun correspond à ce qu'elle entend, signale celui qui suit le verset précédent, et recale ce passage
-       sur celui choisi. Si tout le passage est faux, les autres passages reconnus sont proposés en haut de la liste ;
+       sur celui choisi. Si tout un passage est faux, choisis toi-même la sourate dans *Exporter* → *Analyse de la récitation* ;
      - corrige l'arabe ou la phonétique en cliquant dessus (↺ *Texte d'origine* pour annuler) ;
      - clique sur un mot phonétique (✂) pour **couper** un sous-titre avant ce mot, *Fusionner* pour en réunir deux ;
      - −/+ pour décaler un sous-titre de 0,05 s, *⤓ ici* pour le caler sur la lecture ;
@@ -157,12 +158,20 @@ uv run tilawa make "https://youtube.com/shorts/..." --size 4k
    ([rabah2026/wav2vec2-large-xlsr-53-arabic-quran-v_final](https://huggingface.co/rabah2026/wav2vec2-large-xlsr-53-arabic-quran-v_final))
    donne, toutes les 20 ms, la probabilité de chaque lettre arabe.
    **Identification** (`tilawa/identify.py`) : les lettres les plus probables forment une transcription
-   approximative, retrouvée dans tout le Coran (6236 versets) par vote de groupes de lettres, puis
-   comparée lettre à lettre aux meilleurs candidats.
+   approximative, suivie dans tout le Coran (6236 versets) : des fenêtres de lettres sont situées par vote de
+   groupes de lettres, comparées lettre à lettre, et enchaînées par une recherche de Viterbi qui préfère lire la
+   suite, accepte les répétitions et ne saute ailleurs que quand les lettres le disent. Un enregistrement de
+   plusieurs passages (une prière, une sourate récitée de nouveau, des sourates dans l'ordre inverse) est
+   reconnu passage par passage, avec la basmala entre eux.
 2. **Alignement forcé** — comme le texte est connu, on cherche le meilleur chemin du texte
-   à travers ces probabilités (`tilawa/align.py`). Le chemin accepte l'isti'adha et la basmala,
-   les silences et paroles avant/après, une vidéo coupée au milieu d'un verset, un verset de départ
-   approximatif, et les **répétitions** du récitateur.
+   à travers ces probabilités (`tilawa/align.py`), pour tous les passages à la fois, chacun seulement
+   autour du moment où il a été entendu (une parole ou une musique à côté d'un passage ne reçoit aucun verset).
+   Le chemin accepte l'isti'adha et la basmala avant chaque passage, les silences et paroles avant/après/entre,
+   une vidéo coupée au milieu d'un verset, un verset de départ approximatif, et les **répétitions** du
+   récitateur (là où un mot semble durer trop longtemps, le modèle réécoute avec des fenêtres plus courtes :
+   il peut ne pas entendre un verset dit deux fois de suite). Les longs enregistrements sont alignés en
+   morceaux qui se chevauchent. `tests/detection_bench.py` vérifie tout cela sur 31 récitations assemblées à
+   partir d'enregistrements verset par verset.
 3. **Découpage** (`tilawa/segment.py`) — un sous-titre par verset ; un nouveau à chaque
    **respiration** du récitateur (mesurée sur le son, pas sur les lettres, car les madd et
    ghunna laissent de longs blancs sans pause) ; les versets trop longs sont coupés au meilleur

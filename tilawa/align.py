@@ -12,6 +12,10 @@ a graph rather than a straight line:
   * free start/end: audio before or after the recitation is absorbed by a
     "filler" state, and the recording may stop mid-verse
   * repeats: the reciter may go back to an earlier word and recite again
+  * several passages one after the other (a prayer: Al-Fatiha, then another
+    surah), each with its own optional Isti'adha / Basmala, with silence or
+    anything else between them; each passage's words may be placed only around
+    when the tracker (identify.track) heard it
 """
 
 from __future__ import annotations
@@ -37,6 +41,8 @@ SKIP_PREFIX = 0.0  # Isti'adha / Basmala are optional
 JUMP_TO_VERSE_START = 6.0  # reciter repeats from the start of a verse
 JUMP_TO_WORD = 14.0  # reciter repeats from some earlier word
 JUMP_WINDOW_VERSES = 1  # how far back a repeat may go (in verses)
+SKIP_SEGMENT = 30.0  # a passage the tracker found is not aligned at all
+GAP_BLANK = 0.2  # between passages, a frame the model hears as blank counts as garbage this much below it
 
 
 @dataclass
@@ -46,6 +52,18 @@ class Word:
     index: int  # word index inside its unit
     text: str
     tokens: list[int] = field(default_factory=list)
+    seg: int = 0  # passage (Segment) it belongs to
+
+
+@dataclass
+class Segment:
+    """One passage to align: the verses it may hold, the one expected first (index in
+    verses), and the time (s) where its words may be placed (None: anywhere)."""
+    verses: list[quran.Verse]
+    hint: int = 0
+    prefixes: bool = True
+    band: tuple[float, float] | None = None
+    prefix_band: tuple[float, float] | None = None
 
 
 @dataclass
@@ -126,26 +144,37 @@ def get_model() -> Model:
 
 # ---------------------------------------------------------------- graph
 
-def build_words(model: Model, verses: list[quran.Verse], prefixes: bool = True) -> list[Word]:
+def build_words(model: Model, verses: list[quran.Verse], prefixes: bool = True, seg: int = 0,
+                offset: int = 0) -> list[Word]:
     words: list[Word] = []
     if prefixes:
         for unit, text in (("istiadha", quran.ISTIADHA), ("basmala", quran.BASMALA)):
             for i, w in enumerate(text.split()):
-                words.append(Word(unit, -1, i, w, model.tokens(w)))
+                words.append(Word(unit, -1, i, w, model.tokens(w), seg))
     for vi, v in enumerate(verses):
         for i, w in enumerate(v.align):
-            words.append(Word("verse", vi, i, w, model.tokens(w) or [model.sep]))
+            words.append(Word("verse", offset + vi, i, w, model.tokens(w) or [model.sep], seg))
     return words
 
 
-def _build_graph(words: list[Word], blank: int, hint: int = 0):
-    """States: 0 = filler-start, 1 = filler-end, 2 = end-blank, then for each
-    word [blank, c1, blank, c2, ..., blank, cn].
+def _build_graph(words: list[Word], blank: int, hints: list[int]):
+    """States: 0 = filler-start, 1 = filler-end, 2 = end-blank, then a filler and a
+    blank between each passage and the next, then for each word [blank, c1, blank, c2,
+    ..., blank, cn]. hints: per passage, the verse index expected first.
 
-    Returns token-per-state (-1 blank, -2 filler), the CSR predecessor lists
+    Returns token-per-state (-1 blank, -2 filler, -3 filler between passages), the CSR predecessor lists
     with penalties, the word owning every state, whether a state is a char,
     and the allowed final states."""
+    n_seg = len(hints)
     tok, owner, is_char = [-2, -2, -1], [-1, -1, -1], [False, False, False]
+    gaps, rests = [], []  # before passage k (k >= 1): a filler, and a blank (the silence after a passage:
+    for _ in range(n_seg - 1):  # without it the last letter would stretch over it)
+        gaps.append(len(tok))
+        rests.append(len(tok) + 1)
+        tok += [-3, -1]
+        owner += [-1, -1]
+        is_char += [False, False]
+    sources = [[0]] + [[g, r] for g, r in zip(gaps, rests)]  # where each passage is entered from
     first, last = [], []
     for wi, w in enumerate(words):
         first.append(len(tok))
@@ -159,6 +188,10 @@ def _build_graph(words: list[Word], blank: int, hint: int = 0):
     preds[0].append((0, 0.0))
     preds[1] += [(1, 0.0), (2, 0.0)]
     preds[2].append((2, 0.0))
+    for k, (g, r) in enumerate(zip(gaps, rests)):
+        preds[g] += [(g, 0.0), (r, 0.0), (sources[k][0], SKIP_SEGMENT)]  # (passage k not there at all)
+        preds[r].append((r, 0.0))
+    preds[1].append((sources[-1][0], SKIP_SEGMENT))
 
     def enter(wi: int, src: int, pen: float):
         b, c = first[wi], first[wi] + 1
@@ -176,52 +209,65 @@ def _build_graph(words: list[Word], blank: int, hint: int = 0):
                 preds[s].append((s - 1, 0.0))
             if is_char[s] and s - 2 > b0 and tok[s - 2] != tok[s]:
                 preds[s].append((s - 2, 0.0))
-        # the end states can be reached from every word end (recording may stop mid-verse)
+        # the end states can be reached from every word end (recording may stop mid-verse),
+        # and the next passage from every word end of this one
         preds[1].append((last[wi], 0.0))
         preds[2].append((last[wi], 0.0))
+        if w.seg + 1 < n_seg:
+            preds[gaps[w.seg]].append((last[wi], 0.0))
+            preds[rests[w.seg]].append((last[wi], 0.0))
 
-    unit_words: dict[str, list[int]] = {}
-    for wi, w in enumerate(words):
-        unit_words.setdefault(w.unit, []).append(wi)
-    verse_words = unit_words.get("verse", [])
-    ist, bas = unit_words.get("istiadha", []), unit_words.get("basmala", [])
+    for seg in range(n_seg):
+        hint = hints[seg]
+        unit_words: dict[str, list[int]] = {}
+        for wi, w in enumerate(words):
+            if w.seg == seg:
+                unit_words.setdefault(w.unit, []).append(wi)
+        verse_words = unit_words.get("verse", [])
+        ist, bas = unit_words.get("istiadha", []), unit_words.get("basmala", [])
+        v0 = words[verse_words[0]].verse_index if verse_words else 0  # verse indexes are global
 
-    # sequential flow inside each unit / between verses
-    for a, b in zip(verse_words, verse_words[1:]):
-        enter(b, last[a], 0.0)
-    for unit in (ist, bas):
-        for a, b in zip(unit, unit[1:]):
+        # sequential flow inside each unit / between verses
+        for a, b in zip(verse_words, verse_words[1:]):
             enter(b, last[a], 0.0)
-    # prefixes: [istiadha] -> [basmala] -> verses
-    if ist:
-        enter(ist[0], 0, SKIP_PREFIX)
+        for unit in (ist, bas):
+            for a, b in zip(unit, unit[1:]):
+                enter(b, last[a], 0.0)
+        # prefixes: [istiadha] -> [basmala] -> verses
+        if ist:
+            for src0 in sources[seg]:
+                enter(ist[0], src0, SKIP_PREFIX)
+            if bas:
+                enter(bas[0], last[ist[-1]], 0.0)
         if bas:
-            enter(bas[0], last[ist[-1]], 0.0)
-    if bas:
-        enter(bas[0], 0, SKIP_PREFIX)
-    # start: the given verse (free), the start of another verse (small
-    # penalty, the user may be off by a few verses), or mid-verse (clip cut)
-    for wi in verse_words:
-        w = words[wi]
-        if w.index == 0:
-            pen = 0.0 if w.verse_index == hint else START_OTHER_VERSE + 0.5 * abs(w.verse_index - hint)
-            enter(wi, 0, pen)
-            for unit in (ist, bas):  # after Isti'adha / Basmala
-                if unit:
-                    enter(wi, last[unit[-1]], pen)
-        else:
-            enter(wi, 0, START_MID_VERSE)
-    # repeats: from any word end back to an earlier word of this or the previous verse
-    for ai in verse_words:
-        va = words[ai].verse_index
-        for bi in verse_words:
-            if bi > ai:
-                break
-            vb = words[bi].verse_index
-            if va - vb > JUMP_WINDOW_VERSES:
-                continue
-            pen = JUMP_TO_VERSE_START if words[bi].index == 0 else JUMP_TO_WORD
-            enter(bi, last[ai], pen)
+            for src0 in sources[seg]:
+                enter(bas[0], src0, SKIP_PREFIX)
+        # start: the given verse (free), the start of another verse (small
+        # penalty, the user may be off by a few verses), or mid-verse (clip cut)
+        for wi in verse_words:
+            w = words[wi]
+            if w.index == 0:
+                d = w.verse_index - v0 - hint
+                pen = 0.0 if d == 0 else START_OTHER_VERSE + 0.5 * abs(d)
+                for src0 in sources[seg]:
+                    enter(wi, src0, pen)
+                for unit in (ist, bas):  # after Isti'adha / Basmala
+                    if unit:
+                        enter(wi, last[unit[-1]], pen)
+            else:
+                for src0 in sources[seg]:
+                    enter(wi, src0, START_MID_VERSE)
+        # repeats: from any word end back to an earlier word of this or the previous verse
+        for ai in verse_words:
+            va = words[ai].verse_index
+            for bi in verse_words:
+                if bi > ai:
+                    break
+                vb = words[bi].verse_index
+                if va - vb > JUMP_WINDOW_VERSES:
+                    continue
+                pen = JUMP_TO_VERSE_START if words[bi].index == 0 else JUMP_TO_WORD
+                enter(bi, last[ai], pen)
 
     # CSR
     ptr = np.zeros(S + 1, dtype=np.int64)
@@ -240,6 +286,9 @@ def _build_graph(words: list[Word], blank: int, hint: int = 0):
 def _emit(em, t, k, blank, sep, filler):
     if k == -2:  # garbage: whatever the audio is, a fixed amount below the best guess
         return filler[t]
+    if k == -3:  # between passages: garbage, or a blank a little below it (speech that is not a
+        # passage is mostly blank for the model too: a free blank would swallow a basmala)
+        return max(filler[t], max(em[t, blank], em[t, sep]) - GAP_BLANK)
     if k == -1:  # blank also absorbs the word separator
         a, b = em[t, blank], em[t, sep]
         m = max(a, b)
@@ -248,7 +297,8 @@ def _emit(em, t, k, blank, sep, filler):
 
 
 @numba.njit(cache=True)
-def _viterbi(em, tok, ptr, src, pen, blank, sep, filler, finals):
+def _viterbi(em, tok, ptr, src, pen, blank, sep, filler, finals, lo, hi):
+    # lo/hi: the frames where each state may be (its passage's time)
     T, S = em.shape[0], tok.shape[0]
     NEG = -1e30
     score = np.full(S, NEG, dtype=np.float64)
@@ -258,6 +308,8 @@ def _viterbi(em, tok, ptr, src, pen, blank, sep, filler, finals):
     # t = 0: the filler, or any state the filler leads to
     score[0] = _emit(em, 0, tok[0], blank, sep, filler)
     for s in range(1, S):
+        if lo[s] > 0:
+            continue
         for k in range(ptr[s], ptr[s + 1]):
             if src[k] == 0:
                 v = _emit(em, 0, tok[s], blank, sep, filler) - pen[k]
@@ -266,6 +318,10 @@ def _viterbi(em, tok, ptr, src, pen, blank, sep, filler, finals):
                     back[0, s] = k - ptr[s]
     for t in range(1, T):
         for s in range(S):
+            if t < lo[s] or t > hi[s]:
+                new[s] = NEG
+                back[t, s] = 0
+                continue
             best, arg = NEG, 0
             for k in range(ptr[s], ptr[s + 1]):
                 v = score[src[k]] - pen[k]
@@ -295,12 +351,31 @@ def align(em: np.ndarray, model: Model, verses: list[quran.Verse], prefixes: boo
           hint: int = 0) -> list[WordTiming]:
     """Word occurrences in the order they are recited (repeats included).
     `hint` is the index in `verses` of the verse the user said comes first."""
-    words = build_words(model, verses, prefixes)
-    tok, ptr, src, pen, owner, is_char, finals = _build_graph(words, model.blank, hint)
+    return align_segments(em, model, [Segment(verses, hint, prefixes)])
+
+
+def align_segments(em: np.ndarray, model: Model, segments: list[Segment]) -> list[WordTiming]:
+    """Several passages one after the other. Word.verse_index counts in all the
+    passages' verses put end to end; Word.seg tells the passage."""
+    words: list[Word] = []
+    offset = 0
+    for k, seg in enumerate(segments):
+        words += build_words(model, seg.verses, seg.prefixes, k, offset)
+        offset += len(seg.verses)
+    tok, ptr, src, pen, owner, is_char, finals = _build_graph(words, model.blank, [seg.hint for seg in segments])
+    T = len(em)
+    lo, hi = np.zeros(len(tok), dtype=np.int64), np.full(len(tok), T, dtype=np.int64)
+    for s, wi in enumerate(owner):
+        if wi < 0:
+            continue
+        seg = segments[words[wi].seg]
+        band = seg.band if words[wi].unit == "verse" else (seg.prefix_band or seg.band)
+        if band:
+            lo[s], hi[s] = max(0, int(band[0] / FRAME_S)), min(T, int(np.ceil(band[1] / FRAME_S)))
     filler = em.max(axis=1).astype(np.float64) - FILLER_PENALTY
     if np.diff(ptr).max() >= 65535:
         raise ValueError("Too many verses for one alignment; choose a shorter verse range")
-    path, _ = _viterbi(em.astype(np.float64), tok, ptr, src, pen, model.blank, model.sep, filler, finals)
+    path, _ = _viterbi(em.astype(np.float64), tok, ptr, src, pen, model.blank, model.sep, filler, finals, lo, hi)
 
     out: list[WordTiming] = []
     cur, chars, prev_state = -1, [], -1

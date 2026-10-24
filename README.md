@@ -5,7 +5,8 @@
 Turns a Quran recitation (a video, a link or just an audio file) into a subtitled video:
 **surah and reciter names at the top, verse number, translation, Arabic text and transliteration**,
 each part appearing exactly when the reciter says it. The app **recognises the surah and verses
-on its own**. No need to read Arabic.
+on its own**, even several surahs in one video (a prayer: Al-Fatiha then another surah; the last
+three surahs in a row). No need to read Arabic.
 
 Formats: vertical 9:16 (Shorts, Reels, TikTok), horizontal 16:9 (YouTube), square 1:1 and portrait 4:5,
 from Full HD to 4K. Translations: French (Hamidullah, Rachid Maach or Noor International Center), English
@@ -62,7 +63,7 @@ downloaded in a browser.
      - **Wrong verse?** under a subtitle: many verses repeat word for word or nearly (Ar-Rahman's refrain,
        similar verses in other surahs). The app lists those that read the same, says how well each matches what
        it hears, marks the one that follows the previous verse, and aligns that stretch again with the one chosen.
-       If the whole passage is wrong, the other passages it recognised are offered at the top of the list;
+       If a whole passage is wrong, choose the surah yourself in *Export* → *Recitation analysis*;
      - correct the Arabic or the transliteration by clicking it (↺ *Original text* to undo);
      - click a transliterated word (✂) to **split** a subtitle before that word, *Merge* to join two;
      - −/+ to shift a subtitle by 0.05 s, *⤓ here* to set it at the playhead;
@@ -157,12 +158,19 @@ uv run tilawa make "https://youtube.com/shorts/..." --size 4k
    ([rabah2026/wav2vec2-large-xlsr-53-arabic-quran-v_final](https://huggingface.co/rabah2026/wav2vec2-large-xlsr-53-arabic-quran-v_final))
    gives, every 20 ms, the probability of each Arabic letter.
    **Identification** (`tilawa/identify.py`): the most likely letters form a rough transcript,
-   found in the whole Quran (6236 verses) by a vote of letter groups, then compared letter by letter
-   with the best candidates.
+   followed through the whole Quran (6236 verses): windows of letters are located by a vote of letter
+   groups, compared letter by letter, and chained by a Viterbi search that reads on, accepts repeats
+   and jumps to another place only when the letters say so. A recording holding several passages
+   (a prayer, a surah recited again, surahs in reverse order) is found passage by passage, with the
+   basmala between them.
 2. **Forced alignment** — since the text is known, the best path of the text through those
-   probabilities is searched (`tilawa/align.py`). The path allows the isti'adha and the basmala,
-   silence and speech before/after, a video cut in the middle of a verse, an approximate starting
-   verse, and the reciter's **repeats**.
+   probabilities is searched (`tilawa/align.py`), for all the passages at once, each only around
+   when it was heard (so talk or music next to a passage gets no verse). The path allows the
+   isti'adha and the basmala before each passage, silence and speech before/after/between, a video cut
+   in the middle of a verse, an approximate starting verse, and the reciter's **repeats** (where a
+   word seems to last too long, the model listens again with shorter windows: it may not hear a
+   verse said twice in a row). Long recordings are aligned in overlapping pieces.
+   `tests/detection_bench.py` checks all this on 31 recitations stitched from verse-by-verse recordings.
 3. **Splitting** (`tilawa/segment.py`) — one subtitle per verse; a new one at every **breath**
    of the reciter (measured on the sound, not on the letters, because madd and ghunna leave long
    gaps without a pause); verses that are too long are cut at the best place (pause marks, dips in the
