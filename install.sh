@@ -23,8 +23,27 @@ if [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" != "1" ]; then
        "Tilawa Studio needs an Apple Silicon Mac (M1 or newer)."
 fi
 
+# free space in GB, as Finder counts it (with the space macOS frees on demand), else as df does
+free_gb() {
+  local gb
+  gb=$(osascript -l JavaScript -e 'ObjC.import("Foundation"); var k = $("NSURLVolumeAvailableCapacityForImportantUsageKey");
+    var r = $.NSURL.fileURLWithPath($.NSHomeDirectory()).resourceValuesForKeysError($.NSArray.arrayWithObject(k), null);
+    (ObjC.unwrap(r.objectForKey(k)) / 1e9).toFixed(1)' 2>/dev/null || true)
+  case "$gb" in ''|*[!0-9.]*) gb=$(df -Pk "$HOME" | awk 'NR == 2 { printf "%.1f", $4 * 1024 / 1e9 }') ;; esac
+  echo "$gb"
+}
+no_space() {
+  fail "Pas assez d'espace libre sur ce Mac : il reste $(free_gb) Go, il en faut environ $1 Go. Libère de la place (Corbeille, Téléchargements, vidéos), puis relance cette commande." \
+       "Not enough free space on this Mac: $(free_gb) GB left, about $1 GB needed. Free some space (Trash, Downloads, videos), then run this command again."
+}
+low() { awk -v f="$(free_gb)" -v n="$1" 'BEGIN { exit !(f < n) }'; }
+# download 0.5 + app 1.4, and the first time the model and text engine 1.3
+need=2; [ -d "$APP" ] || need=4
+low "$need" && no_space "$need"
+
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+unpacked="$DEST/.Tilawa Studio-new"  # next to the app, so it is moved into place rather than copied
+trap 'rm -rf "$tmp" "$unpacked"' EXIT
 
 say "Téléchargement de Tilawa Studio (~500 Mo)..." "Downloading Tilawa Studio (~500 MB)..."
 curl -fL --progress-bar "$BASE/$FILE" -o "$tmp/$FILE" \
@@ -36,8 +55,12 @@ expected=$(awk -v f="$FILE" '{ sub(/^\*/, "", $2) } $2 == f { print $1 }' "$tmp/
 actual=$(shasum -a 256 "$tmp/$FILE" | awk '{ print $1 }')
 [ -n "$expected" ] && [ "$expected" = "$actual" ] \
   || fail "Le téléchargement est abîmé, réessaie." "The download is damaged, try again."
-ditto -x -k "$tmp/$FILE" "$tmp/unpacked"
-[ -d "$tmp/unpacked/Tilawa Studio.app" ] || fail "Le téléchargement ne contient pas l'app." "The download doesn't contain the app."
+mkdir -p "$DEST"
+rm -rf "$unpacked" "$DEST/.Tilawa Studio-new.app" "$APP.old"
+ditto -x -k "$tmp/$FILE" "$unpacked" 2>/dev/null || { low 2 && no_space "$need"
+  fail "Impossible de décompresser l'app, réessaie." "Couldn't unpack the app, try again."; }
+rm -f "$tmp/$FILE"
+[ -d "$unpacked/Tilawa Studio.app" ] || fail "Le téléchargement ne contient pas l'app." "The download doesn't contain the app."
 
 # never close the app for the user: wait until it is quit
 running() { pgrep -f "Tilawa Studio.app/Contents/MacOS/tilawa-python" >/dev/null 2>&1 || pgrep -f "tilawa.cli desktop" >/dev/null 2>&1; }
@@ -50,13 +73,9 @@ if running; then
 fi
 
 say "Installation dans $DEST..." "Installing into $DEST..."
-mkdir -p "$DEST"
-staged="$DEST/.Tilawa Studio-new.app"
-rm -rf "$staged" "$APP.old"
-ditto "$tmp/unpacked/Tilawa Studio.app" "$staged"
-xattr -dr com.apple.quarantine "$staged" 2>/dev/null || true
+xattr -dr com.apple.quarantine "$unpacked/Tilawa Studio.app" 2>/dev/null || true
 [ -e "$APP" ] && mv "$APP" "$APP.old"
-mv "$staged" "$APP"
+mv "$unpacked/Tilawa Studio.app" "$APP"
 rm -rf "$APP.old"
 # the earlier kind of install, replaced by this one
 if [ -d "$OLD/tilawa" ] && [ -f "$OLD/pyproject.toml" ]; then
@@ -68,7 +87,7 @@ if [ -z "${TILAWA_NO_SETUP:-}" ]; then
   say "Modèle de reconnaissance et moteur du texte (une seule fois, ~1,3 Go)..." \
       "Recognition model and text engine (once, ~1.3 GB)..."
   PYTHONHOME="$APP/Contents/Resources/python" PYTHONNOUSERSITE=1 "$APP/Contents/MacOS/tilawa-python" -m tilawa.cli setup \
-    || fail "La préparation a échoué : relance cette commande." "Setup failed: run this command again."
+    || { low 2 && no_space 2; fail "La préparation a échoué : relance cette commande." "Setup failed: run this command again."; }
 fi
 
 say "Tilawa Studio est installé : il est dans tes Applications (Launchpad, Spotlight)." \
