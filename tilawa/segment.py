@@ -450,10 +450,15 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
                 bounds[0] = 0
             # a word or two the model barely heard (a voice fading on the last madd, a soft
             # first word): a verse is recited whole unless the reciter goes back inside it
+            # (said again from its start after a voice, not a pause: it was finished)
             prev = raw[i - 1][0] if i else None
             nxt = raw[i + len(group)][0] if i + len(group) < len(raw) else None
             same = lambda q: q is not None and q.kind == "verse" and q.verse_index == p.verse_index
-            if 0 < missing <= MISSED_WORDS and nxt is not None and not same(nxt):
+            if same(nxt):
+                end, again = group[-1][-1].end, raw[i + len(group)][1][0]
+                finished = again.word.index == 0 and (again.start - end) - loud.pause(
+                    end, again.start, opt.breath_depth_db)[0] >= 0.3 * missing
+            if 0 < missing <= MISSED_WORDS and nxt is not None and (not same(nxt) or finished):
                 bounds[-1] = len(v.align)
             if 0 < bounds[0] <= MISSED_WORDS and prev is not None and not same(prev):
                 bounds[0] = 0

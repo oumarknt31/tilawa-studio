@@ -73,6 +73,8 @@ COST_SKIP = 3.0  # letters missed by the model
 COST_JUMP = 9.0  # another place of the Quran
 BACK_LIMIT = 900  # letters: how far back a repeat may go
 SKIP_LIMIT = 160
+GAP_LETTERS = 12  # letters before or after the passages listened to again (a short verse)
+GAP_SHARE = 0.5  # share of its verses' letters a passage found there must have heard
 
 
 @dataclass
@@ -185,10 +187,10 @@ def _vote(q: np.ndarray, top: int) -> list[int]:
     return [b * 8 for b in out]
 
 
-def _cost(p: int, q: int) -> float:
+def _cost(p: int, q: int, step: int = STEP) -> float:
     """Moving from Quran position p (one window) to q (the next)."""
     d = q - p
-    if STEP * 0.25 - 4 <= d <= STEP * 2 + 4:
+    if step * 0.25 - 4 <= d <= step * 2 + 4:
         return 0.0
     if -BACK_LIMIT <= d < 0:
         return COST_BACK
@@ -202,17 +204,47 @@ def track(em: np.ndarray, model, beam: int = 8, top: int = 6) -> list[Passage]:
     codes, frames = heard(em, model)
     if len(codes) < W // 2:
         return []
-    starts = list(range(0, max(1, len(codes) - W + 1), STEP))
-    if starts[-1] + W < len(codes):
-        starts.append(len(codes) - W)
+    out = _track(codes, frames, W, STEP, beam, top)
+    if not out and len(codes) < 3 * W:  # a short verse said twice is shorter than a window
+        return _track(codes, frames, W // 2, STEP // 2, beam, top)
+    # letters before the first passage or after the last (a short verse before or after another
+    # surah: every window there reads half of each; the passage's edge window may already reach
+    # into it), listened to again with smaller windows
+    t = frames * 0.02
+    more = []
+    if out:
+        lo = int(np.searchsorted(t, out[0].t0)) + STEP
+        hi = int(np.searchsorted(t, max(p.t1 for p in out), side="right")) - STEP
+        for a, b in ((0, lo), (hi, len(codes))):
+            a = max(a, _after_istiadha(codes, a, b))  # (it reads like the end of 16:98)
+            if b - a >= GAP_LETTERS:
+                more += _track(codes[a:b], frames[a:b], W // 2, STEP // 2, beam, top)
+        # most of what they claim heard (a talk before a recitation quotes pieces of long verses)
+        vs = _verses()
+        more = [p for p in more if p.letters >= GAP_SHARE * sum(vs[(p.surah, a)][1] for a in range(p.first, p.last + 1))]
+    return _clean(sorted(out + more, key=lambda p: p.t0)) if more else out
+
+
+def _after_istiadha(codes, a: int, b: int) -> int:
+    """Where the letters [a, b) go on after an isti'adha said among them (a if there is none)."""
+    _, table = _codes()
+    ist = np.array([table[c] for c in _letters(quran.ISTIADHA)], dtype=np.int16)
+    matched, _fq, _lq, _ft, lt = _fit(ist, codes[a:b]) if b - a >= len(ist) // 2 else (0, 0, 0, 0, 0)
+    return a + lt + 1 if matched >= 0.8 * len(ist) else a
+
+
+def _track(codes, frames, w: int, step: int, beam: int, top: int) -> list[Passage]:
+    starts = list(range(0, max(1, len(codes) - w + 1), step))
+    if starts[-1] + w < len(codes):
+        starts.append(len(codes) - w)
     # Viterbi over windows: each state is a Quran position (or -1: not the Quran)
     layers = []  # per window: list of (position, score, back index, fit, details)
     prev = [(-1, 0.0, -1, 0.0, None)]
     for k, s0 in enumerate(starts):
-        q = codes[s0:s0 + W]
+        q = codes[s0:s0 + w]
         guesses = _vote(q, top)
         ranked = sorted(range(len(prev)), key=lambda i: -prev[i][1])[:beam]
-        guesses += [prev[i][0] + STEP for i in ranked if prev[i][0] >= 0]
+        guesses += [prev[i][0] + step for i in ranked if prev[i][0] >= 0]
         cands = []
         for g in guesses:
             f, start, det = _place(q, g)
@@ -230,7 +262,8 @@ def track(em: np.ndarray, model, beam: int = 8, top: int = 6) -> list[Passage]:
             gain = FIT_GAIN * (f - MIN_FIT)
             best, arg = -1e18, 0
             for i, (p, sc, *_r) in enumerate(prev):
-                v = sc - (COST_ENTER if p < 0 else _cost(p, start))
+                # at the very start, half (as for stopping): a short clip is one window, it must be able to win
+                v = sc - ((COST_ENTER / 2 if k == 0 else COST_ENTER) if p < 0 else _cost(p, start, step))
                 if v > best:
                     best, arg = v, i
             layer.append((start, best + gain, arg, f, det))
@@ -243,10 +276,10 @@ def track(em: np.ndarray, model, beam: int = 8, top: int = 6) -> list[Passage]:
         path.append((k, layers[k][i]))
         i = layers[k][i][2]
     path.reverse()
-    return _passages(path, starts, codes, frames)
+    return _passages(path, starts, codes, frames, w, step)
 
 
-def _passages(path, starts, codes, frames) -> list[Passage]:
+def _passages(path, starts, codes, frames, w: int = W, step: int = STEP) -> list[Passage]:
     """Runs of windows reading on in the Quran -> passages (one per surah)."""
     full, owner, _ = _index(True)
     runs, cur = [], []
@@ -256,7 +289,7 @@ def _passages(path, starts, codes, frames) -> list[Passage]:
                 runs.append(cur)
             cur = []
             continue
-        if cur and _cost(cur[-1][1], pos) >= COST_JUMP:
+        if cur and _cost(cur[-1][1], pos, step) >= COST_JUMP:
             runs.append(cur)
             cur = []
         cur.append((k, pos, f, det))
@@ -287,7 +320,7 @@ def _passages(path, starts, codes, frames) -> list[Passage]:
         cur = None
         for a, b, q, q_end in pieces:
             s = owner[q][0]
-            if cur and cur["s"] == s and q >= _verse_start(s, owner[cur["q"]][1] - 1) - W:
+            if cur and cur["s"] == s and q >= _verse_start(s, owner[cur["q"]][1] - 1) - w:
                 cur["h1"], cur["q"] = max(cur["h1"], b), max(cur["q"], q_end)
                 cur["ps"].append((a, b, q, q_end))
             else:
