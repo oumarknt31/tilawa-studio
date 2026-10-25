@@ -204,14 +204,34 @@ def evaluate(blocks: list[segment.Block], truth: list[dict]) -> dict:
         last[-1] = b
         prev = b
     want = [((x["surah"], x["ayah"]), x) for x in truth if x["kind"] == "verse"]
-    problems = []
+    problems, notes = [], []
+    # a verse said again inside its own recording (the source repeats it; the truth cannot
+    # know): one recitation, if the repeat lies within that verse's time
+    seq, ends, j = [], [], -1
+    for (k, b), end in zip(got_seq, last):
+        if j + 1 < len(want) and want[j + 1][0] == k:
+            j += 1
+            seq.append((k, b))
+            ends.append(end)
+        elif seq and seq[-1][0] == k and want[j][1]["t0"] - 0.6 <= b.voice_start and end.voice_end <= want[j][1]["t1"] + 0.6:
+            ends[-1] = end
+            notes.append(f"{k[0]}:{k[1]} said again within its recording")
+        else:
+            break
+    else:
+        if len(seq) == len(want) and len(seq) < len(got_seq):
+            got_seq, last = seq, ends
+        else:
+            notes = []
     if [k for k, _ in got_seq] != [k for k, _ in want]:
+        notes = []
         problems.append(f"verses {_fmt([k for k, _ in got_seq])} instead of {_fmt([k for k, _ in want])}")
     else:
         for (k, b), end, (_, x) in zip(got_seq, last, want):
             if not x["cut_end"] and end.a1 < len(quran.verse(*k).align):
                 problems.append(f"{k[0]}:{k[1]} shown up to word {end.a1} of {len(quran.verse(*k).align)}")
-            if not x["cut_start"] and abs(b.voice_start - x["t0"]) > 0.6:
+            # (t0_lo / t0_hi: when the truth only knows the start within a range)
+            if not x["cut_start"] and not x.get("t0_lo", x["t0"]) - 0.6 <= b.voice_start <= x.get("t0_hi", x["t0"]) + 0.6:
                 problems.append(f"{k[0]}:{k[1]} starts at {b.voice_start:.1f}s instead of {x['t0']:.1f}s")
             if x["cut_start"] is False and b.a0 != 0:
                 problems.append(f"{k[0]}:{k[1]} shown from word {b.a0 + 1}")
@@ -225,7 +245,7 @@ def evaluate(blocks: list[segment.Block], truth: list[dict]) -> dict:
                 ov = min(b.voice_end, x["t1"]) - max(b.voice_start, x["t0"])
                 if ov > 0.5:
                     problems.append(f"{b.kind} {b.surah}:{b.ayah} shown over {x['kind']} ({ov:.1f}s)")
-    return {"ok": not problems, "problems": problems, "got": _fmt([k for k, _ in got_seq])}
+    return {"ok": not problems, "problems": problems, "notes": notes, "got": _fmt([k for k, _ in got_seq])}
 
 
 def _fmt(seq):
