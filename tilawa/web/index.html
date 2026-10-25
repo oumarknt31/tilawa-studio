@@ -70,6 +70,7 @@
   .logo { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: .2px; cursor: pointer; font-size: 15.5px; }
   .logo .mark { width: 34px; height: 34px; margin: -2px -2px -2px -4px; }
   .logo span { color: var(--accent); }
+  .app-ver { font-size: 11px; color: var(--faint); border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 8px; white-space: nowrap; cursor: default; }
   #ed-head { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; order: 1; }
   #update-btn { order: 2; } #ui-lang { order: 2; padding: 2px; } #home-head { order: 3; }
   body:not(.editing) #update-btn { margin-left: auto; } body:not(.editing) #update-btn:not(.hidden) + #ui-lang { margin-left: 0; }
@@ -401,6 +402,7 @@
 
 <header>
   <div class="logo" onclick="go('')"><img class="mark" src="/assets/icon.png" alt="">Tilawa <span>Studio</span></div>
+  <span id="app-version" class="app-ver hidden" title="Version de Tilawa Studio que tu utilises"></span>
   <div id="ed-head" class="hidden">
     <span class="vsep"></span>
     <button class="ghost icon" onclick="go('')" title="Mes projets"><svg class="i"><use href="#i-back"/></svg></button>
@@ -885,7 +887,8 @@
     <li>« Zones des applis » montre où TikTok, Reels et Shorts posent leurs boutons : garde tes textes en dehors.</li>
     <li>« Enregistrer mon style » le rend disponible pour toutes tes vidéos (et ★ en fait le style par défaut).</li>
   </ul>
-  <div class="row" style="margin-top:18px;justify-content:flex-end"><button class="primary" onclick="$('help').close()">Compris</button></div>
+  <div class="row" style="margin-top:18px;justify-content:space-between"><span class="muted small" id="help-version"></span>
+    <button class="primary" onclick="$('help').close()">Compris</button></div>
 </dialog>
 
 <dialog id="replace-dlg" style="max-width:640px">
@@ -1180,8 +1183,9 @@ const EN = {
   "« Enregistrer mon style » le rend disponible pour toutes tes vidéos (et ★ en fait le style par défaut).": "« Save my style » makes it available for all your videos (and ★ makes it the default).",
   "Compris": "Got it", "OK": "OK", "Mise à jour disponible": "Update available", "Plus tard": "Later",
   "Mettre à jour": "Update", "✨ Mise à jour": "✨ Update", "Redémarrage…": "Restarting…",
-  "Une nouvelle version de Tilawa Studio est prête ({when}) : « {msg} ». Tes projets et vidéos sont conservés.":
-    "A new version of Tilawa Studio is ready ({when}): « {msg} ». Your projects and videos are kept.",
+  "La version {tag} de Tilawa Studio est prête ({when}) : « {msg} ». Tu utilises la {cur}. Tes projets et vidéos sont conservés.":
+    "Tilawa Studio {tag} is ready ({when}): « {msg} ». You're using {cur}. Your projects and videos are kept.",
+  "Version de Tilawa Studio que tu utilises": "The version of Tilawa Studio you're using", "Tilawa Studio {v}": "Tilawa Studio {v}", "dév.": "dev",
   "Installation des composants…": "Installing components…", "Téléchargement de la mise à jour…": "Downloading the update…",
   "Répétition": "Repetition", "Normale": "Normal", "Répétée": "Repeated", "fois": "times", "durée totale ≈ {d}": "total length ≈ {d}",
   "Assemblage des répétitions…": "Putting the repetitions together…",
@@ -1317,7 +1321,7 @@ const DYN = ["ed-badges", "saved", "new-formats", "surah", "a-surah", "lang", "e
   "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes", "font-num", "font-tr", "intro-note", "logo-sugg", "e-trans", "verse-body", "basmala-note", "basmala-list",
   "font-title", "font-arabic", "font-text", "colors-title", "colors-ar", "colors-text", "colors-outline", "res", "r-done", "r-stage",
   "r-pct", "r-error", "exports", "ed-formats", "still-t", "time", "safe", "tl-ruler", "tl-bg", "tl-subs", "fmt-name", "toasts", "src-name", "ui-lang",
-  "tl-hint", "spare-list", "replace-what", "replace-list", "replace-all-t"];
+  "tl-hint", "spare-list", "replace-what", "replace-list", "replace-all-t", "app-version", "help-version"];
 const original = new WeakMap();
 function translateDom() {
   document.documentElement.lang = UI;
@@ -1346,7 +1350,7 @@ async function switchUi(lang) {
   UI = lang;
   localStorage.setItem("ui", UI);
   api("/api/settings", json({ ui: UI }, "PUT")).catch(() => {});
-  translateDom(); fillSelects(); renderFormatTiles(); renderStyleSelect();
+  translateDom(); fillSelects(); renderFormatTiles(); renderStyleSelect(); showVersion();
   if (P && !$("editor").classList.contains("hidden")) refreshAll(); else renderProjects();
 }
 const icon = (name, size = 16) => `<svg class="i" style="width:${size}px;height:${size}px"><use href="#i-${name}"/></svg>`;
@@ -1446,6 +1450,7 @@ async function init() {
   [surahs, langs, styles, fonts, settings, info, basmalas] = await Promise.all(
     ["/api/surahs", "/api/languages", "/api/styles", "/api/fonts", "/api/settings", "/api/info", "/api/basmala"].map(u => api(u)));
   document.body.classList.toggle("desktop", !!info.desktop);
+  showVersion();
   setTimeout(checkUpdate, 1500);
   loadFaces();
   if (!localStorage.getItem("ui") && settings.ui) UI = settings.ui;
@@ -3364,14 +3369,20 @@ function renderRights(where) {
 }
 
 // ---------------------------------------------------------------- updates
+// the version in use (the release's tag; none when run from the source code)
+const appVersion = () => info.version ? "v" + String(info.version).replace(/^v/, "") : t("dév.");
+function showVersion() {
+  $("app-version").textContent = appVersion(); $("app-version").classList.remove("hidden");
+  $("help-version").textContent = t("Tilawa Studio {v}", { v: appVersion() });
+}
 async function checkUpdate() {
   try {
     const u = await api("/api/update");
     if (!u.available) return;
     $("update-btn").classList.remove("hidden");
     const when = new Date(u.date).toLocaleDateString(UI === "fr" ? "fr-FR" : "en-GB", { dateStyle: "long" });
-    $("update-text").textContent = t("Une nouvelle version de Tilawa Studio est prête ({when}) : « {msg} ». Tes projets et vidéos sont conservés.",
-      { when, msg: u.message });
+    $("update-text").textContent = t("La version {tag} de Tilawa Studio est prête ({when}) : « {msg} ». Tu utilises la {cur}. Tes projets et vidéos sont conservés.",
+      { tag: "v" + String(u.tag).replace(/^v/, ""), when, msg: u.message, cur: appVersion() });
     // a new version opens the dialog once by itself: the small button alone goes unnoticed
     let seen = null;
     try { seen = localStorage.getItem("update-seen"); localStorage.setItem("update-seen", u.tag); } catch {}
