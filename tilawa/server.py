@@ -146,6 +146,8 @@ def _public(p: project.Project) -> dict:
     d["auto_title"] = project.titles(p.lang, d["surahs"])  # the title made from the surahs (headerTitles)
     d["surah_titles"] = {s: render.surah_title(s, p.lang) for s in d["surahs"]}
     d["background"] = p.get_background()
+    if p.rights and "platforms" not in p.rights:  # estimated before there was one per platform
+        d["rights"] = p.rights | {"platforms": rights.by_platform(p.rights.get("site", ""), p.rights.get("reasons", []))}
     d["width"], d["height"] = p.width, p.height
     for b, raw in zip(d["blocks"], p.blocks):  # for the verse ornament in the preview
         b["ends_verse"] = render.ends_verse(segment.Block.from_dict(raw))

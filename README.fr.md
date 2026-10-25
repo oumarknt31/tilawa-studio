@@ -56,11 +56,14 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
 2. **Dépose une vidéo** (ou colle un lien YouTube / Instagram / TikTok, ou dépose un audio mp3 / m4a…),
    puis choisis le **format**, la **traduction**, le **style** et le nom du récitateur.
    La sourate et les versets sont **détectés automatiquement** (tu peux aussi les choisir toi-même).
-   Avec un lien, l'appli dit aussi à quel point la vidéo risque une **réclamation de droits d'auteur** sur les
-   plateformes où tu publies (YouTube, TikTok, Instagram, Facebook), et ce qui arriverait : son coupé, vidéo
-   bloquée, revenus des publicités pour le propriétaire. C'est une estimation d'après ce que dit la vidéo
-   (licence, mentions de droits, chaîne officielle ou grande) : aucune appli ne peut savoir à l'avance si une
-   plateforme reconnaîtra un son.
+   Avec un lien, l'appli dit aussi à quel point la vidéo risque une **réclamation de droits d'auteur**, **pour chaque
+   plateforme** où tu publies (YouTube, TikTok, Instagram, Facebook) : chacune ne reconnaît que les enregistrements
+   inscrits chez elle (Content ID de YouTube, celui de TikTok, Rights Manager de Meta pour Instagram et Facebook),
+   une vidéo peut donc être coupée sur l'une et passer sur l'autre. Une grande chaîne protège ses enregistrements là
+   où elle les publie ; un enregistrement distribué dans les boutiques de musique, ou un titre commercial, est inscrit
+   presque partout. Pour chaque plateforme : pourquoi, ce qui arriverait (son coupé, vidéo bloquée, revenus des
+   publicités pour le propriétaire) et comment vérifier avant de publier. C'est une estimation d'après ce que dit la
+   vidéo : aucune appli ne peut savoir à l'avance si une plateforme reconnaîtra un son.
 3. **Créer ma vidéo** : le logiciel écoute la récitation, reconnaît le passage et retrouve chaque mot (10 à 60 secondes).
 4. **Vérifie et personnalise** dans l'éditeur (les icônes à gauche). L'aperçu montre exactement le résultat final.
    - **Sous-titres** :

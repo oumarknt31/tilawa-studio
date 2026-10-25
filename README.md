@@ -56,10 +56,14 @@ downloaded in a browser.
 2. **Drop a video** (or paste a YouTube / Instagram / TikTok link, or drop an mp3 / m4a… audio file),
    then choose the **format**, the **translation**, the **style** and the reciter's name.
    The surah and verses are **detected automatically** (you can also choose them yourself).
-   With a link, the app also says how likely the video is to be **claimed for copyright** on the platforms
-   you post on (YouTube, TikTok, Instagram, Facebook), and what would happen: sound muted, video blocked,
-   ad money going to the owner. It is an estimate from what the video says about itself (licence, rights
-   notices, official or large channel): no app can know in advance whether a platform will recognise a sound.
+   With a link, the app also says how likely the video is to be **claimed for copyright**, **for each platform**
+   you post on (YouTube, TikTok, Instagram, Facebook): each one only recognises the recordings registered with
+   it (YouTube's Content ID, TikTok's, Meta's Rights Manager for Instagram and Facebook), so a video can be
+   muted on one and fine on another. A large channel protects its recordings where it publishes them; a
+   recording sent to the music stores, or a commercial track, is registered almost everywhere. For each
+   platform: why, what would happen (sound muted, video blocked, ad money going to the owner) and how to
+   check before posting. It is an estimate from what the video says about itself: no app can know in advance
+   whether a platform will recognise a sound.
 3. **Create my video**: the app listens to the recitation, recognises the passage and finds every word (10 to 60 seconds).
 4. **Check and customise** in the editor (icons on the left). The preview shows exactly the final result.
    - **Subtitles**:

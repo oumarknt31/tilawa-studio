@@ -121,3 +121,26 @@ def test_copyright_estimate_of_a_link():
     tiktok = lambda **info: rights.assess({"extractor_key": "TikTok", **info})
     assert tiktok(track="Song", artist="Label Artist")["level"] == "high"
     assert [r["key"] for r in tiktok(track="original sound - someone")["reasons"]] == ["original_sound", "someone_else"]
+
+
+def test_copyright_is_estimated_for_each_platform():
+    from tilawa import rights
+
+    per = lambda **info: {p: x["level"] for p, x in rights.assess(info)["platforms"].items()}
+    # a large YouTube channel protects its recordings on YouTube; elsewhere a claim is only possible
+    assert per(extractor_key="Youtube", channel="Alafasy", channel_follower_count=12_200_000) == \
+        {"youtube": "high", "tiktok": "medium", "instagram": "medium", "facebook": "medium"}
+    # Instagram and Facebook share Meta's Rights Manager
+    assert per(extractor_key="Instagram", channel="Page", channel_follower_count=2_000_000) == \
+        {"youtube": "medium", "tiktok": "medium", "instagram": "high", "facebook": "high"}
+    # "licensed to YouTube" is about YouTube, wherever the video was found
+    assert per(extractor_key="Facebook", description="Licensed to YouTube by X")["youtube"] == "high"
+    # a recording sent to the music stores is registered everywhere
+    assert set(per(extractor_key="Youtube", description="Provided to YouTube by DistroKid").values()) == {"high"}
+    # a TikTok library track: allowed from a personal TikTok account, recognised elsewhere
+    assert per(extractor_key="TikTok", track="Song", artist="Label") == \
+        {"youtube": "high", "tiktok": "medium", "instagram": "high", "facebook": "high"}
+    assert set(per(extractor_key="Youtube", license="Creative Commons Attribution license (reuse allowed)").values()) == {"low"}
+    # estimates saved before (one level for all) get theirs from their reasons
+    old = rights.by_platform("youtube", [{"key": "big", "channel": "X"}, {"key": "someone_else", "channel": "X"}])
+    assert old["youtube"]["level"] == "high" and old["tiktok"]["level"] == "medium"
