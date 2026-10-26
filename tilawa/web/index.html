@@ -59,16 +59,6 @@
   .notice.gold { border-color: rgba(242, 201, 92, .45); background: rgba(242, 201, 92, .07); }
   .notice.teal { border-color: rgba(61, 214, 195, .4); background: var(--accent-soft); }
   .notice.warn { border-color: rgba(255, 107, 107, .5); background: rgba(255, 107, 107, .07); }
-  .notice.rights ul { margin: 6px 0; padding-left: 18px; }
-  .notice.rights li { margin: 3px 0; }
-  .notice.rights .seg-ctl button { padding: 4px 10px; font-size: 12px; }
-  .notice.rights .seg-ctl button i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-  .lv-high { background: var(--danger); } .lv-medium { background: var(--gold); } .lv-low { background: var(--accent); }
-  .badge.warn { background: rgba(255, 107, 107, .12); color: var(--danger); border-color: rgba(255, 107, 107, .4); }
-  .plats { display: grid; gap: 8px; margin: 8px 0; }
-  .plat { background: rgba(0, 0, 0, .18); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
-  .plat .ph { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-  .plat .small { margin-top: 3px; }
   ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
 
   /* header */
@@ -477,7 +467,6 @@
           <div class="field"><label>Traduction</label><select id="lang"></select></div>
         </div>
         <div class="field"><label>Style</label><select id="new-style"></select></div>
-        <div id="new-rights"></div>
         <button id="go" class="primary bigbtn" onclick="createProject()"><svg class="i"><use href="#i-spark"/></svg>Créer ma vidéo</button>
       </div>
       <!-- step 3: progress -->
@@ -738,7 +727,6 @@
     <!-- export -->
     <div id="tab-export" class="hidden">
       <div class="panel-head"><h2>Export</h2></div>
-      <div id="ed-rights"></div>
       <div class="section">
         <div class="sh"><h3>Format</h3></div>
         <div class="formats" id="ed-formats"></div>
@@ -1198,63 +1186,6 @@ const EN = {
   "Assemblage des répétitions…": "Putting the repetitions together…",
   "La récitation jouée plusieurs fois de suite, pour l'apprendre par cœur. Les cartes de titre et la basmala ajoutée ne passent qu'une fois, au début.":
     "The recitation played several times in a row, to learn it by heart. The title cards and the added basmala come only once, at the start.",
-  "Droits d'auteur : risque élevé de réclamation": "Copyright: high risk of a claim", "Droits d'auteur : réclamation possible": "Copyright: a claim is possible",
-  "Droits d'auteur : risque faible": "Copyright: low risk", "Je publie sur :": "I post on:", "Si la plateforme reconnaît ce son :": "If the platform recognises this sound:",
-  "Pour l'éviter :": "To avoid it:", "celui qui l'a publiée": "whoever posted it",
-  "Vérification des droits d'auteur de la vidéo…": "Checking the video's copyright…",
-  "La vidéo est sous licence Creative Commons : la réutiliser est permis, en citant son auteur.":
-    "The video is under a Creative Commons licence: reusing it is allowed, crediting its author.",
-  "Sa description dit « sans copyright » : c'est l'avis de celui qui l'a publiée, pas une licence, et ça n'empêche pas une réclamation.":
-    "Its description says \"no copyright\": that is the poster's opinion, not a licence, and it does not prevent a claim.",
-  "Son son est un enregistrement protégé : « {track} »{artist}.": "Its sound is a protected recording: \"{track}\"{artist}.",
-  "Son son est le son original de celui qui l'a publiée.": "Its sound is the poster's original sound.",
-  "Elle porte une mention de droits (©, « tous droits réservés »…).": "It carries a rights notice (©, \"all rights reserved\"…).",
-  "Elle vient d'une chaîne officielle ({channel}) : ses enregistrements sont souvent protégés.":
-    "It comes from an official channel ({channel}): its recordings are often protected.",
-  "Elle vient d'une grande chaîne ({channel}) : les grandes chaînes font souvent protéger leurs enregistrements.":
-    "It comes from a large channel ({channel}): large channels often have their recordings protected.",
-  "L'enregistrement appartient à {channel} (ou au récitateur, ou à son producteur) : citer le récitateur ne suffit pas.":
-    "The recording belongs to {channel} (or to the reciter, or their producer): crediting the reciter is not enough.",
-  "YouTube reconnaît le son (Content ID) : son propriétaire peut bloquer la vidéo ou toucher l'argent de ses publicités. Tu pourras couper ou remplacer le son revendiqué dans YouTube Studio : la récitation disparaît.":
-    "YouTube recognises the sound (Content ID): its owner can block the video or take its ad money. You can mute or replace the claimed sound in YouTube Studio: the recitation is gone.",
-  "Un Short de plus d'une minute revendiqué est bloqué, quoi que choisisse le propriétaire.":
-    "A claimed Short longer than one minute is blocked, whatever the owner chooses.",
-  "TikTok peut couper le son (la vidéo reste, muette) ou retirer la vidéo ; des retraits répétés pénalisent le compte.":
-    "TikTok can mute the sound (the video stays, silent) or take the video down; repeated takedowns penalise the account.",
-  "Instagram peut couper le son (« Audio indisponible ») ou bloquer la vidéo ; il ne propose de le remplacer que par une musique de sa bibliothèque.":
-    "Instagram can mute the sound (\"Audio unavailable\") or block the video; it only offers to replace it with music from its library.",
-  "Facebook (Rights Manager) peut couper le son ou bloquer la vidéo.": "Facebook (Rights Manager) can mute the sound or block the video.",
-  "demande l'autorisation à la chaîne ou au récitateur (par écrit : elle te permet de contester une réclamation), ou utilise un enregistrement dont tu as les droits (le tien, ou un dont l'auteur permet la réutilisation).":
-    "ask the channel or the reciter for permission (in writing: it lets you dispute a claim), or use a recording you have the rights to (your own, or one whose author allows reuse).",
-  "Sur YouTube, l'étape « Vérifications » de la mise en ligne te dit en quelques minutes, avant de publier, si le son est revendiqué.":
-    "On YouTube, the \"Checks\" step of the upload tells you within minutes, before publishing, whether the sound is claimed.",
-  "C'est une estimation d'après ce que dit la vidéo : aucune appli ne peut savoir à l'avance si une plateforme reconnaîtra un son.":
-    "This is an estimate from what the video says about itself: no app can know in advance whether a platform will recognise a sound.",
-  // copyright, per platform
-  "C'est un enregistrement distribué dans les boutiques de musique (Spotify, Apple Music…).": "It's a recording distributed to the music stores (Spotify, Apple Music…).",
-  "Risque élevé": "High risk",
-  "Réclamation possible": "Claim possible",
-  "Risque faible": "Low risk",
-  "ce site": "this site",
-  "Les distributeurs de musique inscrivent en général leurs enregistrements sur YouTube, TikTok, Instagram et Facebook à la fois.": "Music distributors usually register their recordings on YouTube, TikTok, Instagram and Facebook at once.",
-  "Les maisons de disques font reconnaître leurs titres sur {p} aussi.": "Record labels have their tracks recognised on {p} too.",
-  "Ce titre est dans la bibliothèque musicale de TikTok : en général permis depuis un compte personnel ; un compte professionnel peut être coupé.": "This track is in TikTok's music library: usually allowed from a personal account; a business account can be muted.",
-  "Sa description parle d'une licence YouTube (Content ID) : YouTube reconnaîtra ce son.": "Its description mentions a YouTube licence (Content ID): YouTube will recognise this sound.",
-  "Elle porte une mention de droits et vient de {site} : son propriétaire l'y fait sans doute reconnaître.": "It carries a rights notice and comes from {site}: its owner most likely has it recognised there.",
-  "Chaîne officielle sur {site} : ses enregistrements y sont très probablement protégés.": "Official channel on {site}: its recordings are very likely protected there.",
-  "Grande chaîne sur {site} : les grandes chaînes y font en général protéger leurs enregistrements.": "Large channel on {site}: large channels usually have their recordings protected there.",
-  "Rien n'indique que {site} protège cet enregistrement, mais il n'est pas à toi : une réclamation reste possible.": "Nothing shows {site} protects this recording, but it isn't yours: a claim is still possible.",
-  "Rien n'indique qu'il soit inscrit sur {p} (il vient de {site}) ; ce n'est pas une garantie : il n'est pas à toi.": "Nothing shows it's registered on {p} (it comes from {site}); that's no guarantee: it isn't yours.",
-  "Droits d'auteur : risque élevé sur {list}": "Copyright: high risk on {list}",
-  "Droits d'auteur : réclamation possible sur {list}": "Copyright: a claim is possible on {list}",
-  "Droits d'auteur : risque faible sur {list}": "Copyright: low risk on {list}",
-  "Avant de publier : l'étape « Vérifications » de la mise en ligne te dit en quelques minutes si le son est revendiqué.": "Before publishing: the \"Checks\" step of the upload tells you within minutes whether the sound is claimed.",
-  "Avant de publier : active la vérification des droits d'auteur dans l'éditeur de Reels (ou dans Meta Business Suite) ; si le son est reconnu, le Reel est retenu 1 h pour que tu corriges.": "Before publishing: turn on the copyright check in the Reels composer (or in Meta Business Suite); if the sound is recognised, the reel is held for 1 hour so you can fix it.",
-  "Instagram vérifie après la publication. Il partage le système de Facebook (Rights Manager) : une vérification sans problème sur Facebook est un bon indice, pas une garantie.": "Instagram checks after publishing. It shares Facebook's system (Rights Manager): a clean check on Facebook is a good sign, not a guarantee.",
-  "Si ton appli la propose (Paramètres › Outils pour créateurs), active la vérification des droits d'auteur du son avant de publier.": "If your app offers it (Settings › Creator tools), turn on the sound copyright check before posting.",
-  "Choisis où tu publies : chaque plateforme reconnaît ses propres enregistrements, une vidéo peut être coupée sur l'une et passer sur l'autre.": "Choose where you post: each platform recognises its own recordings, a video can be muted on one and fine on another.",
-  "Ailleurs :": "Elsewhere:",
-  "Ce que dit la vidéo :": "What the video says:",
   // timeline editing, reserve
   "tête de lecture": "playhead",
   "coupe de l'arrière-plan": "background cut",
@@ -1544,7 +1475,6 @@ function useLink() {
   const url = $("url").value.trim();
   if (!/^https?:\/\//.test(url)) return toast(t("Colle un lien qui commence par https://"), "err");
   newSource = { url }; showNewForm(url);
-  checkLink(url);
 }
 function showNewForm(name) {
   $("src-name").textContent = name;
@@ -1552,7 +1482,7 @@ function showNewForm(name) {
   $("new-form").classList.remove("hidden");
 }
 function resetNew() {
-  newSource = null; newRights = null; renderRights("new"); $("file").value = ""; $("url").value = "";
+  newSource = null; $("file").value = ""; $("url").value = "";
   $("new-form").classList.add("hidden"); $("job-box").classList.add("hidden"); $("new-source").classList.remove("hidden");
 }
 function setMode(m) {
@@ -1565,7 +1495,7 @@ function formatTiles(current, onclick) {
     <div class="shape" style="width:${w}px;height:${h}px"></div><b>${t(name)} ${f}</b><small>${t(sub)}</small></div>`).join("");
 }
 function renderFormatTiles() { $("new-formats").innerHTML = formatTiles(newFormat, "pickNewFormat"); }
-function pickNewFormat(f) { newFormat = f; renderFormatTiles(); renderStyleSelect(); renderRights("new"); }
+function pickNewFormat(f) { newFormat = f; renderFormatTiles(); renderStyleSelect(); }
 function renderStyleSelect() {
   const ok = styles.filter(s => !s.formats || s.formats.includes(newFormat));
   const cur = $("new-style").value;
@@ -1680,7 +1610,6 @@ function refreshAll() {
   const lang = langs.find(l => l.code === P.lang);
   $("ed-badges").innerHTML = `<span class="badge">${P.format}</span><span class="badge">${esc(lang ? t(lang.name) : P.lang)}</span>`
     + (P.surahs?.length ? P.surahs : P.surah ? [P.surah] : []).map(n => `<span class="badge gold">${esc(surahs[n - 1]?.name || n)}</span>`).join("");
-  renderRights("ed");
   const r = P.render;
   $("r-quality").value = r.quality === "png" ? "max" : r.quality;
   $("r-fade").value = r.fade_in; $("r-trim-start").value = r.trim_start || ""; $("r-trim-end").value = r.trim_end || "";
@@ -3329,117 +3258,6 @@ async function exportStill() {
     refreshExports();
   } catch (e) { toast(esc(e.message), "err"); }
 }
-// ---------------------------------------------------------------- copyright of a video taken from a link
-// The platforms recognise the sound of an upload (YouTube Content ID, TikTok, Meta Rights Manager)
-// and act on it; nothing can tell beforehand: the server estimates the risk (rights.py) and this
-// says what each platform the user posts on would do, so nobody finds out at upload time.
-const PLATFORMS = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram", facebook: "Facebook" };
-let newRights = null;
-function platformsFor(fmt) {
-  if (Array.isArray(settings.platforms)) return settings.platforms;
-  return fmt === "16:9" ? ["youtube"] : fmt === "9:16" ? ["youtube", "tiktok", "instagram"] : ["instagram", "facebook"];
-}
-function togglePlatform(p, where) {
-  const cur = platformsFor(where === "new" ? newFormat : P.format);
-  settings.platforms = cur.includes(p) ? cur.filter(x => x !== p) : [...cur, p];
-  api("/api/settings", json({ platforms: settings.platforms }, "PUT")).catch(() => {});
-  renderRights(where);
-}
-async function checkLink(url) {
-  newRights = { loading: true }; renderRights("new");
-  let r = null;
-  try { r = await api("/api/link-check?url=" + encodeURIComponent(url)); } catch {}
-  if (newSource?.url !== url) return;  // another video meanwhile
-  newRights = r; renderRights("new");
-}
-// what the link says about itself (rights.assess reasons)
-function rightsReason(x) {
-  const ch = `<b>${esc(x.channel || t("celui qui l'a publiée"))}</b>`;
-  switch (x.key) {
-    case "cc": return t("La vidéo est sous licence Creative Commons : la réutiliser est permis, en citant son auteur.");
-    case "says_free": return t("Sa description dit « sans copyright » : c'est l'avis de celui qui l'a publiée, pas une licence, et ça n'empêche pas une réclamation.");
-    case "distributed": return t("C'est un enregistrement distribué dans les boutiques de musique (Spotify, Apple Music…).");
-    case "music": return t("Son son est un enregistrement protégé : « {track} »{artist}.", { track: esc(x.track), artist: x.artist ? " — " + esc(x.artist) : "" });
-    case "original_sound": return t("Son son est le son original de celui qui l'a publiée.");
-    case "notice": return t("Elle porte une mention de droits (©, « tous droits réservés »…).");
-    case "official": return t("Elle vient d'une chaîne officielle ({channel}) : ses enregistrements sont souvent protégés.", { channel: ch });
-    case "big": return t("Elle vient d'une grande chaîne ({channel}) : les grandes chaînes font souvent protéger leurs enregistrements.", { channel: ch });
-    case "someone_else": return t("L'enregistrement appartient à {channel} (ou au récitateur, ou à son producteur) : citer le récitateur ne suffit pas.", { channel: ch });
-  }
-  return "";
-}
-// Each platform only recognises what rights holders registered with it (YouTube Content ID, TikTok,
-// Meta Rights Manager for Instagram and Facebook): one estimate per platform, with why.
-const RISK = { high: ["warn", "Risque élevé"], medium: ["gold", "Réclamation possible"], low: ["teal", "Risque faible"] };
-function platformWhy(key, r, p) {
-  const site = PLATFORMS[r.site] || t("ce site"), name = PLATFORMS[p], home = p === r.site || (r.site === "instagram" && p === "facebook") || (r.site === "facebook" && p === "instagram");
-  switch (key) {
-    case "cc": return t("Licence Creative Commons : la réutiliser est permis, en citant son auteur.");
-    case "distributed": return t("Les distributeurs de musique inscrivent en général leurs enregistrements sur YouTube, TikTok, Instagram et Facebook à la fois.");
-    case "music": return t("Les maisons de disques font reconnaître leurs titres sur {p} aussi.", { p: name });
-    case "tiktok_library": return t("Ce titre est dans la bibliothèque musicale de TikTok : en général permis depuis un compte personnel ; un compte professionnel peut être coupé.");
-    case "notice": return p === "youtube" && !home ? t("Sa description parle d'une licence YouTube (Content ID) : YouTube reconnaîtra ce son.")
-      : t("Elle porte une mention de droits et vient de {site} : son propriétaire l'y fait sans doute reconnaître.", { site });
-    case "official": return t("Chaîne officielle sur {site} : ses enregistrements y sont très probablement protégés.", { site });
-    case "big": return t("Grande chaîne sur {site} : les grandes chaînes y font en général protéger leurs enregistrements.", { site });
-    case "someone_else": return home ? t("Rien n'indique que {site} protège cet enregistrement, mais il n'est pas à toi : une réclamation reste possible.", { site })
-      : t("Rien n'indique qu'il soit inscrit sur {p} (il vient de {site}) ; ce n'est pas une garantie : il n'est pas à toi.", { p: name, site });
-  }
-  return "";
-}
-function rightsCard(r, fmt, dur, where) {
-  const plats = r.platforms || Object.fromEntries(Object.keys(PLATFORMS).map(k => [k, { level: r.level, why: [] }]));
-  const chosen = platformsFor(fmt), shown = chosen.length ? chosen : Object.keys(PLATFORMS);
-  const rank = { low: 0, medium: 1, high: 2 }, worst = shown.reduce((a, k) => rank[plats[k].level] > rank[a] ? plats[k].level : a, "low");
-  const names = (lv) => shown.filter(k => plats[k].level === lv).map(k => PLATFORMS[k]).join(", ");
-  const head = worst === "high" ? t("Droits d'auteur : risque élevé sur {list}", { list: names("high") })
-    : worst === "medium" ? t("Droits d'auteur : réclamation possible sur {list}", { list: names("medium") })
-    : t("Droits d'auteur : risque faible sur {list}", { list: names("low") });
-  const chips = Object.entries(PLATFORMS).map(([k, n]) =>
-    `<button class="${chosen.includes(k) ? "on" : ""}" onclick="togglePlatform('${k}', '${where}')" title="${t(RISK[plats[k].level][1])}"><i class="lv-${plats[k].level}"></i>${n}</button>`).join("");
-  const short = fmt === "9:16" && dur > 60;
-  const what = {
-    youtube: t("YouTube reconnaît le son (Content ID) : son propriétaire peut bloquer la vidéo ou toucher l'argent de ses publicités. Tu pourras couper ou remplacer le son revendiqué dans YouTube Studio : la récitation disparaît.")
-      + (short ? " " + t("Un Short de plus d'une minute revendiqué est bloqué, quoi que choisisse le propriétaire.") : ""),
-    tiktok: t("TikTok peut couper le son (la vidéo reste, muette) ou retirer la vidéo ; des retraits répétés pénalisent le compte."),
-    instagram: t("Instagram peut couper le son (« Audio indisponible ») ou bloquer la vidéo ; il ne propose de le remplacer que par une musique de sa bibliothèque."),
-    facebook: t("Facebook (Rights Manager) peut couper le son ou bloquer la vidéo."),
-  };
-  const check = {
-    youtube: t("Avant de publier : l'étape « Vérifications » de la mise en ligne te dit en quelques minutes si le son est revendiqué."),
-    facebook: t("Avant de publier : active la vérification des droits d'auteur dans l'éditeur de Reels (ou dans Meta Business Suite) ; si le son est reconnu, le Reel est retenu 1 h pour que tu corriges."),
-    instagram: t("Instagram vérifie après la publication. Il partage le système de Facebook (Rights Manager) : une vérification sans problème sur Facebook est un bon indice, pas une garantie."),
-    tiktok: t("Si ton appli la propose (Paramètres › Outils pour créateurs), active la vérification des droits d'auteur du son avant de publier."),
-  };
-  const card = (k) => {
-    const x = plats[k], [cls, label] = RISK[x.level];
-    const why = (x.why || []).map(w => platformWhy(w, r, k)).filter(Boolean);
-    return `<div class="plat"><div class="ph"><b>${PLATFORMS[k]}</b><span class="badge ${cls}">${t(label)}</span></div>
-      ${why.map(w => `<div class="small">${w}</div>`).join("")}
-      ${x.level !== "low" ? `<div class="small muted">${what[k]}</div>` : ""}
-      <div class="small">🔎 ${check[k]}</div></div>`;
-  };
-  const others = Object.keys(PLATFORMS).filter(k => !shown.includes(k));
-  return `<div class="notice ${RISK[worst][0]} rights">
-    <b>${worst === "low" ? icon("check", 14) : "⚠️"} ${head}</b>
-    <div class="row" style="align-items:center;gap:8px;margin:8px 0 4px"><span class="small muted">${t("Je publie sur :")}</span><div class="seg-ctl">${chips}</div></div>
-    ${chosen.length ? "" : `<div class="small muted">${t("Choisis où tu publies : chaque plateforme reconnaît ses propres enregistrements, une vidéo peut être coupée sur l'une et passer sur l'autre.")}</div>`}
-    <div class="plats">${shown.map(card).join("")}</div>
-    ${others.length ? `<div class="small muted">${t("Ailleurs :")} ${others.map(k => `${PLATFORMS[k]} — ${t(RISK[plats[k].level][1]).toLowerCase()}`).join(" · ")}</div>` : ""}
-    <div class="small" style="margin-top:6px">${t("Ce que dit la vidéo :")}</div><ul>${r.reasons.map(rightsReason).filter(Boolean).map(x => `<li>${x}</li>`).join("")}</ul>
-    ${worst !== "low" ? `<div class="small"><b>${t("Pour l'éviter :")}</b> ${t("demande l'autorisation à la chaîne ou au récitateur (par écrit : elle te permet de contester une réclamation), ou utilise un enregistrement dont tu as les droits (le tien, ou un dont l'auteur permet la réutilisation).")}</div>` : ""}
-    <div class="small faint" style="margin-top:6px">${t("C'est une estimation d'après ce que dit la vidéo : aucune appli ne peut savoir à l'avance si une plateforme reconnaîtra un son.")}</div>
-  </div>`;
-}
-function renderRights(where) {
-  const box = $(where === "new" ? "new-rights" : "ed-rights");
-  if (!box) return;
-  const r = where === "new" ? (newSource?.url ? newRights : null) : P?.rights;
-  if (!r || r.error) { box.innerHTML = ""; return; }
-  box.innerHTML = r.loading ? `<div class="notice small muted">${t("Vérification des droits d'auteur de la vidéo…")}</div>`
-    : rightsCard(r, where === "new" ? newFormat : P.format, where === "new" ? r.duration : P.duration, where);
-}
-
 // ---------------------------------------------------------------- updates
 // the version in use (the release's tag; none when run from the source code)
 const appVersion = () => info.version ? "v" + String(info.version).replace(/^v/, "") : t("dév.");

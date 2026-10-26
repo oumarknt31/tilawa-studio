@@ -14,7 +14,7 @@ from typing import Callable
 
 import numpy as np
 
-from . import align, basmala, detect, identify, media, quran, render, rights, segment, translit
+from . import align, basmala, detect, identify, media, quran, render, segment, translit
 from .i18n import UserError
 
 Progress = Callable[[str, float], None]
@@ -43,7 +43,6 @@ class Project:
     detected: dict | None = None  # the passages heard (detect.py): {"matches": [...]}
     surahs: list[int] = field(default_factory=list)  # every surah recited, in order (several: a prayer...)
     audio_only: bool = False  # made from a sound file: the picture is a plain frame
-    rights: dict | None = None  # made from a link: how likely it is to be claimed (rights.assess)
 
     @property
     def media_dir(self) -> Path:
@@ -95,10 +94,8 @@ def create(folder: Path, source: str, surah: int, first_verse: int, last_verse: 
         quran.verse(surah, first_verse)  # validates
     if fmt not in render.FORMATS or lang not in quran.LANGS:
         raise UserError("bad_format_lang")
-    link: dict | None = None
     if source.startswith(("http://", "https://")):
-        link = {}
-        path = media.download(source, folder, lambda f: progress("download", f), link)
+        path = media.download(source, folder, lambda f: progress("download", f))
     else:
         src = Path(source).expanduser()
         if not src.is_file():
@@ -118,8 +115,7 @@ def create(folder: Path, source: str, surah: int, first_verse: int, last_verse: 
     thumbnail(folder)
     p = Project(folder, path.name, surah, first_verse or 1, last_verse, reciter.strip(),
                 title.strip() or (render.surah_title(surah, lang) if surah else ""), info.duration, info.width, info.height,
-                format=fmt, lang=lang, style=dict(style or {}), audio_only=audio_only,
-                rights=rights.assess(link) if link else None)
+                format=fmt, lang=lang, style=dict(style or {}), audio_only=audio_only)
     p.segment.update(lang=lang, translit=translit, translation=quran.edition(lang, translation) or "")
     p.save()
     return p

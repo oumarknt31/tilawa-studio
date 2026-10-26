@@ -26,7 +26,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import basmala, media, project, quran, render, rights, segment
+from . import basmala, media, project, quran, render, segment
 from .cli import HOME
 from .i18n import UI_LANGS, UserError
 from .library import Library
@@ -146,8 +146,6 @@ def _public(p: project.Project) -> dict:
     d["auto_title"] = project.titles(p.lang, d["surahs"])  # the title made from the surahs (headerTitles)
     d["surah_titles"] = {s: render.surah_title(s, p.lang) for s in d["surahs"]}
     d["background"] = p.get_background()
-    if p.rights and "platforms" not in p.rights:  # estimated before there was one per platform
-        d["rights"] = p.rights | {"platforms": rights.by_platform(p.rights.get("site", ""), p.rights.get("reasons", []))}
     d["width"], d["height"] = p.width, p.height
     for b, raw in zip(d["blocks"], p.blocks):  # for the verse ornament in the preview
         b["ends_verse"] = render.ends_verse(segment.Block.from_dict(raw))
@@ -583,7 +581,7 @@ def get_settings():
 
 @app.put("/api/settings")
 def put_settings(body: dict):
-    s = LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour", "ui", "logo_auto", "platforms")})
+    s = LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour", "ui", "logo_auto")})
     render.LOGO_AUTO = s.get("logo_auto", True)
     return s
 
@@ -661,18 +659,6 @@ def logo():
     if not LIB.logo_file.is_file():
         raise HTTPException(404)
     return FileResponse(LIB.logo_file, media_type="image/png", headers={"Cache-Control": "no-cache"})
-
-
-@app.get("/api/link-check")
-def link_check(url: str):
-    """Copyright risk of a video link, before making a video from it (rights.py: an estimate)."""
-    if not url.strip().startswith(("http://", "https://")):
-        raise UserError("need_https")
-    try:
-        info = media.link_info(url.strip())
-    except Exception as e:  # private, removed, or not a video: the download will say so
-        return {"error": str(e)[:300]}
-    return rights.assess(info) | {"duration": info.get("duration")}
 
 
 @app.get("/api/basmala")
