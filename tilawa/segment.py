@@ -82,6 +82,7 @@ class Block:
     voice_end: float = 0.0
     words: list[dict] = field(default_factory=list)  # per-word timings, for the editor
     edited: bool = False  # Arabic / phonetic corrected by hand in the editor
+    doubt: str = ""  # why detection may be wrong here (detect.DOUBTS), to check by ear
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -107,6 +108,7 @@ class Loudness:
         win_view = np.lib.stride_tricks.sliding_window_view(padded, 2 * k + 1)[::5]
         ref = np.repeat(np.percentile(win_view, 80, axis=1), 5)[: len(db)]
         self.rel = db - ref
+        self.level = db - np.percentile(db, 80)  # (relative to the whole recording: a long silence)
 
     def pause(self, t0: float, t1: float, depth_db: float) -> tuple[float, float]:
         """(quiet seconds, deepest dip in dB) between t0 and t1."""
@@ -462,7 +464,7 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
                     end, again.start, opt.breath_depth_db)[0] >= 0.3 * missing
             if 0 < missing <= MISSED_WORDS and nxt is not None and (not same(nxt) or finished):
                 bounds[-1] = len(v.align)
-            if 0 < bounds[0] <= MISSED_WORDS and prev is not None and not same(prev):
+            if 0 < bounds[0] <= MISSED_WORDS and not same(prev):
                 bounds[0] = 0
             fracs = [_arabic_weight(v, 0, b) / total for b in bounds]
             # cut the whole verse translation, then keep the slices this run covers
@@ -481,7 +483,7 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
                     highlight=_is_tasbih(v, a0),
                     voice_start=ws[0].start, voice_end=ws[-1].end,
                     words=[{"t0": round(o.start, 3), "t1": round(o.end, 3), "w": o.word.text,
-                            "tr": tr[k] if k < len(tr) else ""} for k, o in enumerate(ws)],
+                            "tr": tr[k] if k < len(tr) else "", "s": round(o.score, 2)} for k, o in enumerate(ws)],
                 ))
         else:
             ws = group[0]

@@ -38,16 +38,17 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import detection_bench as db  # noqa: E402
-from tilawa import align, detect, identify, media, quran, segment  # noqa: E402
+from tilawa import align, detect, media, quran, segment  # noqa: E402
 
 SR = db.SR
 HOME = db.CACHE / "accuracy"
 QDC = {97: "dossari", 2: "abdulbasit", 3: "sudais", 4: "shatri", 5: "rifai", 6: "husary", 10: "shuraim",
        161: "tunaiji", 1: "abdulbasit-mujawwad", 7: "alafasy", 9: "minshawi", 12: "husary-muallim"}
 # (173, Alafasy "streaming", has broken timings)
-# quran.com verse times often over a second off (against forced alignment): the boundaries
-# are found again from the letters the model hears around them
-QDC_REFIND = {2, 5, 7}
+# quran.com verse times are often over a second off, sometimes many: the boundaries come from
+# forced alignment of the text (_bounds); a fit worse than this (mean log-prob) is not the verses
+FORCE_MIN = -2.0
+VOICE_HOLD = 0.15  # the voice proper lasts this long (a click before it does not)
 EA = ["Abdul_Basit_Murattal_192kbps", "Abdul_Basit_Mujawwad_128kbps", "Abdullah_Basfar_192kbps",
       "Abdurrahmaan_As-Sudais_192kbps", "AbdulSamad_64kbps_QuranExplorer.Com", "Abu_Bakr_Ash-Shaatree_128kbps",
       "Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net", "Alafasy_128kbps", "Ghamadi_40kbps", "Hani_Rifai_192kbps",
@@ -125,11 +126,10 @@ def _between(path: Path, vs: list[dict], k: int) -> float:
     other verse in the clip)."""
     v, p = vs[k], vs[k - 1]
     lo, hi = max(p["w0"] + 0.3, min(v["from"], v["w0"]) - 1.2), max(v["from"], v["w0"]) + 0.3
-    if int(path.parent.name) in QDC_REFIND:
-        lo, hi = _refind(path, vs, k) or (lo, hi)
+    lo, hi = (_bounds(path, vs, [k]).get(k) or (lo, hi))[:2]
     if hi - lo < 0.5:
-        return v["from"] if hi - lo < 0.1 else (lo + hi) / 2
-    x = _decode(path, lo, hi)
+        return (lo + hi) / 2
+    x = _decode(path, lo - 0.5, hi)[int(0.5 * SR):]  # (a seek starts with a few ms of zeros)
     hop = SR // 100
     n = len(x) // hop
     if n < 30:
@@ -191,7 +191,8 @@ class Case:
 def _verse_truth(x: np.ndarray, surah: int, ayah: int, t0: float, t1: float, cut_start=False, cut_end=False,
                  word_start: float | None = None, timing: bool = True) -> dict:
     """A verse inside x between t0 and t1 (s): where the voice is. The start is known within a
-    range: from the loudness (which also catches breaths) and quran.com's first word (which
+    range: from the loudness (the first sound, which can be a breath or the echo of the verse
+    before, up to the voice proper, 20 dB below the loudest) and quran.com's first word (which
     can be a second off) when there is one; no range at all when timing is False."""
     a, b = int(t0 * SR), max(int(t0 * SR) + 1, int(t1 * SR))
     o0, o1 = (0.0, (b - a) / SR) if cut_start and cut_end else db._onset(x[a:b])
@@ -200,7 +201,8 @@ def _verse_truth(x: np.ndarray, surah: int, ayah: int, t0: float, t1: float, cut
     if cut_end:
         o1 = (b - a) / SR
     start = t0 + o0
-    known = [start] + ([min(max(word_start, t0), t1)] if word_start is not None and not cut_start else [])
+    known = [start] + ([] if cut_start else [t0 + db._onset(x[a:b], 20, VOICE_HOLD)[0]])
+    known += [min(max(word_start, t0), t1)] if word_start is not None and not cut_start else []
     lo, hi = (min(known), max(known)) if timing else UNKNOWN
     return {"kind": "verse", "surah": surah, "ayah": ayah, "t0": start, "t1": t0 + o1, "t0_lo": lo, "t0_hi": hi,
             "cut_start": cut_start, "cut_end": cut_end}
@@ -209,41 +211,142 @@ def _verse_truth(x: np.ndarray, surah: int, ayah: int, t0: float, t1: float, cut
 _model = None
 
 
-def _refind(path: Path, vs: list[dict], k: int) -> tuple[float, float] | None:
-    """Between which times the pause between verse k-1 and verse k is: after the last letters
-    of the one and before the first letters of the other, as the model hears them within 5 s
-    of quran.com's boundary (shifted as much as at the boundary before when they are not
-    there: some timings drift away). Cached; None when they are not both heard."""
+def _bounds(path: Path, vs: list[dict], ks=()) -> dict[int, list | None]:
+    """Where verse k-1 ends and verse k starts in a quran.com recording: {k: [end, start,
+    clean]}, None where forced alignment does not find the verses around quran.com's times;
+    clean is False when over a second of voice lies between them (a verse said again, or half
+    of it, that the timings do not know). The boundaries ks are found together (the verses
+    from k-1 to the last k, aligned at once over their stretch); cached."""
     global _model
-    cache = path.with_name(f"{path.stem}.refind.json")
-    known = json.loads(cache.read_text()) if cache.exists() else {}
-    if str(k) in known:
-        return tuple(known[str(k)]) if known[str(k)] else None
-    v, p = vs[k], vs[k - 1]
+    cache = path.with_name(f"{path.stem}.bounds.json")
+    out = {int(k): b for k, b in json.loads(cache.read_text()).items()} if cache.exists() else {}
+    ks = sorted(k for k in ks if 0 < k < len(vs) and k not in out)
+    if not ks:
+        return out
     _model = _model or align.get_model()
-    _, table = identify._codes()
-    letters = lambda a_: np.array([table[c] for c in identify._letters(" ".join(quran.verse(int(path.stem), a_).align))
-                                   if c in table], dtype=np.int16)
-    tail, head = letters(p["ayah"])[-10:], letters(v["ayah"])[:10]
+    surah, first, last = int(path.stem), ks[0] - 1, ks[-1]
+    toks = [[t for w in quran.verse(surah, vs[j]["ayah"]).align for t in _model.tokens(w)] for j in range(first, last + 1)]
+    end = vs[last + 1]["from"] if last + 1 < len(vs) else vs[-1]["to"]
+    found = None
+    for pad in (20.0, 60.0):  # (the times drift: up to 17 s seen)
+        a = max(0.0, vs[first]["from"] - pad)
+        x = _decode(path, a, end + pad)
+        chunk = 4 * SR  # one pass of detection's two (longer windows go deaf to 82:17-18, alike)
+        em = _model._pass(x, list(range(0, len(x), chunk)), chunk, SR, len(x) // 320)
+        frames, ends, score = _force(em, [t for v in toks for t in v], _model)
+        if score >= FORCE_MIN:
+            found = a, x, frames, ends
+            break
+    for k in ks:
+        out[k] = None
+    if found:
+        a, x, frames, ends = found
+        hop = SR // 100
+        n = len(x) // hop
+        level = 10 * np.log10((x[:n * hop].reshape(n, hop) ** 2).mean(axis=1) + 1e-12)
+        edges = np.cumsum([0] + [len(v) for v in toks])  # first token of each verse
+        for k in ks:
+            j = k - first
+            e, s_ = a + (ends[edges[j] - 1] + 1) * align.FRAME_S, a + frames[edges[j]] * align.FRAME_S
+            voice = np.count_nonzero(level[int((e - a) * 100):int((s_ - a) * 100)] > level.max() - 20) / 100
+            out[k] = [float(e), float(s_), bool(voice < 1.0)]
+    cache.write_text(json.dumps(out))
+    return out
 
-    def look(t: float):
-        a = max(0.0, t - 5)
-        codes, frames = identify.heard(_model.emissions(_decode(path, a, t + 5)), _model)
-        if len(codes) <= 20:
-            return None
-        mt, _, _, _, t_end = identify._fit(tail, codes)
-        mh, _, _, h_start, _ = identify._fit(head, codes)
-        if mt >= 0.7 * len(tail) and mh >= 0.7 * len(head) and t_end < h_start:
-            return [a + (frames[t_end] + 1) * align.FRAME_S, a + frames[h_start] * align.FRAME_S]
+
+def _force(em: np.ndarray, toks: list[int], model) -> tuple[np.ndarray, np.ndarray, float]:
+    """Strict CTC alignment of toks (every one, in order; word separators count as blank)
+    with anything before and after them: (first frame of each token, last frame of each
+    token, mean log-prob of the tokens there)."""
+    em = em.astype(np.float64)
+    T, L = len(em), len(toks)
+    S = 2 * L + 1  # blank, token, blank, ..., blank
+    tok = np.array(toks)
+    is_tok = np.arange(S) % 2 == 1
+    col = np.where(is_tok, tok[np.clip((np.arange(S) - 1) // 2, 0, L - 1)], 0)
+    blank = np.logaddexp(em[:, model.blank], em[:, model.sep])
+    # silence costs nothing outside the verses and a little inside them, else they spread over it
+    filler = np.maximum(em.max(axis=1) - align.FILLER_PENALTY, blank)
+    blank = blank - 0.02
+    skip = np.zeros(S, dtype=bool)  # s-2 -> s: a token unlike the one before
+    skip[3::2] = tok[1:] != tok[:-1]
+    skip[1] = True
+    NEG = -1e18
+    # states: 0 before, 1..S the CTC states, S+1 after
+    dp = np.full(S + 2, NEG)
+    back = np.zeros((T, S + 2), dtype=np.int8)
+    emit = lambda t: np.where(is_tok, em[t, col], blank[t])
+    e0 = emit(0)
+    dp[0], dp[1], dp[2] = filler[0], e0[0], e0[1]
+    for t in range(1, T):
+        prev, cur = dp, np.full(S + 2, NEG)
+        cur[0] = prev[0] + filler[t]
+        stay = prev[1:S + 1]
+        step = np.concatenate(([prev[0]], prev[1:S]))
+        jump = np.where(skip, np.concatenate(([NEG, prev[0]], prev[1:S - 1])), NEG)
+        cand = np.stack([stay, step, jump])
+        k = cand.argmax(axis=0)
+        cur[1:S + 1] = cand[k, np.arange(S)] + emit(t)
+        back[t, 1:S + 1] = k
+        last = max(prev[S - 1], prev[S])
+        if prev[S + 1] >= last:
+            cur[S + 1], back[t, S + 1] = prev[S + 1] + filler[t], 0
+        else:
+            cur[S + 1], back[t, S + 1] = last + filler[t], 1 if prev[S] >= prev[S - 1] else 2
+        dp = cur
+    s = int(np.argmax([dp[S - 1], dp[S], dp[S + 1]])) + S - 1
+    frames, ends = np.full(L, -1, dtype=np.int64), np.full(L, -1, dtype=np.int64)
+    if dp[s] <= NEG / 2:
+        return frames, ends, -1e9
+    for t in range(T - 1, -1, -1):
+        if 1 <= s <= S and s % 2 == 0:  # (state s is CTC index s-1: odd = a token)
+            frames[(s - 2) // 2] = t  # (going back: ends at the token's first frame)
+            if ends[(s - 2) // 2] < 0:
+                ends[(s - 2) // 2] = t
+        if t == 0:
+            break
+        k = int(back[t, s])
+        if s == S + 1:
+            s = S + 1 if k == 0 else S + 1 - k
+        elif s > 0:
+            s -= k
+    if (frames < 0).any():
+        return frames, ends, -1e9
+    return frames, ends, float(np.mean(em[frames, tok]))
+
+
+def _heard_from(path: Path, vs: list[dict], k: int, cut: float) -> int | None:
+    """Verse k of a quran.com recording cut at `cut` (s): its first word heard whole (the
+    words before it are not heard, or only their end); None where its stretch is not known."""
+    global _model
+    b0, b1 = _bounds(path, vs, [k, k + 1]).get(k), _bounds(path, vs, [k + 1]).get(k + 1)
+    start = vs[0]["w0"] if k == 0 else b0 and b0[1]
+    end = vs[-1]["to"] if k + 1 == len(vs) else b1 and b1[0]
+    if start is None or end is None:
         return None
+    words = quran.verse(int(path.stem), vs[k]["ayah"]).align
+    _model = _model or align.get_model()
+    toks = [_model.tokens(w) for w in words]
+    a = max(0.0, start - 0.5)
+    x = _decode(path, a, end + 0.5)
+    chunk = 4 * SR
+    em = _model._pass(x, list(range(0, len(x), chunk)), chunk, SR, len(x) // 320)
+    frames, _, score = _force(em, [t for w in toks for t in w], _model)
+    if score < FORCE_MIN:
+        return None
+    firsts = np.cumsum([0] + [len(w) for w in toks])[:-1]
+    return next((w for w, f in enumerate(firsts) if a + frames[f] * align.FRAME_S >= cut), len(words) - 1)
 
-    found = look(v["w0"])
-    if found is None and k > 1 and (before := _refind(path, vs, k - 1)):
-        found = look(v["w0"] + before[1] - p["w0"])
-    known = json.loads(cache.read_text()) if cache.exists() else {}  # (the call before wrote to it)
-    known[str(k)] = found
-    cache.write_text(json.dumps(known))
-    return tuple(found) if found else None
+
+def _start_known(path: Path, vs: list[dict], k: int, t0: float) -> tuple[float | None, bool]:
+    """(word_start, timing) for _verse_truth, verse k of a quran.com recording cut at t0: where
+    forced alignment starts it (the verses may be joined without a pause: the end of the one
+    before, "-un", after the cut), unknown where it did not find the boundary or where
+    something lies between the verses; quran.com's first word for a surah's first verse."""
+    if k == 0:
+        return vs[0]["w0"] - t0, True
+    b = _bounds(path, vs, [k]).get(k)
+    return (b[1] - t0 if b else None), bool(b and b[2])
 
 
 def _qdc_clip(c: Case, rid: int, surah: int, rng, mode: str, target: float):
@@ -266,6 +369,7 @@ def _qdc_clip(c: Case, rid: int, surah: int, rng, mode: str, target: float):
         i1 += 1
     cut_start = mode != "start" and rng.random() < 0.2
     cut_end = mode != "end" and i1 + 1 < len(vs) and rng.random() < 0.12
+    _bounds(path, vs, range(i0, i1 + 2))
     cuts = [0.0 if i0 == 0 else _between(path, vs, i0)] + [_between(path, vs, k) for k in range(i0 + 1, i1 + 1)] + \
         [info["duration"] if i1 + 1 == len(vs) else _between(path, vs, i1 + 1)]
     if cut_start:
@@ -277,7 +381,9 @@ def _qdc_clip(c: Case, rid: int, surah: int, rng, mode: str, target: float):
     truth = []
     for j, k in enumerate(range(i0, i1 + 1)):
         truth.append(_verse_truth(x, surah, vs[k]["ayah"], cuts[j] - t0, cuts[j + 1] - t0, cut_start and j == 0,
-                                  cut_end and k == i1, vs[k]["w0"] - t0))
+                                  cut_end and k == i1, *_start_known(path, vs, k, t0)))
+    if cut_start:
+        truth[0]["heard_from"] = _heard_from(path, vs, i0, cuts[0])
     c.add(x, truth)
 
 
@@ -290,10 +396,11 @@ def _qdc_repeat(c: Case, rid: int, surah: int, rng):
     i1 = min(len(vs) - 1, i0 + int(rng.integers(1, 4)))
     rep = int(rng.integers(i0, i1 + 1))
     cut = lambda k: 0.0 if k == 0 else info["duration"] if k == len(vs) else _between(path, vs, k)
+    _bounds(path, vs, range(i0, i1 + 2))
     for k in list(range(i0, rep + 1)) + list(range(rep, i1 + 1)):
         a, b = cut(k), cut(k + 1)
         x = _decode(path, a, b)
-        c.add(x, [_verse_truth(x, surah, vs[k]["ayah"], 0.0, len(x) / SR, word_start=vs[k]["w0"] - a)])
+        c.add(x, [_verse_truth(x, surah, vs[k]["ayah"], 0.0, len(x) / SR, False, False, *_start_known(path, vs, k, a))])
 
 
 def _ea_run(c: Case, folder: str, surah: int, rng, target: float, warsh: bool):
@@ -313,10 +420,47 @@ def _ea_run(c: Case, folder: str, surah: int, rng, target: float, warsh: bool):
     while v <= n and (c.t - start < target or v == a):
         x = _ea(folder, f"{surah:03d}{v:03d}.mp3")
         timing = folder not in EA_NO_TIMING and not (v == 1 and surah != 1 and folder in EA_BASMALA_IN_V1)
+        lead, cuts = _ea_lead(folder, surah, v, x)  # (the verses before, said again first)
+        cuts = [0.0] + cuts + [len(x) / SR]
         for _ in range(2 if v == rep else 1):
-            c.add(x, [_verse_truth(x, surah, v, 0.0, len(x) / SR, timing=timing)])
+            c.add(x, [_verse_truth(x, surah, u, cuts[j], cuts[j + 1], timing=timing) for j, u in enumerate(lead + [v])])
             c.gap(0.35)
         v += 1
+
+
+EA_LEAD_MAX = 3  # verses before a verse a recording of it may start with (mujawwad: the one before, again)
+EA_LEAD_LOSS = 0.3  # their letters must fit about as well as the verse's own (mean log-prob)
+
+
+def _ea_lead(folder: str, surah: int, v: int, x: np.ndarray) -> tuple[list[int], list[float]]:
+    """An EveryAyah recording of verse v that starts with the verses before it said again
+    (Minshawi's mujawwad: "al-hamdu... ar-rahmani r-rahim" in 1:3's file): (those verses,
+    where each next one starts, s), found by forced alignment; cached."""
+    global _model
+    if v == 1:
+        return [], []
+    cache = HOME / "everyayah" / folder / "lead.json"
+    known = json.loads(cache.read_text()) if cache.exists() else {}
+    key = f"{surah:03d}{v:03d}"
+    if key not in known:
+        _model = _model or align.get_model()
+        chunk = 4 * SR
+        em = _model._pass(x, list(range(0, len(x), chunk)), chunk, SR, len(x) // 320)
+        toks = lambda u: [t for w in quran.verse(surah, u).align for t in _model.tokens(w)]
+        own = _force(em, toks(v), _model)[2]
+        best = ([], [])
+        for k in range(1, min(EA_LEAD_MAX, v - 1) + 1):
+            us = list(range(v - k, v + 1))
+            parts = [toks(u) for u in us]
+            frames, ends, score = _force(em, [t for q in parts for t in q], _model)
+            if score < max(FORCE_MIN, own - EA_LEAD_LOSS):
+                break
+            edges = np.cumsum([0] + [len(q) for q in parts])
+            cuts = [float((ends[edges[j] - 1] + 1 + frames[edges[j]]) / 2 * align.FRAME_S) for j in range(1, len(us))]
+            best = (us[:-1], cuts)
+        known[key] = best
+        cache.write_text(json.dumps(known))
+    return [int(u) for u in known[key][0]], [float(t) for t in known[key][1]]
 
 
 def build(i: int) -> tuple[np.ndarray, list[dict], dict]:
@@ -462,13 +606,14 @@ def _augment(audio: np.ndarray, truth: list[dict], meta: dict, rng) -> tuple[np.
 
 # ---------------------------------------------------------------- running
 
-def emissions(i: int, audio: np.ndarray, model) -> np.ndarray:
-    f = HOME / "cases" / f"{i}.em.npy"
+def emissions(i: int, audio: np.ndarray, model, short: bool = False) -> np.ndarray:
+    """The model's letters (short: with detect's short windows), cached."""
+    f = HOME / "cases" / f"{i}.{'em2' if short else 'em'}.npy"
     if f.exists():
         em = np.load(f)
         if len(em) == len(audio) // 320:
             return em
-    em = model.emissions(audio)
+    em = model.emissions(audio, detect.SHORT_CHUNK_S, detect.SHORT_CONTEXT_S) if short else model.emissions(audio)
     np.save(f, em)
     return em
 
@@ -509,11 +654,11 @@ def main():
     results, t_all = [], time.time()
     for i in ids:
         audio, truth, meta = build(i)
-        em = emissions(i, audio, model)
+        em, short = emissions(i, audio, model), emissions(i, audio, model, short=True)
         if args.build_only:
             print(f"built {i} ({len(audio) / SR:.0f}s)", flush=True)
             continue
-        blocks, _ = detect.detect(em, audio, model, segment.Options())
+        blocks, _ = detect.detect(em, audio, model, segment.Options(), short=short)
         res = db.evaluate(blocks, truth)
         res.update(case=i, meta=meta, duration=round(len(audio) / SR, 1))
         results.append(res)

@@ -126,14 +126,19 @@ def _speech() -> np.ndarray:
     return media.load_audio(f)
 
 
-def _onset(x: np.ndarray) -> tuple[float, float]:
-    """Where the voice starts and stops in a recording (s)."""
+def _onset(x: np.ndarray, below: float = 28, hold: float = 0.0) -> tuple[float, float]:
+    """Where the voice starts and stops in a recording (s): the first and last sound within
+    `below` dB of the loudest (and lasting `hold` s: not a click)."""
     hop = SR // 100
     n = len(x) // hop
     rms = np.sqrt((x[: n * hop].reshape(n, hop) ** 2).mean(axis=1) + 1e-12)
     db = 20 * np.log10(rms)
-    loud = np.nonzero(db > db.max() - 28)[0]  # (lower picks up breaths and room noise)
-    return (loud[0] / 100, (loud[-1] + 1) / 100) if len(loud) else (0.0, len(x) / SR)
+    above = db > db.max() - below  # (28: lower picks up breaths and room noise)
+    loud = np.nonzero(above)[0]
+    if not len(loud):
+        return 0.0, len(x) / SR
+    held = np.nonzero(np.convolve(above, np.ones(int(hold * 100)), "valid") >= int(hold * 100))[0] if hold else loud
+    return (held[0] if len(held) else loud[0]) / 100, (loud[-1] + 1) / 100
 
 
 def build(name: str) -> tuple[np.ndarray, list[dict]]:
@@ -180,14 +185,16 @@ def build(name: str) -> tuple[np.ndarray, list[dict]]:
     return np.concatenate(out), truth
 
 
-def emissions(name: str, audio: np.ndarray) -> np.ndarray:
-    f = CACHE / "cases" / f"{name}.npy"
+def emissions(name: str, audio: np.ndarray, short: bool = False) -> np.ndarray:
+    """The model's letters (short: with detect's short windows), cached."""
+    f = CACHE / "cases" / f"{name}{'.short' if short else ''}.npy"
     if f.exists():
         em = np.load(f)
         if len(em) == len(audio) // 320:  # else the case changed
             return em
     f.parent.mkdir(parents=True, exist_ok=True)
-    em = align.get_model().emissions(audio)
+    m = align.get_model()
+    em = m.emissions(audio, detect.SHORT_CHUNK_S, detect.SHORT_CONTEXT_S) if short else m.emissions(audio)
     np.save(f, em)
     return em
 
@@ -236,8 +243,10 @@ def evaluate(blocks: list[segment.Block], truth: list[dict]) -> dict:
             if x["cut_start"] is False and b.a0 != 0:
                 problems.append(f"{k[0]}:{k[1]} shown from word {b.a0 + 1}")
         first, b0 = want[0][1], got_seq[0][1]
-        if first["cut_start"] and (b0.a0 != 0 or b0.start > 0.05):
-            problems.append(f"cut clip: first verse shown from word {b0.a0 + 1} at {b0.start:.1f}s, not the start at 0s")
+        # (a long verse may be shown from a later part, if no word heard whole is left out)
+        if first["cut_start"] and (b0.a0 > (first.get("heard_from") or 0) or b0.start > first["t0"] + 0.6):
+            problems.append(f"cut clip: first verse shown from word {b0.a0 + 1} at {b0.start:.1f}s, "
+                            f"not from word {(first.get('heard_from') or 0) + 1} at {first['t0']:.1f}s")
     # nothing over what is not the Quran
     for x in truth:
         if x["kind"] in ("silence", "noise", "speech"):
@@ -265,9 +274,9 @@ def main(names: list[str]) -> None:
     t_all = time.time()
     for name in names:
         audio, truth = build(name)
-        em = emissions(name, audio)
+        em, short = emissions(name, audio), emissions(name, audio, short=True)
         t = time.time()
-        blocks, _ = detect.detect(em, audio, model, segment.Options())
+        blocks, _ = detect.detect(em, audio, model, segment.Options(), short=short)
         res = evaluate(blocks, truth)
         ok += res["ok"]
         print(f"{'ok  ' if res['ok'] else 'FAIL'} {name:24s} {time.time() - t:5.1f}s  {res['got']}")

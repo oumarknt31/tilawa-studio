@@ -38,6 +38,7 @@ START_OTHER_VERSE = 3.0  # start at another verse than the one given (plus 0.5 p
 START_MID_VERSE = 8.0  # start somewhere inside a verse (clip cut mid-verse)
 LOOKBACK_VERSES = 3  # verses before the given start that are also considered
 SKIP_PREFIX = 0.0  # Isti'adha / Basmala are optional
+AMIN_AFTER_FATIHA = 2.0  # "amin" after 1:7 (optional; else its letters read as 2:1 "alif lam mim")
 JUMP_TO_VERSE_START = 6.0  # reciter repeats from the start of a verse
 JUMP_TO_WORD = 14.0  # reciter repeats from some earlier word
 JUMP_WINDOW_VERSES = 1  # how far back a repeat may go (in verses)
@@ -47,7 +48,7 @@ GAP_BLANK = 0.2  # between passages, a frame the model hears as blank counts as 
 
 @dataclass
 class Word:
-    unit: str  # "istiadha", "basmala" or "verse"
+    unit: str  # "istiadha", "basmala", "verse" or "amin" (after 1:7)
     verse_index: int  # index into the verse list (-1 for prefixes)
     index: int  # word index inside its unit
     text: str
@@ -154,6 +155,9 @@ def build_words(model: Model, verses: list[quran.Verse], prefixes: bool = True, 
     for vi, v in enumerate(verses):
         for i, w in enumerate(v.align):
             words.append(Word("verse", offset + vi, i, w, model.tokens(w) or [model.sep], seg))
+    for vi, v in enumerate(verses):
+        if (v.surah, v.ayah) == (1, 7):
+            words.append(Word("amin", offset + vi, 0, quran.AMIN, model.tokens(quran.AMIN), seg))
     return words
 
 
@@ -257,6 +261,9 @@ def _build_graph(words: list[Word], blank: int, hints: list[int]):
             else:
                 for src0 in sources[seg]:
                     enter(wi, src0, START_MID_VERSE)
+        for ai in unit_words.get("amin", []):  # right after the verse's last word
+            enter(ai, last[max(wi for wi in verse_words if words[wi].verse_index == words[ai].verse_index)],
+                  AMIN_AFTER_FATIHA)
         # repeats: from any word end back to an earlier word of this or the previous verse
         for ai in verse_words:
             va = words[ai].verse_index
@@ -369,7 +376,7 @@ def align_segments(em: np.ndarray, model: Model, segments: list[Segment]) -> lis
         if wi < 0:
             continue
         seg = segments[words[wi].seg]
-        band = seg.band if words[wi].unit == "verse" else (seg.prefix_band or seg.band)
+        band = seg.band if words[wi].unit in ("verse", "amin") else (seg.prefix_band or seg.band)
         if band:
             lo[s], hi[s] = max(0, int(band[0] / FRAME_S)), min(T, int(np.ceil(band[1] / FRAME_S)))
     filler = em.max(axis=1).astype(np.float64) - FILLER_PENALTY

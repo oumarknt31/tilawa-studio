@@ -22,6 +22,7 @@ from . import quran
 
 N = 5  # letters per n-gram
 COMMON = 300  # n-grams found more often than this in the Quran say nothing about the place
+SHORT, SHORT_TOP = 4, 3  # and the best places of shorter ones (more survive letters misheard)
 
 
 def _letters(text: str) -> str:
@@ -74,6 +75,7 @@ COST_JUMP = 9.0  # another place of the Quran
 BACK_LIMIT = 900  # letters: how far back a repeat may go
 SKIP_LIMIT = 160
 GAP_LETTERS = 12  # letters before or after the passages listened to again (a short verse)
+GAP_LETTERS_IN = 6  # (further in: "fi 'amadin mumaddadah" has 10, the model heard 7 past the window)
 GAP_SHARE = 0.5  # share of its verses' letters a passage found there must have heard
 
 
@@ -164,15 +166,27 @@ def _place(q: np.ndarray, guess: int, slack: int = 12):
     return matched / len(q), start, (fq, lq, lo + ft, lo + lt)
 
 
-def _vote(q: np.ndarray, top: int) -> list[int]:
-    """Quran positions where window q may start, by its rarest letter groups."""
+@lru_cache(maxsize=1)
+def _short_grams() -> dict:
+    """The positions of every SHORT-gram (see _vote)."""
+    full = _index(True)[0]
+    grams = defaultdict(list)
+    for i in range(len(full) - SHORT + 1):
+        grams[full[i:i + SHORT]].append(i)
+    return {g: np.array(p) for g, p in grams.items()}
+
+
+def _vote(q: np.ndarray, top: int, n: int = N) -> list[int]:
+    """Quran positions where window q may start, by its rarest letter groups (of n letters)."""
     full, owner, grams = _index(True)
+    if n != N:
+        grams = _short_grams()
     _, table = _codes()
     inv = {v: k for k, v in table.items()}
     s = "".join(inv[int(c)] for c in q)
     votes: dict[int, float] = defaultdict(float)
-    for i in range(len(s) - N + 1):
-        pos = grams.get(s[i:i + N])
+    for i in range(len(s) - n + 1):
+        pos = grams.get(s[i:i + n])
         if pos is None or len(pos) > COMMON:
             continue
         w = 1.0 / len(pos)
@@ -215,14 +229,21 @@ def track(em: np.ndarray, model, beam: int = 8, top: int = 6) -> list[Passage]:
     if out:
         lo = int(np.searchsorted(t, out[0].t0)) + STEP
         hi = int(np.searchsorted(t, max(p.t1 for p in out), side="right")) - STEP
-        for a, b in ((0, lo), (hi, len(codes))):
-            a = max(a, _after_istiadha(codes, a, b))  # (it reads like the end of 16:98)
-            if b - a >= GAP_LETTERS:
-                more += _track(codes[a:b], frames[a:b], W // 2, STEP // 2, beam, top)
+        # (after the last one, from where its last window went on or a little further in: half of
+        # each verse in one small window may be too little of the short one; not so before the
+        # first, where it is more often talk)
+        for edges in ([(0, lo)], [(hi + d, len(codes)) for d in (0, STEP // 2, STEP)]):
+            for a, b in edges:
+                a = max(a, _after_istiadha(codes, a, b))  # (it reads like the end of 16:98)
+                enough = GAP_LETTERS if (a, b) == edges[0] else GAP_LETTERS_IN
+                found = _track(codes[a:b], frames[a:b], W // 2, STEP // 2, beam, top) if b - a >= enough else []
+                if found:
+                    more += found
+                    break
         # most of what they claim heard (a talk before a recitation quotes pieces of long verses)
         vs = _verses()
         more = [p for p in more if p.letters >= GAP_SHARE * sum(vs[(p.surah, a)][1] for a in range(p.first, p.last + 1))]
-    return _clean(sorted(out + more, key=lambda p: p.t0)) if more else out
+    return _clean(sorted(out + more, key=lambda p: p.t0), keep={id(p) for p in more}) if more else out
 
 
 def _after_istiadha(codes, a: int, b: int) -> int:
@@ -243,6 +264,7 @@ def _track(codes, frames, w: int, step: int, beam: int, top: int) -> list[Passag
     for k, s0 in enumerate(starts):
         q = codes[s0:s0 + w]
         guesses = _vote(q, top)
+        guesses += [g for g in _vote(q, SHORT_TOP, SHORT) if all(abs(g - h) > 16 for h in guesses)]
         ranked = sorted(range(len(prev)), key=lambda i: -prev[i][1])[:beam]
         guesses += [prev[i][0] + step for i in ranked if prev[i][0] >= 0]
         cands = []
@@ -367,15 +389,16 @@ def _verse_start(s: int, a: int) -> int:
     return vs.get((s, a), vs.get((s, 0), vs.get((s, 1))))[0]
 
 
-def _clean(ps: list[Passage]) -> list[Passage]:
+def _clean(ps: list[Passage], keep=frozenset()) -> list[Passage]:
     """Drop what is not a passage of its own: a basmala before a surah reads like 1:1
-    (or 27:30), and a few letters matching by chance."""
+    (or 27:30), and a few letters matching by chance (but in keep: a short verse found at an
+    edge, which matched most of its letters)."""
     out = []
     for i, p in enumerate(ps):
         basmala = (p.surah, p.first, p.last) in ((1, 1, 1), (27, 30, 30))
         if basmala and (i + 1 < len(ps) or len(ps) > 1):
             continue
-        if p.letters < 14 and len(ps) > 1:
+        if p.letters < 14 and len(ps) > 1 and id(p) not in keep:
             continue
         out.append(p)
     # the same passage going on after a long pause: one passage

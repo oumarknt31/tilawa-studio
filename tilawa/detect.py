@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from difflib import SequenceMatcher
 
 import numpy as np
 
@@ -20,18 +21,65 @@ from . import align, identify, quran, segment
 PRE = 4.0  # s before the first letter heard where a passage's words may start (missed letters)
 POST = 3.0  # and after the last one
 PREFIX = 14.0  # isti'adha and basmala before a passage
+AMIN = 6.0  # more after Al-Fatiha: "ad-daaaallin" (heard as blank), then "amin" in prayer
+TAIL_LETTERS = 24  # letters heard after the last passage: it may go on...
+TAIL_VERSES = 12  # ...for this many verses more
+MUQATTAAT = 8.0  # more before spelled letters ("Alif Laaam Miiim": the tracker hears the last one)
 MAX_CELLS = 120_000_000  # frames x states of one alignment (2 bytes each): longer recordings go in pieces
 PIECE_S = 150.0  # length of those pieces (cut at a quiet moment between two verses)...
 OVERLAP_S = 8.0  # ...aligned with this much more on each side, and joined where both agree
 
 
 def detect(em: np.ndarray, audio: np.ndarray, model, opt: segment.Options, surah: int = 0, first: int = 1,
-           last: int | None = None) -> tuple[list[segment.Block], list[dict]]:
+           last: int | None = None, short: np.ndarray | None = None) -> tuple[list[segment.Block], list[dict]]:
     """Blocks of the recitation, and the passages heard: [{surah, first, last, t0, t1, coverage}].
     surah 0: found in the audio; otherwise the user's choice, used when the audio agrees or
-    says nothing."""
-    duration = len(audio) / align.SR
+    says nothing. short: the model's letters with short windows (Model.emissions(audio,
+    SHORT_CHUNK_S, SHORT_CONTEXT_S)). With its usual windows the model, which knows the Quran's
+    order, may not hear a verse said again; the words are placed again with the short ones
+    (in the same passages), and that is kept when it hears the same verses and a repeat."""
     passages = identify.track(em, model)
+    blocks = _detect(em, audio, model, opt, surah, first, last, passages)
+    doubt = {}
+    if short is not None and blocks:
+        again = _detect(short, audio, model, opt, surah, first, last, passages)
+        said, said2 = _said(blocks), _said(again)
+        if _adds_repeat([v for v, _ in said], [v for v, _ in said2]):
+            blocks = again
+        else:  # heard otherwise this time: to check
+            ops = SequenceMatcher(None, [v for v, _ in said], [v for v, _ in said2], autojunk=False).get_opcodes()
+            for op, i1, i2, _, _ in ops:
+                if op != "equal":
+                    doubt.update({k: "differ" for _, ks in said[max(0, min(i1, i2 - 1)):max(i2, i1 + 1)] for k in ks})
+    _doubts(blocks, doubt)
+    return blocks, [p.to_dict() for p in passages]
+
+
+def _said(blocks: list[segment.Block]) -> list[tuple[tuple[int, int], list[int]]]:
+    """The verses recited, in order (a verse said twice is there twice), with their blocks."""
+    out, prev = [], None
+    for k, b in enumerate(blocks):
+        if b.kind != "verse":
+            continue
+        if not out or out[-1][0] != (b.surah, b.ayah) or (b.a0 == 0 and prev.a1 == len(quran.verse(b.surah, b.ayah).align)):
+            out.append(((b.surah, b.ayah), []))
+        out[-1][1].append(k)
+        prev = b
+    return out
+
+
+def _adds_repeat(said: list[tuple[int, int]], again: list[tuple[int, int]]) -> bool:
+    """again is said with one verse or more said twice in a row more (not spelled letters:
+    "Alif Laaam Miiim" can be heard in a long "amin" before it)."""
+    once = lambda s: [v for k, v in enumerate(s) if not k or s[k - 1] != v]
+    added = [v for k, v in enumerate(again) if k and again[k - 1] == v]
+    return len(again) > len(said) and once(again) == once(said) and not set(added) & quran.MUQATTAAT
+
+
+def _detect(em: np.ndarray, audio: np.ndarray, model, opt: segment.Options, surah: int, first: int,
+            last: int | None, passages: list[identify.Passage]) -> list[segment.Block]:
+    """The blocks of those passages, with these letters of the model."""
+    duration = len(audio) / align.SR
     if surah and not any(p.surah == surah for p in passages):
         # the user's choice, over the whole recording (the audio was not clear enough)
         total = quran.surah(surah)["verses"]
@@ -40,15 +88,20 @@ def detect(em: np.ndarray, audio: np.ndarray, model, opt: segment.Options, surah
         jobs = [(0.0, duration, 0.0, duration, [0], [align.Segment(quran.verses(surah, lo, hi), first - lo)])]
     else:
         if not passages:
-            return [], []
+            return []
         if surah:  # the verses the user gave, if the audio is near them
             for p in passages:
                 if p.surah == surah and 0 < p.first - first <= 10:
                     p.first = first
+        # letters heard after the last passage: the reciter may read on, heard too badly for the
+        # tracker (the aligner tries the next verses there)
+        codes, frames = identify.heard(em, model)
+        end = max(passages, key=lambda p: p.t1)
+        tail = end if np.count_nonzero(frames * align.FRAME_S > end.t1) >= TAIL_LETTERS else None
         jobs = []
         for a, b, parts in _pieces(passages, audio, duration):
             lo, hi = max(0.0, a - OVERLAP_S) if a else 0.0, min(duration, b + OVERLAP_S)
-            jobs.append((a, b, lo, hi, [k for k, _ in parts], _segments([q for _, q in parts], lo, hi)))
+            jobs.append((a, b, lo, hi, [k for k, _ in parts], _segments([q for _, q in parts], lo, hi, tail)))
     occ, verses, index = [], [], {}
     for a, b, lo, hi, which, segments in jobs:
         o, vs = _align(em, audio, model, lo, hi, segments)
@@ -64,24 +117,48 @@ def detect(em: np.ndarray, audio: np.ndarray, model, opt: segment.Options, surah
             mapped.append(align.WordTiming(replace(w, verse_index=vi, seg=k), x.start, x.end, x.score))
         occ = _stitch(occ, mapped, a) if occ else mapped
     occ = _drop_strays(occ, verses, em, model)
+    occ = _fatiha_basmala(occ, verses)  # (may add 1:1 to verses)
+    occ = _trim_ends(occ, audio, opt)
     if passages and not surah:
         occ = _finish_verses(occ, verses, passages, audio, opt)
-        occ = _cut_verse(occ, verses, passages[0])  # (may add that verse to verses)
-    blocks = segment.build_blocks(occ, verses, audio, duration, opt)
-    return blocks, [p.to_dict() for p in passages]
+        occ = _cut_verse(occ, verses, passages[0], em, model)  # (may add that verse to verses)
+        occ = _cut_word(occ, em, audio, model, opt)
+        occ = _missed_start(occ, verses, em, audio, model, opt)
+    return segment.build_blocks(occ, verses, audio, duration, opt)
 
 
-def _segments(passages: list[identify.Passage], a: float, b: float) -> list[align.Segment]:
+# why a subtitle may be wrong, most telling first: the editor asks to check those by ear
+DOUBTS = ("differ", "faint")
+DOUBT_SCORE = -1.5  # words heard this badly on average (mean log-prob): "faint"
+
+
+def _doubts(blocks: list[segment.Block], why: dict[int, str]) -> None:
+    """Mark the subtitles to check: heard otherwise with short windows (differ), words barely
+    heard (faint). Only these: a flag must be rare on the subtitles that are right, or it is soon
+    ignored (on the benchmark, a long word or a repeat heard with short windows are as often
+    right as wrong)."""
+    for k, b in enumerate(blocks):
+        reasons = [why[k]] if k in why else []
+        if b.kind == "verse" and b.words and float(np.mean([w.get("s", 0.0) for w in b.words])) < DOUBT_SCORE:
+            reasons.append("faint")
+        b.doubt = min(reasons, key=DOUBTS.index) if reasons else ""
+
+
+def _segments(passages: list[identify.Passage], a: float, b: float,
+              tail: identify.Passage | None = None) -> list[align.Segment]:
     """What the aligner searches for between a and b (s): each passage, around when it was heard.
     Where one passage ends and the next starts is left to the aligner (the tracker may match a
-    few letters of the silence between them)."""
+    few letters of the silence between them). tail: the last passage, which may go on further
+    than the tracker heard, until the end."""
     out = []
     for k, p in enumerate(passages):
         prev_start = passages[k - 1].t0 if k else a
         next_end = passages[k + 1].t1 if k + 1 < len(passages) else b
         total = quran.surah(p.surah)["verses"]
-        lo, hi = max(1, p.first - 1), min(total, p.last + 1)
-        band = (max(prev_start, p.t0 - PRE, a), min(next_end, p.t1 + POST, b))
+        lo, hi = max(1, p.first - 1), min(total, p.last + (TAIL_VERSES if p is tail else 1))
+        post = (b - p.t1) if p is tail else POST + (AMIN if (p.surah, hi) == (1, 7) else 0.0)
+        pre = PRE + (MUQATTAAT if {(p.surah, lo), (p.surah, p.first)} & quran.MUQATTAAT else 0.0)
+        band = (max(prev_start, p.t0 - pre, a), min(next_end, p.t1 + post, b))
         out.append(align.Segment(quran.verses(p.surah, lo, hi), p.first - lo, True, band,
                                  (max(prev_start, p.t0 - PREFIX, a), band[1])))
     return out
@@ -99,7 +176,7 @@ def _align(em: np.ndarray, audio: np.ndarray, model, a: float, b: float, segment
     if spans:  # listened to again closely, and aligned again
         occ = align.align_segments(_relisten(part, sound, model, spans), model, segs)
     t = f0 * align.FRAME_S
-    return [align.WordTiming(o.word, o.start + t, o.end + t, o.score) for o in occ], verses
+    return [align.WordTiming(o.word, o.start + t, o.end + t, o.score) for o in occ if o.word.unit != "amin"], verses
 
 
 def _pieces(passages: list[identify.Passage], audio: np.ndarray, duration: float):
@@ -200,22 +277,35 @@ def _relisten(em: np.ndarray, audio: np.ndarray, model, spans: list[tuple[float,
     return em
 
 
-CUT_VERSE_WORDS = 4  # a verse this short, cut at the start of a clip, is shown whole
+CUT_VERSE_WORDS = 4  # a verse this short, matched by the tracker at the start of a clip, is shown whole
+CUT_VERSE_S = 8.0  # ...or, when its last word is heard, if the next verse starts this soon
+CUT_HEARD_WORDS = 8  # ...and it is this short (one subtitle)
 
 
-def _cut_verse(occ: list[align.WordTiming], verses: list[quran.Verse], first: identify.Passage) -> list[align.WordTiming]:
+def _cut_verse(occ: list[align.WordTiming], verses: list[quran.Verse], first: identify.Passage,
+               em: np.ndarray, model) -> list[align.WordTiming]:
     """A clip cut in the last words of a short verse: the model often hears too little of it
-    to place its words, but the tracker matched it right at the start. That verse is shown
-    from the first frame until the next one starts (as a recording that stops mid-verse
-    shows the whole verse)."""
+    to place its words, but the tracker matched it right at the start, or the letters heard
+    before the next verse are its last word's. That verse is shown from the first frame until
+    the next one starts (as a recording that stops mid-verse shows the whole verse). (Without
+    letters, a held word cannot be told from a breath, noise or music.)"""
     w = occ[0].word if occ else None
-    if not w or w.unit != "verse" or w.index != 0 or first.t0 > segment.CUT_START_S + 0.5 or occ[0].start < 0.6:
+    if not w or w.unit != "verse" or w.index != 0 or occ[0].start < 0.6:
         return occ
     after = verses[w.verse_index]
-    if (after.surah, after.ayah) != (first.surah, first.first + 1):
-        return occ
-    v = quran.verse(first.surah, first.first)
-    if len(v.align) > CUT_VERSE_WORDS:
+    if (after.surah, after.ayah) == (first.surah, first.first + 1) and first.t0 <= segment.CUT_START_S + 0.5:
+        v = quran.verse(first.surah, first.first)
+        if len(v.align) > CUT_VERSE_WORDS:
+            return occ
+    elif (after.surah, after.ayah) == (first.surah, first.first) and after.ayah > 1 and occ[0].start <= CUT_VERSE_S:
+        v = quran.verse(after.surah, after.ayah - 1)
+        codes, frames = identify.heard(em, model)
+        end = occ[0].start - 0.3
+        if not _fits(codes, frames, v.align[-1:], 0.0, end):
+            return occ
+        if len(v.align) > CUT_HEARD_WORDS:
+            return occ
+    else:
         return occ
     vi = next((i for i, x in enumerate(verses) if (x.surah, x.ayah) == (v.surah, v.ayah)), len(verses))
     if vi == len(verses):
@@ -224,6 +314,106 @@ def _cut_verse(occ: list[align.WordTiming], verses: list[quran.Verse], first: id
     step = (t1 - t0) / len(v.align)
     return [align.WordTiming(align.Word("verse", vi, i, text, [], w.seg), t0 + i * step, t0 + (i + 1) * step, 0.0)
             for i, text in enumerate(v.align)] + occ
+
+
+CUT_WORD_S = 4.0  # a clip may start with this much of a word the aligner did not place
+
+
+def _cut_word(occ: list[align.WordTiming], em: np.ndarray, audio: np.ndarray, model,
+              opt: segment.Options) -> list[align.WordTiming]:
+    """A clip cut inside a word: the model hears its end from the first frame, but too little
+    of it for the aligner. The voice runs, without a pause, from the start into the first word
+    placed (mid-verse): that word starts there, so the clip is seen as cut."""
+    o = occ[0] if occ else None
+    if not o or o.word.unit != "verse" or o.word.index == 0 or not segment.CUT_START_S < o.start <= CUT_WORD_S:
+        return occ
+    loud = segment.Loudness(audio)
+    rel = loud.rel[:int(o.start * 100)]
+    start = int(np.argmax(rel >= -opt.breath_depth_db))
+    if rel[start] < -opt.breath_depth_db or start > 30:  # (voice within 0.3 s)
+        return occ
+    if loud.pause(start / 100, o.start, opt.breath_depth_db)[0] >= 0.3:
+        return occ
+    heard = em[start // 2:int(o.start / align.FRAME_S)].argmax(axis=1)
+    if not np.any((heard != model.blank) & (heard != model.sep)):
+        return occ
+    return [replace(o, start=start / 100)] + occ[1:]
+
+
+MISSED_START_S = 4.0  # the first word(s) of a passage the aligner missed may last this long
+MISSED_START_FIT = -1.0  # from a word heard this well (not a stray one over something else)
+
+
+def _missed_start(occ: list[align.WordTiming], verses: list[quran.Verse], em: np.ndarray, audio: np.ndarray,
+                  model, opt: segment.Options) -> list[align.WordTiming]:
+    """A passage placed from its second or third word: the first was held long ("yaaaa", the
+    ghunna of "innaaa"), the model heard it as blank and the tracker found the passage only
+    after it, too late for the aligner. The voice runs, without a pause, from a pause before
+    into that word, and the letters heard there (if any) are those words: the passage starts
+    there (segment shows the words missed). (Speech running into the verse has other letters.)"""
+    loud = segment.Loudness(audio)
+    codes, frames = identify.heard(em, model)
+    quiet = loud.rel < -opt.breath_depth_db
+    need = int(0.3 * 100)
+    out = list(occ)
+    for i, o in enumerate(out):
+        if o.word.unit != "verse" or not 0 < o.word.index <= segment.MISSED_WORDS or o.score < MISSED_START_FIT:
+            continue
+        if i and out[i - 1].word.seg == o.word.seg:
+            continue
+        floor = int(max(out[i - 1].end if i else 0.0, o.start - MISSED_START_S) * 100)
+        j, run = int(o.start * 100), 0
+        while j > floor and run < need:
+            j -= 1
+            run = run + 1 if quiet[j] else 0
+        if run < need:  # (no pause: the voice before is something else)
+            continue
+        onset = (j + run) / 100
+        missed = verses[o.word.verse_index].align[:o.word.index]
+        heard = np.count_nonzero((frames >= onset / align.FRAME_S) & (frames < o.start / align.FRAME_S))
+        if o.start - onset >= 0.3 * o.word.index and (not heard or _fits(codes, frames, missed, onset, o.start)):
+            out[i] = replace(o, start=onset)
+    return out
+
+
+TRAIL_S = 1.0  # quiet this long inside a word is a silence between passages (a stop on a doubled
+# letter, or between the letters of "Alif Lam Ra", lasts up to 0.8 s)
+SILENCE_DB = 30.0  # below the recording's speech level: quiet even in a long silence
+
+
+def _trim_ends(occ: list[align.WordTiming], audio: np.ndarray, opt: segment.Options) -> list[align.WordTiming]:
+    """A passage's last word ends where its voice stops, its first word starts where the voice
+    starts: the aligner may stretch them over the silence between two passages (blank inside a
+    word costs nothing, like silence), or over the other passage's sound. Such a word, with a
+    long pause inside, keeps the first (last) stretch of voice it covers."""
+    loud = segment.Loudness(audio)
+    quiet = (loud.rel < -opt.breath_depth_db) | (loud.level < -SILENCE_DB)
+    need = int(TRAIL_S * 100)
+    out = list(occ)
+    for i, o in enumerate(out):
+        last = i + 1 == len(out) or out[i + 1].word.seg != o.word.seg
+        first = i == 0 or out[i - 1].word.seg != o.word.seg
+        if o.word.unit != "verse" or not (first or last):
+            continue
+        i0 = int(o.start * 100)
+        q = quiet[i0:min(len(quiet), int(o.end * 100))]
+        edges, j = [0], 0  # pieces of the word between pauses of `need` or more (in 10 ms)
+        while j < len(q):
+            k = j
+            while k < len(q) and q[k]:
+                k += 1
+            if k - j >= need:
+                edges += [j, k]
+            j = max(k, j + 1)
+        if len(edges) == 1:
+            continue
+        edges.append(len(q))
+        ps = [(x, y) for x, y in zip(edges[::2], edges[1::2]) if np.count_nonzero(~q[x:y]) >= 10]  # (0.1 s of voice)
+        if not ps:
+            continue
+        x, y = ps[-1] if first and not last else ps[0] if last and not first else max(ps, key=lambda p: p[1] - p[0])
+        out[i] = replace(o, start=(i0 + x) / 100, end=(i0 + y) / 100 + align.FRAME_S)
+    return out
 
 
 FINISH_AFTER_S = 0.5  # the tracker heard the passage this long after its last word placed (or nothing follows)...
@@ -292,6 +482,41 @@ def _finish_verses(occ: list[align.WordTiming], verses: list[quran.Verse], passa
 
 
 STRAY_FIT = 0.45  # an isolated stretch of words must match this share of the letters heard there
+STRAY_SCORE = -1.5  # a word or two heard this badly (mean log-prob) are checked so too
+STRAY_FIT_WEAK = 0.7  # (isolated as well: most of their letters)
+STRAY_GAP_S = 0.5  # a passage's weak first words this far from the next are checked so too
+
+
+def _fatiha_basmala(occ: list[align.WordTiming], verses: list[quran.Verse]) -> list[align.WordTiming]:
+    """The basmala before Al-Fatiha is its first verse: placed as the basmala said before a
+    surah (the same words), followed by 1:2, it is shown as 1:1."""
+    out = list(occ)
+    for i, o in enumerate(out):
+        nxt = out[i + 1] if i + 1 < len(out) else None
+        if o.word.unit != "basmala" or not nxt or nxt.word.unit != "verse" or nxt.word.index != 0 or nxt.word.seg != o.word.seg:
+            continue
+        if (verses[nxt.word.verse_index].surah, verses[nxt.word.verse_index].ayah) != (1, 2):
+            continue
+        v = quran.verse(1, 1)
+        vi = next((k for k, x in enumerate(verses) if (x.surah, x.ayah) == (1, 1)), len(verses))
+        if vi == len(verses):
+            verses.append(v)
+        j = i
+        while j >= 0 and out[j].word.unit == "basmala" and out[j].word.seg == o.word.seg:
+            w = out[j].word
+            out[j] = replace(out[j], word=replace(w, unit="verse", verse_index=vi, text=v.align[w.index]))
+            j -= 1
+    return out
+
+
+def _fits(codes: np.ndarray, frames: np.ndarray, texts: list[str], t0: float, t1: float, share: float = 0.0) -> bool:
+    """The letters heard between t0 and t1 (s; identify.heard) match these words (this share of
+    them, STRAY_FIT by default)."""
+    _, table = identify._codes()
+    text = np.array([table[c] for w in texts for c in quran.skeleton(w) if c in table], dtype=np.int16)
+    heard = codes[(frames >= t0 / align.FRAME_S - 3) & (frames <= t1 / align.FRAME_S + 3)]
+    matched = identify._fit(heard, text)[0] if len(heard) and len(text) else 0
+    return matched >= (share or STRAY_FIT) * max(len(text), len(heard))
 
 
 def _drop_strays(occ: list[align.WordTiming], verses: list[quran.Verse], em: np.ndarray, model) -> list[align.WordTiming]:
@@ -324,18 +549,28 @@ def _drop_strays(occ: list[align.WordTiming], verses: list[quran.Verse], em: np.
             ((vy.surah, vy.ayah) == (vx.surah, vx.ayah + 1) and y.index == 0 and ends_verse(a))
 
     codes, frames = identify.heard(em, model)
-    _, table = identify._codes()
+    fits = lambda r, share=0.0: _fits(codes, frames, [o.word.text for o in r], r[0].start, r[-1].end, share)
+
+    weak = lambda r: len(r) <= segment.MISSED_WORDS and np.mean([o.score for o in r]) < STRAY_SCORE  # (a few words)
     out = []
     for k, r in enumerate(runs):
         prev, nxt = (runs[k - 1] if k else None), (runs[k + 1] if k + 1 < len(runs) else None)
         linked = (follows(prev, r) if prev and prev[-1].word.seg == r[0].word.seg else r[0].word.index == 0) or \
             (follows(r, nxt) if nxt and nxt[0].word.seg == r[-1].word.seg else ends_verse(r))
-        if not linked:
-            text = np.array([table[c] for o in r for c in quran.skeleton(o.word.text) if c in table], dtype=np.int16)
-            f0, f1 = r[0].start / align.FRAME_S - 3, r[-1].end / align.FRAME_S + 3
-            heard = codes[(frames >= f0) & (frames <= f1)]
-            matched = identify._fit(heard, text)[0] if len(heard) and len(text) else 0
-            if matched < STRAY_FIT * max(len(text), len(heard)):
-                continue
+        if (not linked or weak(r)) and not fits(r, STRAY_FIT_WEAK if not linked and weak(r) else 0.0):
+            continue
         out += r
+    # a passage's first word or two put, barely heard, on what comes before it (speech), apart
+    # from the rest: left out (segment shows a verse's first words the aligner missed). (Next to
+    # the rest, a weak first word is more often the verse, half on what comes before it.)
+    for i in range(len(out) - 1, -1, -1):
+        first = i == 0 or out[i - 1].word.seg != out[i].word.seg
+        if not first or out[i].word.unit != "verse":
+            continue
+        n = 0
+        while (i + n + 1 < len(out) and n < segment.MISSED_WORDS and out[i + n + 1].word.seg == out[i].word.seg
+               and out[i + n + 1].word.verse_index == out[i].word.verse_index and weak([out[i + n]])):
+            n += 1
+        if n and out[i + n].start - out[i + n - 1].end >= STRAY_GAP_S and not fits(out[i:i + n]):
+            del out[i:i + n]
     return out

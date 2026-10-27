@@ -151,17 +151,24 @@ def analyze(p: Project, progress: Progress | None = None) -> Project:
         progress("listening", 0.3)
         em = model.emissions(audio)
         np.save(cache, em)
-    progress("identify", 0.65)
+    cache = p.folder / "emissions-short.npy"
+    if cache.exists():
+        short = np.load(cache)
+    else:
+        progress("listening", 0.5)
+        short = model.emissions(audio, detect.SHORT_CHUNK_S, detect.SHORT_CONTEXT_S)
+        np.save(cache, short)
+    progress("identify", 0.7)
     opt = segment.Options(**{k: v for k, v in p.segment.items() if k in segment.Options.__dataclass_fields__})
     opt.lang = p.lang
     recognised = p.reading == "auto"
     quran.use_reading("hafs" if recognised else p.reading)
-    blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse)
+    blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse, short)
     if p.reading == "auto":  # which reading is recited: the one what the model heard is closer to
         p.reading = warsh.reading_heard(em, model, blocks)
         if p.reading == "warsh":
             quran.use_reading("warsh")
-            blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse)
+            blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse, short)
     p.detected = {"matches": found, "reading_recognised": recognised}
     if not blocks or not any(b.kind == "verse" for b in blocks):
         raise UserError("no_verse" if p.surah else "not_recognized")

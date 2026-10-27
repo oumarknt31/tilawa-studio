@@ -52,6 +52,7 @@
   .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 2px 8px; border-radius: 20px; background: var(--surface-3); color: var(--muted); border: 1px solid var(--line-2); }
   .badge.gold { background: rgba(242, 201, 92, .12); color: var(--gold); border-color: rgba(242, 201, 92, .35); }
   .badge.teal { background: var(--accent-soft); color: var(--accent); border-color: rgba(61, 214, 195, .35); }
+  .badge.warn { background: rgba(255, 166, 77, .12); color: #ffae5c; border-color: rgba(255, 166, 77, .4); cursor: pointer; }
   .progress { height: 7px; background: var(--surface-3); border-radius: 6px; overflow: hidden; }
   .progress > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--gold)); width: 0; transition: width .3s; }
   .error { color: var(--danger); white-space: pre-wrap; font-size: 13px; }
@@ -998,6 +999,9 @@ const EN = {
   "Utiliser la détection": "Use the detection", "Choisir la sourate": "Choose the surah", "Analyser": "Analyse",
   "écouter": "listen", "apparition (s)": "appears at (s)", "disparition (s)": "disappears at (s)",
   "faire apparaître à la position de lecture": "make it appear at the playhead", "⤓ ici": "⤓ here", "corrigé": "corrected",
+  "à vérifier": "to check", "(clique quand c'est vérifié)": "(click once checked)", "{n} à vérifier": "{n} to check",
+  "Ce passage a été mal entendu : vérifie le verset et le moment.": "This passage was heard badly: check the verse and its timing.",
+  "Une deuxième écoute entend d'autres versets ici : vérifie ce passage.": "A second listen hears other verses here: check this passage.",
   "clique pour corriger l'arabe": "click to correct the Arabic", "clique pour corriger la phonétique": "click to correct the transliteration",
   "Couper avant": "Split before", "couper avant « {w} » ({t})": "split before « {w} » ({t})", "(pas de traduction)": "(no translation)",
   "✨ Mise en valeur": "✨ Highlight", "annuler tes corrections de l'arabe et de la phonétique": "undo your corrections of the Arabic and transliteration",
@@ -2349,7 +2353,7 @@ function renderNotice() {
       <button class="primary" style="margin-top:10px" onclick="reanalyze({ surah: $('ps-surah').value, first_verse: $('ps-first').value, last_verse: null }, true)">${t("Analyser")}</button>`;
     if (P.surah) $("ps-surah").value = P.surah;
   }
-  $("subs-count").textContent = t(P.blocks.length > 1 ? "{n} sous-titres" : "{n} sous-titre", { n: P.blocks.length });
+  renderCount();
 }
 function renderBlocks() {
   $("blocks").innerHTML = P.blocks.map((b, i) => {
@@ -2372,6 +2376,7 @@ function renderBlocks() {
           <button class="small ghost" onclick="toPlayhead(${i})" title="${t("faire apparaître à la position de lecture")}">${t("⤓ ici")}</button>
         </div>
         <span class="grow"></span>
+        ${b.doubt ? `<span class="badge warn" onclick="clearDoubt(${i})" title="${t(DOUBTS[b.doubt] || DOUBTS.faint)} ${t("(clique quand c'est vérifié)")}">${t("à vérifier")}</span>` : ""}
         ${b.edited ? `<span class="badge gold">${t("corrigé")}</span>` : ""}
       </div>
       <textarea class="ar-edit" dir="rtl" lang="ar" rows="1" spellcheck="false" title="${t("clique pour corriger l'arabe")}"
@@ -2444,6 +2449,17 @@ async function setVerse(i, surah, ayah, audio, label) {
 }
 function setFr(i, v) { P.blocks[i].fr = v; changed({ group: "fr" + i }); }
 function setHl(i, v) { P.blocks[i].highlight = v; changed({ tl: true }); }
+// why detection may be wrong on a subtitle (detect.DOUBTS): the user checks those by ear
+const DOUBTS = {
+  differ: "Une deuxième écoute entend d'autres versets ici : vérifie ce passage.",
+  faint: "Ce passage a été mal entendu : vérifie le verset et le moment.",
+};
+function clearDoubt(i) { P.blocks[i].doubt = ""; renderBlocks(); renderCount(); changed({ group: "doubt" + i }); }
+function renderCount() {
+  const n = P.blocks.filter(b => b.doubt).length;
+  $("subs-count").textContent = t(P.blocks.length > 1 ? "{n} sous-titres" : "{n} sous-titre", { n: P.blocks.length }) +
+    (n ? " · " + t("{n} à vérifier", { n }) : "");
+}
 function setMeta(title) {
   if (title !== undefined) $("ed-title").value = title;
   P.title = $("ed-title").value; $("e-title").value = P.title; P.reciter = $("e-reciter").value;
