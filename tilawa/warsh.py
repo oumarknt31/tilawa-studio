@@ -20,6 +20,8 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 
+import numpy as np
+
 from . import quran
 
 PAUSE = "ۖۗۚۛۜۘۙ"  # pause marks, written on the word in this text
@@ -182,22 +184,38 @@ def surah(s: int) -> dict[int, Text]:
 # ---------------------------------------------------------------- which reading is recited
 
 FPS = 50  # model frames per second
-MARGIN = 0.005  # how much closer to the Warsh text what is heard must be (Hafs is the most recited)
+# The model learned from Hafs recitations and leans to their spelling: given a word Warsh
+# says otherwise, it prefers the Hafs spelling even when hearing Warsh, but much less. Measured
+# on stitched EveryAyah recitations: 8 Hafs reciters, -51 to -15 (none above); 3 Warsh ones,
+# 12 of 15 above -10 (Al-Fatiha alone tells nothing: an alif longer or not, as in maliki /
+# maaliki, the model barely hears, so those words are not counted).
+WARSH_ABOVE = -10.0
 
 
 def reading_heard(em, model, blocks: list) -> str:
-    """Hafs or Warsh: the reading whose text what the model heard is closer to."""
-    return "warsh" if warsh_score(em, model, blocks) > MARGIN else "hafs"
+    """Hafs or Warsh: the reading the recitation is in (Hafs without enough to tell)."""
+    score = warsh_score(em, model, blocks)
+    return "warsh" if score is not None and score > WARSH_ABOVE else "hafs"
 
 
-def warsh_score(em, model, blocks: list) -> float:
-    """How much closer to the Warsh text than to the Hafs one what the model heard is, over the
-    verses recited whole (blocks found with the Hafs text). Most of their words are said the
-    same in both: the verses with others decide. (The model learned from Hafs recitations and
-    leans to their spelling: a Hafs recitation is never closer to Warsh, a Warsh one only a little.)"""
-    from . import identify
+def warsh_score(em, model, blocks: list) -> float | None:
+    """How much better than the Hafs spelling the Warsh spelling of the words said otherwise fits
+    what the model heard (log-likelihood per word, in the verses recited whole; blocks found with
+    the Hafs text), or None when no such word was recited."""
+    import torch
 
-    gain = weight = 0.0
+    lp = em.astype(np.float32).copy()
+    lp[:, model.blank] = np.logaddexp(lp[:, model.blank], lp[:, model.sep])  # as align.py does
+    lp[:, model.sep] = -1e4
+
+    def cost(part, words) -> float:
+        toks = [t for w in words for t in model.tokens(w)]
+        x = torch.from_numpy(part).unsqueeze(1)
+        return float(torch.nn.functional.ctc_loss(x, torch.tensor([toks]), torch.tensor([len(part)]),
+                                                  torch.tensor([len(toks)]), blank=model.blank,
+                                                  reduction="sum", zero_infinity=True))
+
+    gains = []
     i = 0
     while i < len(blocks):
         b, j = blocks[i], i
@@ -206,12 +224,14 @@ def warsh_score(em, model, blocks: list) -> float:
                    and (blocks[j + 1].surah, blocks[j + 1].ayah) == (b.surah, b.ayah)):
                 j += 1
             hafs, warsh = quran._verse(b.surah, b.ayah, "hafs"), quran._verse(b.surah, b.ayah, "warsh")
-            h, w = same_key("".join(hafs.align)), same_key("".join(warsh.align))
-            if b.a0 == 0 and blocks[j].a1 == len(hafs.align) and h != w:
-                part = em[int(b.voice_start * FPS): int(blocks[j].voice_end * FPS) + 1]
-                heard = same_key(identify.transcript(part, model).replace(" ", ""))
-                ratio = lambda t: difflib.SequenceMatcher(None, heard, t, autojunk=False).ratio()
-                gain += (ratio(w) - ratio(h)) * len(h)
-                weight += len(h)
+            if b.a0 == 0 and blocks[j].a1 == len(hafs.align) and len(warsh.align) == len(hafs.align):
+                part = lp[max(0, int(b.voice_start * FPS) - 5): int(blocks[j].voice_end * FPS) + 6]
+                base = None
+                for k, (h, w) in enumerate(zip(hafs.align, warsh.align)):
+                    kh, kw = same_key(h), same_key(w)
+                    if kh == kw or kh.replace("ا", "") == kw.replace("ا", ""):
+                        continue
+                    base = cost(part, hafs.align) if base is None else base
+                    gains.append(base - cost(part, hafs.align[:k] + [w] + hafs.align[k + 1:]))
         i = j + 1
-    return gain / weight if weight else 0.0
+    return float(np.mean(gains)) if gains else None

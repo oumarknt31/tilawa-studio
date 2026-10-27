@@ -962,7 +962,7 @@ const EN = {
   "changer de vidéo": "change video", "Format": "Format", "Sourate et versets": "Surah and verses",
   "Détection automatique": "Automatic detection", "Choisir moi-même": "Choose myself",
   "premier verset (environ)": "first verse (roughly)", "fin auto": "auto end", "dernier verset (optionnel)": "last verse (optional)",
-  "Lecture": "Reading", "Reconnue à l'écoute": "Recognised by listening", "lecture (riwaya)": "reading (riwaya)",
+  "Lecture": "Reading", "Lecture reconnue : {r}.": "Reading recognised: {r}.", "C'est du {r}": "It's {r}", "Reconnue à l'écoute": "Recognised by listening", "lecture (riwaya)": "reading (riwaya)",
   "la riwaya récitée : Hafs presque partout ; Warsh surtout au Maroc, en Algérie et en Afrique de l'Ouest": "the riwaya recited: Hafs almost everywhere; Warsh mostly in Morocco, Algeria and West Africa",
   "Récitateur": "Reciter", "ex. Muhammad Dibirov": "e.g. Muhammad Dibirov", "Traduction": "Translation", "Style": "Style",
   "Créer ma vidéo": "Create my video", "Préparation…": "Preparing…", "Import": "Import", "Écoute": "Listening",
@@ -2329,6 +2329,11 @@ function renderNotice() {
     });
     const auto = m.length && ss.every(s => m.some(x => x.surah === s));
     html = `<div class="notice ${auto ? "teal" : "gold"}">${auto ? icon("spark", 14) + " " + t("Reconnu automatiquement :") + " " : ""}${found.join(" · ")}.</div>`;
+    if (P.detected?.reading_recognised && P.reading in READINGS) {  // the reading heard: one click to the other
+      const other = P.reading === "warsh" ? "hafs" : "warsh";
+      html += `<div class="notice small">${t("Lecture reconnue : {r}.", { r: `<b>${READINGS[P.reading]}</b>` })}
+        <button class="small" style="margin-left:6px" onclick="reanalyze({ auto: true, reading: '${other}' })">${t("C'est du {r}", { r: READINGS[other] })}</button></div>`;
+    }
     const heard = m.filter(x => !ss.includes(x.surah) && x.coverage > 0.7);
     if (heard.length)
       html += `<div class="notice warn">${t("J'entends plutôt la sourate {name} (versets {range}).", { name: `<b>${esc(name(heard[0].surah))}</b>`, range: `${heard[0].first}–${heard[0].last}` })}

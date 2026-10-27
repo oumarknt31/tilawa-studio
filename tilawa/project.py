@@ -154,14 +154,15 @@ def analyze(p: Project, progress: Progress | None = None) -> Project:
     progress("identify", 0.65)
     opt = segment.Options(**{k: v for k, v in p.segment.items() if k in segment.Options.__dataclass_fields__})
     opt.lang = p.lang
-    quran.use_reading("hafs" if p.reading == "auto" else p.reading)
+    recognised = p.reading == "auto"
+    quran.use_reading("hafs" if recognised else p.reading)
     blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse)
     if p.reading == "auto":  # which reading is recited: the one what the model heard is closer to
         p.reading = warsh.reading_heard(em, model, blocks)
         if p.reading == "warsh":
             quran.use_reading("warsh")
             blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse)
-    p.detected = {"matches": found}
+    p.detected = {"matches": found, "reading_recognised": recognised}
     if not blocks or not any(b.kind == "verse" for b in blocks):
         raise UserError("no_verse" if p.surah else "not_recognized")
     auto_title = not p.title or p.title in (titles(p.lang, [p.surah] if p.surah else []), titles(p.lang, p.surahs))
