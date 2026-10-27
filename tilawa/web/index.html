@@ -466,7 +466,11 @@
           <div class="field"><label>Récitateur</label><input id="reciter" list="reciters" placeholder="ex. Muhammad Dibirov"><datalist id="reciters"></datalist></div>
           <div class="field"><label>Traduction</label><select id="lang"></select></div>
         </div>
-        <div class="field"><label>Style</label><select id="new-style"></select></div>
+        <div class="grid2">
+          <div class="field"><label>Lecture</label><select id="reading" title="la riwaya récitée : Hafs presque partout ; Warsh surtout au Maroc, en Algérie et en Afrique de l'Ouest">
+            <option value="auto">Reconnue à l'écoute</option><option value="hafs">Hafs ʿan ʿĀṣim</option><option value="warsh">Warsh ʿan Nāfiʿ</option></select></div>
+          <div class="field"><label>Style</label><select id="new-style"></select></div>
+        </div>
         <button id="go" class="primary bigbtn" onclick="createProject()"><svg class="i"><use href="#i-spark"/></svg>Créer ma vidéo</button>
       </div>
       <!-- step 3: progress -->
@@ -772,6 +776,8 @@
       </div>
       <div class="section">
         <div class="sh"><h3>Analyse de la récitation</h3></div>
+        <div class="field"><label>Lecture</label><select id="a-reading" title="la riwaya récitée : Hafs presque partout ; Warsh surtout au Maroc, en Algérie et en Afrique de l'Ouest">
+          <option value="auto">Reconnue à l'écoute</option><option value="hafs">Hafs ʿan ʿĀṣim</option><option value="warsh">Warsh ʿan Nāfiʿ</option></select></div>
         <div class="seg-ctl"><button id="ra-auto" onclick="raMode(true)">✨ Détection automatique</button><button id="ra-manual" onclick="raMode(false)">Choisir</button></div>
         <div id="ra-fields" class="hidden" style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-top:10px">
           <select id="a-surah"></select><input id="a-first" type="number" min="1" title="premier verset"><input id="a-last" type="number" min="1" placeholder="fin auto" title="dernier verset">
@@ -956,6 +962,8 @@ const EN = {
   "changer de vidéo": "change video", "Format": "Format", "Sourate et versets": "Surah and verses",
   "Détection automatique": "Automatic detection", "Choisir moi-même": "Choose myself",
   "premier verset (environ)": "first verse (roughly)", "fin auto": "auto end", "dernier verset (optionnel)": "last verse (optional)",
+  "Lecture": "Reading", "Reconnue à l'écoute": "Recognised by listening", "lecture (riwaya)": "reading (riwaya)",
+  "la riwaya récitée : Hafs presque partout ; Warsh surtout au Maroc, en Algérie et en Afrique de l'Ouest": "the riwaya recited: Hafs almost everywhere; Warsh mostly in Morocco, Algeria and West Africa",
   "Récitateur": "Reciter", "ex. Muhammad Dibirov": "e.g. Muhammad Dibirov", "Traduction": "Translation", "Style": "Style",
   "Créer ma vidéo": "Create my video", "Préparation…": "Preparing…", "Import": "Import", "Écoute": "Listening",
   "Identification": "Identification", "Synchronisation": "Sync", "Recommencer": "Start again",
@@ -1480,6 +1488,7 @@ function showNewForm(name) {
   $("src-name").textContent = name;
   $("new-source").classList.add("hidden"); $("job-box").classList.add("hidden");
   $("new-form").classList.remove("hidden");
+  $("reading").value = settings.reading || "auto";
 }
 function resetNew() {
   newSource = null; $("file").value = ""; $("url").value = "";
@@ -1512,7 +1521,8 @@ async function createProject() {
   const reciter = $("reciter").value.trim();
   const [lang, translation = ""] = $("lang").value.split("|");
   fd.append("reciter", reciter); fd.append("format", newFormat); fd.append("lang", lang); fd.append("translation", translation);
-  fd.append("style", $("new-style").value);
+  fd.append("style", $("new-style").value); fd.append("reading", $("reading").value);
+  settings.reading = $("reading").value;
   if (newSource.file) fd.append("file", newSource.file); else fd.append("url", newSource.url);
   if (reciter) {
     const rec = [reciter, ...(settings.reciters || []).filter(x => x !== reciter)].slice(0, 40);
@@ -1609,6 +1619,7 @@ function refreshAll() {
   $("ed-title").value = P.title; $("e-title").value = P.title; $("e-reciter").value = P.reciter;
   const lang = langs.find(l => l.code === P.lang);
   $("ed-badges").innerHTML = `<span class="badge">${P.format}</span><span class="badge">${esc(lang ? t(lang.name) : P.lang)}</span>`
+    + (P.reading in READINGS ? `<span class="badge" title="${t("lecture (riwaya)")}">${READINGS[P.reading]}</span>` : "")
     + (P.surahs?.length ? P.surahs : P.surah ? [P.surah] : []).map(n => `<span class="badge gold">${esc(surahs[n - 1]?.name || n)}</span>`).join("");
   const r = P.render;
   $("r-quality").value = r.quality === "png" ? "max" : r.quality;
@@ -1704,10 +1715,15 @@ async function serverEdit(path, body) {
 }
 
 // ---------------------------------------------------------------- preview
+// The verse number the reader sees, in the project's reading (the server's num: Warsh counts
+// some verses differently; 0 is Al-Fatiha's basmala, not a verse in Warsh).
+const READINGS = { hafs: "Hafs", warsh: "Warsh" };
+const vnum = (b) => b.num ?? b.ayah;
+const vlabel = (b) => vnum(b) ? `${vnum(b)}${b.num_end && b.num_end !== vnum(b) ? "–" + b.num_end : ""}` : "Basmala";
 function payload(b) {
   const rtl = langs.find(l => l.code === P.lang)?.rtl;
-  return { num: b.kind === "verse" ? b.ayah + "." : "", fr: b.fr, ar: b.ar, tr: b.tr, highlight: b.highlight,
-           ayah: b.ends_verse ? b.ayah : 0, rtl, lang: P.lang };
+  return { num: b.kind === "verse" && vnum(b) ? vnum(b) + "." : "", fr: b.fr, ar: b.ar, tr: b.tr, highlight: b.highlight,
+           ayah: b.ends_verse === true ? b.ayah : b.ends_verse || 0, rtl, lang: P.lang };
 }
 function currentIndex(t) { return P.blocks.findIndex(b => t >= b.start && t < b.end); }
 let lastShown = "", lastHeader = "", lastStyle = "", lastLogo = null, introPlay = null, logoHover = null;
@@ -2298,7 +2314,7 @@ function chipWords(b) {
   return tr.length === b.words.length ? tr : b.words.map(w => w.tr || w.w);
 }
 function renderNotice() {
-  const ayahs = P.blocks.filter(b => b.kind === "verse").map(b => b.ayah);
+  const ayahs = P.blocks.filter(b => b.kind === "verse").map(vnum);
   const m = P.detected?.matches || [], name = (n) => surahs[n - 1]?.name || n;
   let html = "";
   if (!P.surah || !ayahs.length) {
@@ -2307,7 +2323,7 @@ function renderNotice() {
     // each surah recited, with its verses (a prayer: Al-Fatiha, then another surah)
     const ss = [...new Set(P.blocks.filter(b => b.kind === "verse").map(b => b.surah))];
     const found = ss.map(s => {
-      const a = P.blocks.filter(b => b.kind === "verse" && b.surah === s).map(b => b.ayah);
+      const a = P.blocks.filter(b => b.kind === "verse" && b.surah === s).flatMap(b => [vnum(b), b.num_end || vnum(b)]).filter(Boolean);
       const lo = Math.min(...a), hi = Math.max(...a);
       return `<b>${t("Sourate {name}", { name: esc(name(s)) })}</b>, ${t("versets {range}", { range: lo === hi ? lo : `${lo}–${hi}` })}`;
     });
@@ -2332,7 +2348,7 @@ function renderNotice() {
 }
 function renderBlocks() {
   $("blocks").innerHTML = P.blocks.map((b, i) => {
-    const label = b.kind === "verse" ? `${b.ayah}` : b.kind === "basmala" ? "Basmala" : "Isti'adha";
+    const label = b.kind === "verse" ? vlabel(b) : b.kind === "basmala" ? "Basmala" : "Isti'adha";
     const words = chipWords(b);
     const canSplit = b.kind === "verse" && words.length > 1;
     const next = P.blocks[i + 1];
@@ -2388,7 +2404,7 @@ async function chooseVerse(i) {
   try {
     const { job } = await api(`/api/projects/${pid()}/verse-candidates`, json({ index: i }));
     const r = await follow(job, null, null);
-    const name = (c) => `${t("Sourate {name}", { name: esc(c.name) })}, ${t("verset {n}", { n: c.ayah })}`;
+    const name = (c) => `${t("Sourate {name}", { name: esc(c.name) })}, ${t("verset {n}", { n: c.label || c.ayah })}`;
     body.innerHTML = (r.parts > 1 ? `<p class="small muted" style="margin-top:0">${t("Les {n} sous-titres de ce verset seront refaits ensemble.", { n: r.parts })}</p>` : "")
       + r.candidates.map((c, k) => `<div class="vcand ${k === 0 ? "best" : ""}">
         <div><b>${name(c)}</b>
@@ -2396,20 +2412,21 @@ async function chooseVerse(i) {
           ${c.follows ? `<span class="badge teal">${t("suit le verset précédent")}</span>` : ""}
           ${c.same_text && !c.current ? `<span class="badge">${t("même texte")}</span>` : ""}
           <div class="small muted" style="margin-top:4px"><span class="meter"><div style="width:${Math.round(c.audio * 100)}%"></div></span>${t("{p} % de ce que j'entends", { p: Math.round(c.audio * 100) })}</div></div>
-        ${c.current ? `<span class="small muted">${t("déjà choisi")}</span>` : `<button class="small ${k === 0 ? "primary" : ""}" onclick="setVerse(${i}, ${c.surah}, ${c.ayah}, ${c.audio})">${t("C'est celui-là")}</button>`}
+        ${c.current ? `<span class="small muted">${t("déjà choisi")}</span>` : `<button class="small ${k === 0 ? "primary" : ""}" onclick="setVerse(${i}, ${c.surah}, ${c.ayah}, ${c.audio}, '${c.label || c.ayah}')">${t("C'est celui-là")}</button>`}
         <div class="ar">${esc(c.ar)}</div></div>`).join("")
       + `<details style="margin-top:10px"><summary class="small">${t("Un autre verset")}</summary>
           <div class="row" style="margin-top:8px"><select id="vd-surah" style="flex:2">${$("surah").innerHTML}</select>
-          <input id="vd-ayah" type="number" min="1" value="${r.current.ayah}" style="flex:1">
-          <button class="small" onclick="setVerse(${i}, +$('vd-surah').value, +$('vd-ayah').value, null)">${t("Choisir")}</button></div></details>`;
+          <input id="vd-ayah" type="number" min="1" value="${r.current.number || r.current.ayah}" style="flex:1">
+          <button class="small" onclick="setVerse(${i}, +$('vd-surah').value, null, null, $('vd-ayah').value)">${t("Choisir")}</button></div></details>`;
     $("vd-surah").value = r.current.surah;
   } catch (e) { body.innerHTML = `<p class="error">${esc(e.message)}</p>`; }
 }
-async function setVerse(i, surah, ayah, audio) {
+// ayah: the verse's Hafs key (from the list); or null and label: a number typed, as the reading numbers it
+async function setVerse(i, surah, ayah, audio, label) {
   if (audio !== null && audio < 0.5 && !await ask(t("Ce verset ne correspond pas bien à ce que j'entends ({p} %). Le choisir quand même ?", { p: Math.round(audio * 100) }))) return;
-  $("verse-body").innerHTML = `<p class="muted">${t("Je recale ce passage sur le verset {n}…", { n: ayah })}</p>`;
+  $("verse-body").innerHTML = `<p class="muted">${t("Je recale ce passage sur le verset {n}…", { n: label })}</p>`;
   try {
-    const { job } = await api(`/api/projects/${pid()}/set-verse`, json({ index: i, surah, ayah }));
+    const { job } = await api(`/api/projects/${pid()}/set-verse`, json(ayah ? { index: i, surah, ayah } : { index: i, surah, number: +label }));
     await follow(job, null, null);
     const p = await api(`/api/projects/${pid()}`);
     undoStack.push(lastState); redoStack.length = 0; lastGroup = null;
@@ -2417,7 +2434,7 @@ async function setVerse(i, surah, ayah, audio) {
     if (followVerses()) scheduleSave();
     lastState = state(); refreshAll();
     $("verse-dlg").close();
-    toast(`${icon("check")} ${t("Verset {n} : sous-titres refaits", { n: ayah })}`, "ok");
+    toast(`${icon("check")} ${t("Verset {n} : sous-titres refaits", { n: label })}`, "ok");
   } catch (e) { $("verse-body").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
 }
 function setFr(i, v) { P.blocks[i].fr = v; changed({ group: "fr" + i }); }
@@ -2466,11 +2483,13 @@ function raMode(a) {
 }
 function renderAnalysis() {
   if (P.surah) $("a-surah").value = P.surah;
-  $("a-first").value = P.first_verse; $("a-last").value = P.last_verse || "";
+  $("a-first").value = P.first_number || P.first_verse; $("a-last").value = P.last_number || "";
+  $("a-reading").value = P.reading || "hafs";
   raMode(raAuto);
 }
 async function reanalyze(body, quiet) {
   body = body || (raAuto ? { auto: true } : { surah: $("a-surah").value, first_verse: $("a-first").value, last_verse: $("a-last").value || null });
+  if (!("reading" in body)) body.reading = $("a-reading").value;
   if (!quiet && !await ask(t("Réanalyser la récitation ? Les sous-titres seront recréés (tes modifications de sous-titres seront remplacées)."))) return;
   await save();
   setTab("export");
@@ -3369,7 +3388,7 @@ function tlRender() {
   $("tl-reserve").style.cssText = rw ? `left:${x0 - RES_GAP / 2}px;width:${rw - RES_GAP / 2}px` : "display:none";
   $("tl-subs").innerHTML = P.blocks.map((b, i) => `<div class="seg ${b.highlight ? "hl" : ""} ${selKind === "seg" && i === selSeg ? "sel" : ""}" data-i="${i}"
       style="left:${b.start * k}px;width:${Math.max(2, (b.end - b.start) * k)}px" title="${esc(b.fr)}">
-      <div class="h l" data-edge="start"></div>${b.kind === "verse" ? b.ayah : "★"}<div class="h r" data-edge="end"></div></div>`).join("");
+      <div class="h l" data-edge="start"></div>${b.kind === "verse" ? vlabel(b) : "★"}<div class="h r" data-edge="end"></div></div>`).join("");
   const t0 = P.render.trim_start || 0, t1 = P.render.trim_end || D;
   $("shade-l").style.cssText = `left:0;width:${t0 * k}px`;
   $("shade-r").style.cssText = `left:${t1 * k}px;width:${Math.max(0, (D - t1) * k)}px`;
@@ -3431,8 +3450,8 @@ function snapPoints(skip = new Set()) {
   add(r.trim_end || P.duration, "trim:end", t("fin de la vidéo"));
   clipTimes().slice(1).forEach(x => add(x.s, "cut:" + (x.i - 1), t("coupe de l'arrière-plan")));
   // starts first: where one verse ends and the next begins, the label names the one beginning
-  P.blocks.forEach((b, i) => add(b.start, "s:" + i, b.kind === "verse" ? t("début du verset {n}", { n: b.ayah }) : t("début du sous-titre")));
-  P.blocks.forEach((b, i) => add(b.end, "e:" + i, b.kind === "verse" ? t("fin du verset {n}", { n: b.ayah }) : t("fin du sous-titre")));
+  P.blocks.forEach((b, i) => add(b.start, "s:" + i, b.kind === "verse" ? t("début du verset {n}", { n: vlabel(b) }) : t("début du sous-titre")));
+  P.blocks.forEach((b, i) => add(b.end, "e:" + i, b.kind === "verse" ? t("fin du verset {n}", { n: vlabel(b) }) : t("fin du sous-titre")));
   return pts;
 }
 // the nearest point within 10 px (snapInfo: what it is), unless the magnet is off or ⌘ / Ctrl is held

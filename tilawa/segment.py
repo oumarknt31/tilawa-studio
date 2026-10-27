@@ -367,6 +367,8 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
     cuts = [k for k in range(1, n) if feats[k][0] >= opt.breath_quiet_s]
     # don't leave tiny fragments around a breath
     cuts = [k for k in cuts if k >= opt.min_part_words and n - k >= opt.min_part_words] or []
+    # and always where a verse ends inside this one (Warsh counts some Hafs verses as two)
+    cuts += [k for k in range(1, n) if occ[k - 1].word.index + 1 in v.ends]
     parts = _cut(occ, cuts)
 
     # 2) length
@@ -487,7 +489,7 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
             if p.kind == "istiadha":
                 ar, fr = ISTIADHA_UTHMANI, quran.ISTIADHA_TRANSLATION[opt.lang]
             else:
-                ar, fr = quran.BASMALA_UTHMANI, translation(quran.verse(1, 1), opt.lang, opt.translation)
+                ar, fr = quran.basmala_uthmani(), translation(quran.verse(1, 1), opt.lang, opt.translation)
             blocks.append(Block(p.kind, 0, 0, 0, len(ws), 0, 0, ar, fr, tr,
                                 voice_start=ws[0].start, voice_end=ws[-1].end,
                                 words=[{"t0": round(o.start, 3), "t1": round(o.end, 3), "w": o.word.text} for o in ws]))

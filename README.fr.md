@@ -56,6 +56,9 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
 2. **Dépose une vidéo** (ou colle un lien YouTube / Instagram / TikTok, ou dépose un audio mp3 / m4a…),
    puis choisis le **format**, la **traduction**, le **style** et le nom du récitateur.
    La sourate et les versets sont **détectés automatiquement** (tu peux aussi les choisir toi-même).
+   La **lecture** (riwaya) aussi : **Hafs** ou **Warsh** (Maroc, Algérie, Afrique de l'Ouest), ou choisis-la toi-même.
+   En Warsh, les sous-titres montrent le texte Warsh, sa prononciation dans la ligne phonétique et ses numéros de
+   versets (Warsh compte certains versets autrement : la basmala d'Al-Fatiha n'est pas un verset, 2:1 et 2:2 n'en font qu'un…).
 3. **Créer ma vidéo** : le logiciel écoute la récitation, reconnaît le passage et retrouve chaque mot (10 à 60 secondes).
 4. **Vérifie et personnalise** dans l'éditeur (les icônes à gauche). L'aperçu montre exactement le résultat final.
    - **Sous-titres** :
@@ -223,6 +226,10 @@ Tests : `uv run python -m pytest -q`
   anciennement Montada Islamic Foundation (`french_montada`, version 1.0.0). Aussi via Tanzil : Abdullah Yusuf Ali
   et Marmaduke Pickthall (en).
 - Noms des sourates : quran.com.
+- Texte Warsh : **Qur'anpedia.net** (https://quranpedia.net), son mushaf Warsh (le mushaf Warsh imprimé du
+  Complexe du roi Fahd), dump `mushafs-4` version 2026-10-26, sous la licence de données de Qur'anpedia.net
+  (https://api.quranpedia.net/dumps/LICENSE.md) ; `tilawa/data/quran-warsh.txt`, copié tel quel et tenu à jour
+  par `packaging/warsh_text.py`.
 - Polices (SIL Open Font License, voir `tilawa/fonts/`) : Amiri Quran, Amiri, Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat, Nunito, Baloo 2,
   Playfair Display, Lora, Cinzel.

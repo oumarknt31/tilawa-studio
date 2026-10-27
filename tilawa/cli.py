@@ -44,12 +44,12 @@ def make(args) -> int:
     folder = (Path(args.out) if args.out else HOME) / "projects" / slug
     print(f"Project: {folder}")
     p = project.create(folder, args.source, args.surah, args.first, args.last, args.reciter, args.title or "", _bar,
-                       args.format, args.lang, lib.style(args.style), args.translit, args.translation or "")
+                       args.format, args.lang, lib.style(args.style), args.translit, args.translation or "", args.reading)
     p.render.update({k: v for k, v in (("size", args.size), ("quality", args.quality), ("fit", args.fit)) if v})
     project.analyze(p, _bar)
     print(" + ".join(f"Surah {s}, verses {a}-{b}" for s, a, b in project.passages(p)))
     for b in p.blocks:
-        label = f"{b['ayah']:>3}" if b["kind"] == "verse" else b["kind"][:3]
+        label = f"{project.numbers(b)[0]:>3}" if b["kind"] == "verse" else b["kind"][:3]
         print(f"  {b['start']:6.2f}-{b['end']:6.2f}  [{label}] {b['fr'][:70]}")
     out = project.make_video(p, Path(args.out) if args.out else HOME, _bar)
     print(f"\nDone: {out}")
@@ -79,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
                    "for 16:9: cinema, pieux-youtube, bandeau, bandeau-titre, cinema-dore, minimal)")
     m.add_argument("--translation", help="for fr: fr.hamidullah (default), fr.maach, fr.noor; "
                    "for en: en.sahih (default), en.yusufali, en.pickthall")
+    m.add_argument("--reading", default="auto", choices=["auto", "hafs", "warsh"],
+                   help="the riwaya recited (default: recognised by listening)")
     m.add_argument("--translit", default="simple", choices=["simple", "fr", "academic", "tanzil"],
                    help="phonetic line: simple (Wal yawmil maw'ood), fr (maw'oud), academic (wa-l-yawmi l-mawʿūd), tanzil")
     m.add_argument("--size", choices=["auto", "hd", "2k", "4k"])

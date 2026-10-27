@@ -14,7 +14,7 @@ from typing import Callable
 
 import numpy as np
 
-from . import align, basmala, detect, identify, media, quran, render, segment, translit
+from . import align, basmala, detect, identify, media, quran, render, segment, translit, warsh
 from .i18n import UserError
 
 Progress = Callable[[str, float], None]
@@ -43,6 +43,7 @@ class Project:
     detected: dict | None = None  # the passages heard (detect.py): {"matches": [...]}
     surahs: list[int] = field(default_factory=list)  # every surah recited, in order (several: a prayer...)
     audio_only: bool = False  # made from a sound file: the picture is a plain frame
+    reading: str = "hafs"  # quran.READINGS (Hafs, Warsh), or "auto" until the recitation is heard
 
     @property
     def media_dir(self) -> Path:
@@ -78,6 +79,7 @@ class Project:
         d = json.loads((folder / "project.json").read_text(encoding="utf-8"))
         d["folder"] = folder
         p = Project(**{k: v for k, v in d.items() if k in Project.__dataclass_fields__})
+        quran.use_reading(p.reading)  # the verses read from here on are in the project's reading
         if p.blocks and "translit" not in p.segment:
             p.segment["translit"] = "tanzil"  # made before the other conventions: its phonetic is Tanzil's
         return p
@@ -86,7 +88,7 @@ class Project:
 def create(folder: Path, source: str, surah: int, first_verse: int, last_verse: int | None = None,
            reciter: str = "", title: str = "", progress: Progress | None = None,
            fmt: str = "9:16", lang: str = "fr", style: dict | None = None, translit: str = "simple",
-           translation: str = "") -> Project:
+           translation: str = "", reading: str = "auto") -> Project:
     """Copy (or download) the source into the project folder. surah 0: find it in the audio."""
     progress = progress or (lambda s, f: None)
     folder.mkdir(parents=True, exist_ok=True)
@@ -115,7 +117,9 @@ def create(folder: Path, source: str, surah: int, first_verse: int, last_verse: 
     thumbnail(folder)
     p = Project(folder, path.name, surah, first_verse or 1, last_verse, reciter.strip(),
                 title.strip() or (render.surah_title(surah, lang) if surah else ""), info.duration, info.width, info.height,
-                format=fmt, lang=lang, style=dict(style or {}), audio_only=audio_only)
+                format=fmt, lang=lang, style=dict(style or {}), audio_only=audio_only,
+                reading=reading if reading in quran.READINGS else "auto")
+    quran.use_reading(p.reading)
     p.segment.update(lang=lang, translit=translit, translation=quran.edition(lang, translation) or "")
     p.save()
     return p
@@ -150,7 +154,13 @@ def analyze(p: Project, progress: Progress | None = None) -> Project:
     progress("identify", 0.65)
     opt = segment.Options(**{k: v for k, v in p.segment.items() if k in segment.Options.__dataclass_fields__})
     opt.lang = p.lang
+    quran.use_reading("hafs" if p.reading == "auto" else p.reading)
     blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse)
+    if p.reading == "auto":  # which reading is recited: the one what the model heard is closer to
+        p.reading = warsh.reading_heard(em, model, blocks)
+        if p.reading == "warsh":
+            quran.use_reading("warsh")
+            blocks, found = detect.detect(em, audio, model, opt, p.surah, p.first_verse, p.last_verse)
     p.detected = {"matches": found}
     if not blocks or not any(b.kind == "verse" for b in blocks):
         raise UserError("no_verse" if p.surah else "not_recognized")
@@ -200,18 +210,26 @@ def header_titles(p: Project) -> list[tuple[float, str]] | None:
     return [(t, render.surah_title(s, p.lang)) for t, s in out]
 
 
+def numbers(b: dict) -> tuple[int, int]:
+    """The verse numbers a verse block shows, of its first and last words (in the project's
+    reading: Warsh counts some verses differently; 0: Al-Fatiha's basmala in Warsh)."""
+    v = quran.verse(b["surah"], b["ayah"])
+    return v.number(b["a0"]), v.number(max(b["a0"], b["a1"] - 1))
+
+
 def passages(p: Project) -> list[tuple[int, int, int]]:
-    """(surah, first verse, last verse) of each surah recited, in order."""
+    """(surah, first verse, last verse) of each surah recited, in order, as numbered for the reader."""
     out = []
     for s in surahs_of(p.blocks):
-        ayahs = [b["ayah"] for b in p.blocks if b["kind"] == "verse" and b["surah"] == s]
-        out.append((s, min(ayahs), max(ayahs)))
+        shown = [n for b in p.blocks if b["kind"] == "verse" and b["surah"] == s for n in numbers(b) if n]
+        if shown:
+            out.append((s, min(shown), max(shown)))
     return out
 
 
 def found_verses(p: Project) -> tuple[int, int] | None:
-    ayahs = [b["ayah"] for b in p.blocks if b["kind"] == "verse"]
-    return (min(ayahs), max(ayahs)) if ayahs else None
+    shown = [n for b in p.blocks if b["kind"] == "verse" for n in numbers(b) if n]
+    return (min(shown), max(shown)) if shown else None
 
 
 def output_name(p: Project) -> str:
@@ -247,7 +265,7 @@ def basmala_state(p: Project) -> dict:
 
 def basmala_payload(p: Project) -> dict:
     """The subtitle of the basmala, in the project's translation and transliteration."""
-    b = segment.Block("basmala", 0, 0, 0, 4, 0, 0, quran.BASMALA_UTHMANI,
+    b = segment.Block("basmala", 0, 0, 0, 4, 0, 0, quran.basmala_uthmani(),
                       segment.translation(quran.verse(1, 1), p.lang, p.segment.get("translation")),
                       " ".join(segment.phonetic("basmala", None, 0, 0, p.segment.get("translit", "simple"))))
     return render.block_payload(b, p.lang)
@@ -414,11 +432,12 @@ def verse_candidates(p: Project, i: int, progress: Progress | None = None, limit
         text = letters(key)
         m = sum(b.size for b in difflib.SequenceMatcher(None, said, text, autojunk=False).get_matching_blocks())
         expect = len(text) * (part if key == cur or len(text) > len(heard) * 1.2 else 1.0)
-        out.append({"surah": key[0], "ayah": key[1], "name": quran.surah(key[0])["name"],
+        out.append({"surah": key[0], "ayah": key[1], "label": quran.verse(*key).label(), "name": quran.surah(key[0])["name"],
                     "ar": quran.verse(*key).display_text(), "same_text": text == letters(cur),
                     "audio": round(2 * m / max(1, len(said) + expect), 3), "current": key == cur, "follows": key == after_prev})
     out.sort(key=lambda c: (-round(c["audio"], 2), not c["follows"], not c["current"]))
-    return {"index": j0, "parts": j1 - j0, "current": {"surah": cur[0], "ayah": cur[1]}, "candidates": out}
+    return {"index": j0, "parts": j1 - j0, "candidates": out,
+            "current": {"surah": cur[0], "ayah": cur[1], "number": quran.verse(*cur).number(blocks[0]["a0"]) or 1}}
 
 
 def set_verse(p: Project, i: int, s: int, a: int, progress: Progress | None = None) -> None:

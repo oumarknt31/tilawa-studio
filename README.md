@@ -56,6 +56,9 @@ downloaded in a browser.
 2. **Drop a video** (or paste a YouTube / Instagram / TikTok link, or drop an mp3 / m4a… audio file),
    then choose the **format**, the **translation**, the **style** and the reciter's name.
    The surah and verses are **detected automatically** (you can also choose them yourself).
+   So is the **reading** (riwaya): **Hafs** or **Warsh** (Morocco, Algeria, West Africa), or choose it yourself.
+   In Warsh the subtitles show the Warsh text, its pronunciation in the phonetic line, and its verse numbers
+   (Warsh counts some verses differently: Al-Fatiha's basmala is not a verse, 2:1 and 2:2 are one verse…).
 3. **Create my video**: the app listens to the recitation, recognises the passage and finds every word (10 to 60 seconds).
 4. **Check and customise** in the editor (icons on the left). The preview shows exactly the final result.
    - **Subtitles**:
@@ -219,6 +222,10 @@ Tests: `uv run python -m pytest -q`
   Montada Islamic Foundation (`french_montada`, version 1.0.0). Also via Tanzil: Abdullah Yusuf Ali and
   Marmaduke Pickthall (en).
 - Surah names: quran.com.
+- Warsh text: **Qur'anpedia.net** (https://quranpedia.net), its Warsh mushaf (the King Fahd Complex's printed
+  Warsh mushaf), dump `mushafs-4` version 2026-10-26, under the Qur'anpedia.net Data License
+  (https://api.quranpedia.net/dumps/LICENSE.md); `tilawa/data/quran-warsh.txt`, copied verbatim and kept current
+  by `packaging/warsh_text.py`.
 - Fonts (SIL Open Font License, see `tilawa/fonts/`): Amiri Quran, Amiri, Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat,
   Nunito, Baloo 2, Playfair Display, Lora, Cinzel.

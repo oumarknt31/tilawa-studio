@@ -6,6 +6,10 @@ Sources (bundled verbatim in tilawa/data, see README for licences):
   en.transliteration.txt  Tanzil transliteration         -> phonetic line, "tanzil" convention
                           (the other conventions are made from the Arabic: translit.py)
   trans/*.txt             Tanzil and QuranEnc translations -> translation line (see LANGS, EDITIONS)
+  quran-warsh.txt         Qur'anpedia.net Warsh text     -> the Warsh reading (warsh.py)
+
+A verse is known by its Hafs number (s, a) whatever the reading: the reading of the
+project being worked on (use_reading) gives its text and its displayed numbers.
 
 The aligned text and the displayed text split some words differently
 (e.g. "يَا أَيُّهَا" vs "يَـٰٓأَيُّهَا"), so every verse carries a map from
@@ -14,6 +18,7 @@ alignment-word boundaries to display-word boundaries.
 
 from __future__ import annotations
 
+import contextvars
 import difflib
 import html
 import json
@@ -173,6 +178,47 @@ def surah(n: int) -> dict:
     return surahs()[n - 1]
 
 
+# ---------------------------------------------------------------- readings
+
+READINGS = {"hafs": "Hafs 'an 'Asim", "warsh": "Warsh 'an Nafi'"}
+_READING = contextvars.ContextVar("reading", default="hafs")
+
+
+def reading() -> str:
+    """The reading of the recitation being worked on (set per request and per job)."""
+    return _READING.get()
+
+
+def use_reading(r: str) -> None:
+    _READING.set(r if r in READINGS else "hafs")
+
+
+def verse_count(s: int) -> int:
+    """Verses of surah s, as the reading counts them."""
+    if reading() == "warsh":
+        from . import warsh
+        return warsh.verse_count(s)
+    return surah(s)["verses"]
+
+
+def key_of(s: int, n: int, end: bool = False) -> tuple[int, int]:
+    """The Hafs verse where verse n of the reading starts (or ends)."""
+    if reading() == "warsh":
+        from . import warsh
+        for a, hafs, _ in warsh.source()[1].get(s, []):
+            if a == n:
+                return s, hafs[-1] if end else (hafs[0] if (s, hafs[0]) != (1, 1) else hafs[1])
+        raise UserError("bad_verse", s=s, a=n)
+    return s, n
+
+
+def basmala_uthmani() -> str:
+    if reading() == "warsh":
+        from . import warsh
+        return " ".join(warsh.display_word(w)[0] for w in warsh.source()[0].split())
+    return BASMALA_UTHMANI
+
+
 @dataclass
 class DisplayWord:
     text: str
@@ -189,10 +235,27 @@ class Verse:
     french: str
     # boundary i of the align words (0..len(align)) -> boundary in display words
     align_to_display: list[int] = field(default_factory=list)
+    numbers: list[int] = field(default_factory=list)  # displayed verse number of each align word
+    ends: dict[int, int] = field(default_factory=dict)  # align boundary -> number of the verse ending there
+    # pause marks drawn (Warsh's are its own signs, which the fonts draw as Hafs ones: kept to cut at)
+    show_pauses: bool = True
 
     @property
     def key(self) -> str:
         return f"{self.surah}:{self.ayah}"
+
+    def number(self, a0: int = 0) -> int:
+        """Displayed number of the verse align word a0 is in (Warsh counts differently; 0: not a verse)."""
+        return self.numbers[min(a0, len(self.numbers) - 1)] if self.numbers else self.ayah
+
+    def end_number(self, a1: int) -> int:
+        """Displayed number of the verse ending at align boundary a1, or 0."""
+        return self.ends.get(a1, 0)
+
+    def label(self) -> str:
+        """Its number as the reader knows it: "7", or "6–7" (a Hafs verse Warsh counts as two)."""
+        shown = sorted({n for n in self.numbers if n}) or [self.ayah]
+        return str(shown[0]) if len(shown) == 1 else f"{shown[0]}–{shown[-1]}"
 
     def display_text(self, start: int = 0, end: int | None = None) -> str:
         """Uthmani text for display words [start, end), pause marks included."""
@@ -201,7 +264,7 @@ class Verse:
         for i, w in enumerate(words):
             out.append(w.text)
             # a pause mark at the very end of a part is dropped (it marks the cut itself)
-            if w.waqf and i < len(words) - 1:
+            if w.waqf and i < len(words) - 1 and self.show_pauses:
                 out.append(w.waqf)
         return " ".join(out)
 
@@ -219,7 +282,7 @@ class Verse:
     def phonetic(self, a0: int, a1: int, style: str = "simple") -> list[str]:
         """One transliterated word per align word of [a0, a1), recited in a row.
         "tanzil": the Tanzil transliteration; else made from the Arabic (translit.py)."""
-        if style == "tanzil":
+        if style == "tanzil" and self.translit:
             return [self.translit_text(k, k + 1) if k else self.translit_text(0, 1) for k in range(a0, a1)]
         return _translit.transliterate(self.align[a0:a1], style, start_of_verse=a0 == 0)
 
@@ -270,15 +333,25 @@ def _boundary_map(align: list[str], display: list[DisplayWord]) -> list[int]:
     return out
 
 
-@lru_cache(maxsize=4096)
 def verse(s: int, a: int) -> Verse:
+    """Verse (s, a) (its Hafs number), in the reading being worked on."""
+    return _verse(s, a, reading())
+
+
+@lru_cache(maxsize=8192)
+def _verse(s: int, a: int, r: str) -> Verse:
     uth, ali, trl, fr = _sources()
     if (s, a) not in uth:
         raise UserError("bad_verse", s=s, a=a)
+    if r == "warsh":
+        from . import warsh
+        w = warsh.surah(s)[a]
+        return Verse(s, a, w.display, w.align, [], fr[(s, a)], w.align_to_display, w.numbers, w.ends, False)
     display = _split_display(uth[(s, a)], strip_basmala=(a == 1 and s not in (1, 9)))
     align = ali[(s, a)].split()
     v = Verse(s, a, display, align, _clean_translit(trl[(s, a)]), fr[(s, a)])
     v.align_to_display = _boundary_map(align, display)
+    v.numbers, v.ends = [a] * len(align), {len(align): a}
     return v
 
 

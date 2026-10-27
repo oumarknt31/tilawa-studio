@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
-from contextvars import ContextVar
+from contextvars import ContextVar, copy_context
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
@@ -103,7 +103,7 @@ def _job(kind: str, project_id: str, fn) -> str:
             traceback.print_exc()
             job["status"], job["error"] = "error", (e.text(lang) if isinstance(e, UserError) else str(e)) or e.__class__.__name__
 
-    _pool.submit(run)
+    _pool.submit(copy_context().run, run)  # with the request's project reading (quran.use_reading)
     return jid
 
 
@@ -146,9 +146,16 @@ def _public(p: project.Project) -> dict:
     d["auto_title"] = project.titles(p.lang, d["surahs"])  # the title made from the surahs (headerTitles)
     d["surah_titles"] = {s: render.surah_title(s, p.lang) for s in d["surahs"]}
     d["background"] = p.get_background()
+    d["verse_counts"] = [quran.verse_count(s) for s in range(1, 115)]  # as the project's reading counts them
+    if p.surah:  # the verses asked for, numbered as the reading numbers them
+        first = quran.verse(p.surah, p.first_verse)
+        d["first_number"] = first.number(0) or 1
+        d["last_number"] = quran.verse(p.surah, p.last_verse).numbers[-1] if p.last_verse else None
     d["width"], d["height"] = p.width, p.height
-    for b, raw in zip(d["blocks"], p.blocks):  # for the verse ornament in the preview
-        b["ends_verse"] = render.ends_verse(segment.Block.from_dict(raw))
+    for b, raw in zip(d["blocks"], p.blocks):  # the verse numbers shown, and the ornament in the preview
+        x = segment.Block.from_dict(raw)
+        b["num"], b["num_end"] = project.numbers(raw) if x.kind == "verse" else (0, 0)
+        b["ends_verse"] = render.ends_verse(x)
     d["exports"] = _exports(p)
     d["basmala"] = project.basmala_state(p) | {"payload": project.basmala_payload(p)}
     return d
@@ -166,7 +173,8 @@ def _exports(p: project.Project) -> list[dict]:
 
 @app.get("/api/surahs")
 def surahs():
-    return quran.surahs()
+    from . import warsh
+    return [s | {"verses_warsh": warsh.verse_count(s["n"])} for s in quran.surahs()]
 
 
 @app.get("/api/projects")
@@ -190,10 +198,14 @@ def list_projects():
 async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_verse: int | None = Form(None),
                       reciter: str = Form(""), title: str = Form(""), url: str = Form(""),
                       format: str = Form("9:16"), lang: str = Form("fr"), style: str = Form(""), translation: str = Form(""),
-                      file: UploadFile | None = File(None)):
+                      reading: str = Form("auto"), file: UploadFile | None = File(None)):
     """surah 0: the surah and verses are found in the recitation."""
+    reading = reading if reading in quran.READINGS else "auto"
     try:
-        if surah:
+        if surah:  # verses numbered as the chosen reading numbers them
+            quran.use_reading(reading)
+            first_verse = quran.key_of(surah, first_verse)[1]
+            last_verse = quran.key_of(surah, last_verse, end=True)[1] if last_verse else None
             quran.verse(surah, first_verse)
         if format not in render.FORMATS or lang not in quran.LANGS:
             raise UserError("bad_format_lang")
@@ -216,7 +228,7 @@ async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_ver
             shutil.copyfileobj(file.file, f, length=8 << 20)
         source = str(dst)
 
-    settings = LIB.update_settings({"format": format, "lang": lang, "style": style})
+    settings = LIB.update_settings({"format": format, "lang": lang, "style": style, "reading": reading})
     look = LIB.style(style)
     translit = settings.get("translit", "simple")
     translation = translation or (settings.get("translations") or {}).get(lang, "")
@@ -225,7 +237,7 @@ async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_ver
 
     def work(progress):
         p = project.create(folder, source, surah, first_verse, last_verse, reciter, title, progress, format, lang, look,
-                           translit, translation)
+                           translit, translation, reading)
         if file:
             Path(source).unlink(missing_ok=True)
         project.analyze(p, progress)
@@ -246,7 +258,8 @@ def save_project(pid: str, body: dict):
         if key in body:
             setattr(p, key, body[key])
     for b in p.blocks:
-        b.pop("ends_verse", None)
+        for k in ("ends_verse", "num", "num_end"):
+            b.pop(k, None)
     if "background" in body:
         known = {m["file"] for m in p.media} | {"original"}
         bg = body["background"]
@@ -260,15 +273,19 @@ def save_project(pid: str, body: dict):
 @app.post("/api/projects/{pid}/analyze")
 def reanalyze(pid: str, body: dict):
     p = project.Project.load(_folder(pid))
+    if body.get("reading") in (*quran.READINGS, "auto"):
+        p.reading = body["reading"]
+        quran.use_reading(p.reading)
     if body.get("auto"):
         p.surah, p.first_verse, p.last_verse = 0, 1, None
     if body.get("surah"):
         p.surah = int(body["surah"])
+    # verses numbered as the project's reading numbers them
     if "first_verse" in body and p.surah:
-        quran.verse(p.surah, int(body["first_verse"]))
-        p.first_verse = int(body["first_verse"])
+        p.first_verse = quran.key_of(p.surah, int(body["first_verse"]))[1]
+        quran.verse(p.surah, p.first_verse)
     if "last_verse" in body:
-        p.last_verse = int(body["last_verse"]) if body["last_verse"] else None
+        p.last_verse = quran.key_of(p.surah, int(body["last_verse"]), end=True)[1] if body["last_verse"] else None
     if "segment" in body:
         p.segment.update(body["segment"])
     p.save()
@@ -363,7 +380,10 @@ def verse_candidates(pid: str, body: dict):
 def set_verse(pid: str, body: dict):
     """Give the recitation of a subtitle to another verse: aligned again with it (a job)."""
     folder = _folder(pid)
-    i, s, a = int(body["index"]), int(body["surah"]), int(body["ayah"])
+    project.Project.load(folder)  # its reading
+    i, s = int(body["index"]), int(body["surah"])
+    # a verse picked in the list (its Hafs key), or typed (numbered as the reading numbers it)
+    a = int(body["ayah"]) if "ayah" in body else quran.key_of(s, int(body["number"]))[1]
     quran.verse(s, a)  # validates
 
     def work(progress):

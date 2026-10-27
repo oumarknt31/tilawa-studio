@@ -76,14 +76,16 @@ def surahs_title(surahs: list[int], lang: str = "fr") -> str:
     return " · ".join([first] + [quran.surah(n)["name"].upper().replace("-", " ") for n in surahs[1:]])
 
 
-def ends_verse(b: Block) -> bool:
-    return b.kind == "verse" and b.a1 >= len(quran.verse(b.surah, b.ayah).align)
+def ends_verse(b: Block) -> int:
+    """Number of the verse the block ends (in the project's reading), or 0."""
+    return quran.verse(b.surah, b.ayah).end_number(b.a1) if b.kind == "verse" else 0
 
 
 def block_payload(b: Block, lang: str = "fr") -> dict:
     """What the overlay page draws for a block (same as payload() in index.html)."""
-    return {"num": f"{b.ayah}." if b.kind == "verse" else "", "fr": b.fr, "ar": b.ar, "tr": b.tr,
-            "highlight": b.highlight, "ayah": b.ayah if ends_verse(b) else 0,
+    num = quran.verse(b.surah, b.ayah).number(b.a0) if b.kind == "verse" else 0
+    return {"num": f"{num}." if num else "", "fr": b.fr, "ar": b.ar, "tr": b.tr,
+            "highlight": b.highlight, "ayah": ends_verse(b),
             "rtl": quran.LANGS.get(lang, ("", "", "", False))[3], "lang": lang}
 
 
