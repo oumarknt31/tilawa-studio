@@ -99,6 +99,9 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
        traduction numérotée en majuscules avec ses mots importants en gras, phonétique légère), *Le Chemin des
        Pieux — YouTube*, *Bandeau classique*, *Bandeau titre* (traduction au milieu, arabe et phonétique dans
        un bandeau translucide en bas), *Cinéma doré*, *Minimal* ;
+     - les **éléments du bloc** (numéro, traduction, arabe, phonétique) : × pour en retirer un, quel que soit
+       le style ; sur l'aperçu, le bloc se déplace d'un seul tenant, ou chaque élément séparément avec *Déplacer
+       les éléments un par un* (ou ⌥ + glisser) — clique pour le choisir, pince pour changer sa taille ;
      - **disposition** (empilée, arabe en haut, bandeau en bas) ; **mots importants** de la traduction en gras
        ou en couleurs, trouvés automatiquement ou choisis en les entourant d'*astérisques* ; majuscules ou
        petites capitales ; épaisseur du contour (ou simple ombre douce) ;

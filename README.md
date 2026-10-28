@@ -98,6 +98,9 @@ downloaded in a browser.
        numbered translation in capitals with its key words in bold, light transliteration), *Le Chemin des
        Pieux — YouTube*, *Classic band*, *Headline band* (translation in the middle, Arabic and transliteration
        in a translucent band at the bottom), *Golden cinema*, *Minimal*;
+     - the **items of the block** (number, translation, Arabic, transliteration): × to take one out, whatever
+       the style; on the preview the block moves as a whole, or each item on its own with *Move the items one
+       by one* (or ⌥ + drag) — click to choose it, pinch to change its size;
      - **layout** (stacked, Arabic on top, band at the bottom); **key words** of the translation in bold or
        in colour, found automatically or chosen by putting *asterisks* around them; capitals or small caps;
        outline thickness (or just a soft shadow);

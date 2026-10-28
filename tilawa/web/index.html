@@ -157,6 +157,10 @@
   .guide { top: 0; bottom: 0; left: 50%; width: 1px; background: var(--pink); }
   #hit { z-index: 5; cursor: grab; touch-action: none; }
   #hit.text { cursor: move; } #hit.dragging { cursor: grabbing; }
+  #el-sel { position: absolute; z-index: 6; display: none; pointer-events: none; border: 1.5px solid var(--accent); border-radius: 6px; }
+  #el-sel button { position: absolute; right: -11px; top: -11px; width: 22px; height: 22px; padding: 0; border-radius: 50%; z-index: 6;
+    pointer-events: auto; background: var(--danger); border-color: var(--danger); color: #fff; font-size: 15px; line-height: 1; }
+  #el-sel.top button { top: auto; bottom: -11px; } #el-sel.right button { right: auto; left: -11px; }
   .transport { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 5px; flex-wrap: wrap; justify-content: center; }
   .transport .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12.5px; padding: 0 8px; min-width: 104px; text-align: center; }
   #play { width: 40px; height: 34px; padding: 0; border-radius: 10px; }
@@ -203,6 +207,14 @@
   .crow > span:first-child { width: 120px; }
   input[type=color] { width: 40px; height: 28px; padding: 2px; border-radius: 7px; cursor: pointer; }
   .sizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .els { display: flex; gap: 6px; flex-wrap: wrap; }
+  .els .el { display: inline-flex; align-items: center; background: var(--bg); border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; }
+  .els .el button { border: 0; border-radius: 0; background: transparent; padding: 4px 10px; font-size: 12.5px; }
+  .els .el button.x { padding: 4px 9px 4px 4px; color: var(--faint); }
+  .els .el button.x:hover { color: var(--danger); }
+  .els .el.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .els .el.off { border-style: dashed; } .els .el.off button { color: var(--faint); }
+  .el-box { margin-top: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
   .sizes .nf { justify-content: space-between; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 3px 3px 3px 8px; }
   .sizes .nf input { width: 52px; border: 0; background: transparent; }
 
@@ -594,7 +606,7 @@
         <label style="margin-top:12px">Position</label>
         <div class="xform">${XFORM:hdr}</div>
       </div>
-      <div class="section">
+      <div class="section" id="sec-ar">
         <div class="sh"><h3>Arabe</h3></div>
         <div class="fontpick" id="font-arabic"></div>
         <div class="row" style="margin-top:8px"><button class="small" onclick="$('font-file').click()"><svg class="i" style="width:14px"><use href="#i-upload"/></svg>Importer une police (.ttf, .otf)</button>
@@ -609,7 +621,7 @@
         <div class="sizes" style="margin-top:10px">${SIZE:ar:Taille}</div>
         <div id="colors-ar" style="margin-top:8px"></div>
       </div>
-      <div class="section">
+      <div class="section" id="sec-fr">
         <div class="sh"><h3>Traduction</h3></div>
         <div class="grid2">
           <div class="field"><label>Langue</label><select id="e-lang" onchange="changeLanguage(this.value)"></select></div>
@@ -618,10 +630,6 @@
         <label>Police (traduction, numéro et phonétique)</label>
         <div class="fontpick" id="font-text"></div>
         <div class="sizes" style="margin-top:10px">${SIZE:fr:Traduction}${SIZE:num:Numéro}${SIZE:tr:Phonétique}</div>
-        <div class="row" style="margin-top:10px">
-          <label class="toggle"><input type="checkbox" id="show-num" onchange="setLook('--num-display', this.checked ? null : 'none')"> Numéro au-dessus (« 12. »)</label>
-          <label class="toggle"><input type="checkbox" id="show-tr" onchange="setLook('--tr-display', this.checked ? null : 'none')"> Phonétique</label>
-        </div>
         <div class="field" style="margin-top:10px"><label>Écriture de la phonétique</label>
           <select id="e-translit" onchange="changeTranslit(this.value)">
             <option value="simple">Lisible — Wal yawmil maw'ood</option>
@@ -649,7 +657,17 @@
       </div>
       <div class="section">
         <div class="sh"><h3>Bloc des sous-titres</h3></div>
-        <label>Disposition</label>
+        <label>Éléments <span class="faint">— × pour en retirer un</span></label>
+        <div id="els" class="els"></div>
+        <label class="toggle" style="margin-top:10px"><input type="checkbox" id="detach" onchange="setDetached(this.checked)"> Déplacer les éléments un par un</label>
+        <p class="faint small" id="detach-note" style="margin:4px 0 0"></p>
+        <div id="el-box" class="el-box hidden">
+          <div class="row"><b id="el-name"></b><span class="grow"></span>
+            <button class="small ghost" onclick="gotoEl()">Police et couleurs</button>
+            <button class="small ghost" onclick="showEl(selEl, false)">Retirer</button></div>
+          <div class="xform" style="margin-top:8px" title="0 = sa place dans le bloc">${XFORM:el}</div>
+        </div>
+        <label style="margin-top:12px">Disposition</label>
         <div class="seg-ctl" id="layout-ctl">
           <button data-v="stack" onclick="setLayout(null)">Empilée</button>
           <button data-v="cinema" onclick="setLayout('cinema')">Arabe en haut</button>
@@ -802,6 +820,7 @@
         <iframe id="overlay" src="/overlay.html" title="aperçu"></iframe>
         <div id="safe" class="hidden"></div>
         <div class="outline" id="outline"></div>
+        <div id="el-sel"><button onclick="showEl(selEl, false)" title="retirer cet élément">×</button></div>
         <div class="guide" id="guide"></div>
         <div id="hit" title="Fais glisser un texte ou l'image · pince ou Ctrl + molette pour zoomer"></div>
       </div>
@@ -875,6 +894,7 @@
     <kbd>+ − \</kbd><span>Zoomer / dézoomer / tout voir</span>
     <kbd>⌘Z</kbd><span>Annuler (⇧⌘Z ou Ctrl+Y : rétablir)</span>
     <kbd>Glisser</kbd><span>Sur l'aperçu : déplacer un texte ou l'image</span>
+    <kbd>⌥ + glisser</kbd><span>Sur l'aperçu : déplacer un seul élément du bloc (arabe, traduction…)</span>
     <kbd>Pincer</kbd><span>Sur l'aperçu (ou Ctrl + molette) : taille d'un texte ou zoom de l'image</span>
     <kbd>Maj + flèches</kbd><span>Dans les réglages de position : déplacer de 10 px</span>
     <kbd>?</kbd><span>Cette aide</span>
@@ -1179,7 +1199,7 @@ const EN = {
   "barre du haut": "top bar", "légende et nom du compte": "caption and account name", "boutons": "buttons",
   "Tout est enregistré automatiquement. ↶ annule la dernière modification.": "Everything is saved automatically. ↶ undoes the last change.",
   "Espace": "Space", "Lecture / pause": "Play / pause", "Sous-titre précédent / suivant": "Previous / next subtitle",
-  "Annuler (⇧⌘Z ou Ctrl+Y : rétablir)": "Undo (⇧⌘Z or Ctrl+Y: redo)", "Glisser": "Drag", "Sur l'aperçu : déplacer un texte ou l'image": "On the preview: move a text or the picture",
+  "Annuler (⇧⌘Z ou Ctrl+Y : rétablir)": "Undo (⇧⌘Z or Ctrl+Y: redo)", "Glisser": "Drag", "⌥ + glisser": "⌥ + drag", "Sur l'aperçu : déplacer un seul élément du bloc (arabe, traduction…)": "On the preview: move a single item of the block (Arabic, translation…)", "Sur l'aperçu : déplacer un texte ou l'image": "On the preview: move a text or the picture",
   "Pincer": "Pinch", "Sur l'aperçu (ou Ctrl + molette) : taille d'un texte ou zoom de l'image": "On the preview (or Ctrl + wheel): text size or picture zoom",
   "Maj + flèches": "Shift + arrows", "Dans les réglages de position : déplacer de 10 px": "In the position settings: move by 10 px", "Cette aide": "This help",
   "Astuces": "Tips", "Clique sur un mot phonétique (✂) pour couper un sous-titre à cet endroit.": "Click a transliterated word (✂) to split a subtitle there.",
@@ -1282,6 +1302,15 @@ const EN = {
   "Tout garder (début et fin)": "Keep everything (start and end)",
   "Seules tes vidéos ont un passage à choisir : une photo ou la vidéo d'origine restent en place.": "Only your videos have a part to choose: a photo or the original video stays as it is.",
   "la vidéo commence à {s}": "the video starts at {s}",
+  "Éléments": "Items", "— × pour en retirer un": "— × to take one out", "Déplacer les éléments un par un": "Move the items one by one",
+  "Police et couleurs": "Font and colours", "Remettre à sa place": "Back to its place", "0 = sa place dans le bloc": "0 = its place in the block",
+  "retirer cet élément": "take this item out", "régler sa place et sa taille": "set its place and size", "retirer du bloc": "take it out of the block",
+  "remettre dans le bloc": "put it back in the block", "Tout remettre en place": "Put everything back in place", "Remettre": "Put back",
+  "Sur l'aperçu, clique sur un élément pour le choisir, fais-le glisser, pince pour changer sa taille.":
+    "On the preview, click an item to choose it, drag it, pinch to change its size.",
+  "Sur l'aperçu, le bloc se déplace d'un seul tenant (⌥ Alt en glissant : un seul élément).":
+    "On the preview, the block moves as a whole (⌥ Alt while dragging: a single item).",
+  "Garde au moins un élément dans le bloc.": "Keep at least one item in the block.", "{name} retiré du bloc": "{name} taken out of the block",
 };
 
 // interface language: French (as written) or English
@@ -1296,7 +1325,7 @@ const DYN = ["ed-badges", "saved", "new-formats", "surah", "a-surah", "lang", "e
   "projects", "subs-count", "notice", "pick-surah", "blocks", "media-status", "media-list", "clip-list", "inspector", "bg-dim-v", "themes", "font-num", "font-tr", "intro-note", "logo-sugg", "e-trans", "verse-body", "basmala-note", "basmala-list",
   "font-title", "font-arabic", "font-text", "colors-title", "colors-ar", "colors-text", "colors-outline", "res", "r-done", "r-stage",
   "r-pct", "r-error", "exports", "ed-formats", "still-t", "time", "safe", "tl-ruler", "tl-bg", "tl-subs", "fmt-name", "toasts", "src-name", "ui-lang",
-  "tl-hint", "spare-list", "replace-what", "replace-list", "replace-all-t", "app-version", "help-version"];
+  "tl-hint", "els", "detach-note", "el-name", "spare-list", "replace-what", "replace-list", "replace-all-t", "app-version", "help-version"];
 const original = new WeakMap();
 function translateDom() {
   document.documentElement.lang = UI;
@@ -1773,6 +1802,11 @@ function draw() {
     const el = w.document.getElementById("block");
     if (el) el.style.opacity = Math.max(0, a);
   }
+  const sel = $("el-sel");
+  frameAround(sel, detached && isEl(selEl) && tab === "text" && !drag && textBox(selEl));
+  // its × inside the preview, near an edge
+  sel.classList.toggle("top", parseFloat(sel.style.top) < 12);
+  sel.classList.toggle("right", parseFloat(sel.style.left) + parseFloat(sel.style.width) > $("stage").clientWidth - 12);
 }
 // the title cards, played over the paused video (the final video shows them before the recitation)
 // a recitation of several surahs with the automatic title: each surah's title from its
@@ -2108,23 +2142,25 @@ function textBox(id) {
   const d = ow().document, root = d.getElementById(id);
   if (!root || root.hidden || root.style.display === "none") return null;
   let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
-  for (const el of root.querySelectorAll(".ol, #mic")) {
+  for (const el of root.matches(".ol") ? [root] : root.querySelectorAll(".ol, #mic")) {
     const q = el.getBoundingClientRect();
     if (!q.width || el.style.display === "none") continue;
     l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom);
   }
   return l < Infinity ? { l, t, r, b } : null;
 }
-function textAt(pt) {
+function textAt(pt, single) {
   const X = pt.x * pt.k, Y = pt.y * pt.k;
-  for (const id of ["logo", "block", "band", "header"]) {
+  for (const id of single ? ["logo", ...ELEMENTS.map(([k]) => k), "header"] : ["logo", "block", "band", "header"]) {
     const q = textBox(id);
     if (q && X >= q.l - 16 && X <= q.r + 16 && Y >= q.t - 16 && Y <= q.b + 16) return id;
   }
   return null;
 }
 function showOutline(id) {
-  const q = id && textBox(id), o = $("outline");
+  frameAround($("outline"), id && textBox(id));
+}
+function frameAround(o, q) {
   if (!q) { o.style.display = "none"; return; }
   const k = $("stage").clientWidth / canvasW();
   Object.assign(o.style, { display: "block", left: (q.l - 10) * k + "px", top: (q.t - 10) * k + "px",
@@ -2150,11 +2186,14 @@ function currentClip() {
 }
 hit.addEventListener("pointerdown", (e) => {
   if (!P) return;
-  const pt = stagePoint(e), id = textAt(pt);
+  const pt = stagePoint(e), id = textAt(pt, detached || e.altKey);
   hit.setPointerCapture(e.pointerId);
   if (id === "logo") {
     const q = textBox("logo");
     drag = { kind: "logo", x0: e.clientX, y0: e.clientY, lx: q.l, ly: q.t, w: q.r - q.l, h: q.b - q.t, k: pt.k, moved: false };
+  } else if (isEl(id)) {  // one text of the block, moved from its place in it (inside the block's zoom)
+    drag = { kind: "el", id, x0: e.clientX, y0: e.clientY, dx: getVar(`--${id}-dx`), dy: getVar(`--${id}-dy`),
+             q: textBox(id), z: getVar("--block-zoom"), k: pt.k, moved: false };
   } else if (id) {
     const pre = "--" + id;
     drag = { kind: "text", id, pre, x0: e.clientX, y0: e.clientY, top: getVar(pre + "-top"), x: getVar(pre + "-x"), k: pt.k, moved: false };
@@ -2168,7 +2207,7 @@ hit.addEventListener("pointerdown", (e) => {
 hit.addEventListener("pointermove", (e) => {
   if (!P) return;
   if (!drag) {
-    const id = textAt(stagePoint(e));
+    const id = textAt(stagePoint(e), detached || e.altKey);
     hit.classList.toggle("text", !!id); showOutline(id);
     return;
   }
@@ -2187,6 +2226,15 @@ hit.addEventListener("pointermove", (e) => {
     setVar(drag.pre + "-top", Math.max(0, Math.min(canvasH() - 60, drag.top + dy * drag.k)), true);
     if (drag.id !== "band") setVar(drag.pre + "-x", Math.max(-canvasW() / 2, Math.min(canvasW() / 2, x)), true);  // the band spans the width
     showOutline(drag.id);
+  } else if (drag.kind === "el") {
+    const q = drag.q;  // it stays in the frame
+    let x = drag.dx + Math.max(-q.l, Math.min(canvasW() - q.r, dx * drag.k)) / drag.z;
+    if (Math.abs(x) < 10) { x = 0; snapped = !getVar("--block-x"); }  // back in line with the block
+    setVar(`--${drag.id}-dx`, x, true);
+    setVar(`--${drag.id}-dy`, drag.dy + Math.max(-q.t, Math.min(canvasH() - q.b, dy * drag.k)) / drag.z, true);
+    selEl = drag.id;
+    draw();  // it moves first, then its outline
+    showOutline(drag.id);
   } else {
     const c = P.background.clips[drag.i];
     let x = drag.cx + dx / drag.W, y = drag.cy + dy / drag.H;
@@ -2202,9 +2250,10 @@ hit.addEventListener("pointerup", () => {
   if (!drag) return;
   const d = drag; drag = null;
   hit.classList.remove("dragging"); $("guide").style.display = "none";
-  if (d.moved) { changed(d.kind === "bg" ? { bg: true } : d.kind === "logo" ? { look: true } : {}); return; }
+  if (d.moved) { changed(d.kind === "bg" ? { bg: true } : d.kind === "logo" || d.kind === "el" ? { look: true } : {}); return; }
   // a simple click opens the matching settings
   if (d.kind === "logo") { setTab("text"); $("logo-opts").scrollIntoView({ block: "center", behavior: "smooth" }); }
+  else if (d.kind === "el") { setTab("text"); selectEl(d.id, true); }
   else if (d.kind === "text") setTab("text");
   else { selClip = d.i; setTab("bg"); renderBgPanel(); tlRender(); }
 });
@@ -2212,9 +2261,12 @@ hit.addEventListener("pointerleave", () => { if (!drag) showOutline(null); });
 hit.addEventListener("wheel", (e) => {
   if (!P || !(e.ctrlKey || e.metaKey)) return;  // trackpad pinch arrives as ctrl + wheel
   e.preventDefault();
-  const f = Math.exp(-e.deltaY * 0.01), id = textAt(stagePoint(e));
+  const f = Math.exp(-e.deltaY * 0.01), id = textAt(stagePoint(e), detached || e.altKey);
   if (id === "logo") {
     setVar("--logo-size", Math.max(40, Math.min(600, getVar("--logo-size") * f)), true);
+    draw(); showOutline(id);
+  } else if (isEl(id)) {  // its text size
+    CTL["size." + id].set(CTL["size." + id].get() * f);
     draw(); showOutline(id);
   } else if (id) {
     const k = (id === "header" ? "--header" : "--block") + "-zoom";
@@ -2231,6 +2283,55 @@ hit.addEventListener("wheel", (e) => {
   hit.wheelTimer = setTimeout(() => changed({ group: "wheel" }), 300);
 }, { passive: false });
 
+// ---------------------------------------------------------------- the texts of the subtitle block
+// Each can be left out (--ar-display: none) and moved on its own (--ar-dx, --ar-dy: from its place
+// in the block). Dragging moves the whole block, unless "one by one" is on (or ⌥ / Alt is held).
+const ELEMENTS = [["num", "Numéro"], ["fr", "Traduction"], ["ar", "Arabe"], ["tr", "Phonétique"]];
+const isEl = (id) => ELEMENTS.some(([k]) => k === id);
+const elName = (k) => t((ELEMENTS.find(([x]) => x === k) || [, ""])[1]);
+const elShown = (k) => P.style[`--${k}-display`] !== "none";
+let selEl = null, detached = false;
+try { detached = localStorage.getItem("detach") === "1"; } catch {}
+function renderElements() {
+  const moved = ELEMENTS.some(([k]) => getVar(`--${k}-dx`) || getVar(`--${k}-dy`));
+  $("els").innerHTML = ELEMENTS.map(([k]) => elShown(k)
+    ? `<span class="el ${k === selEl ? "sel" : ""}" data-el="${k}"><button onclick="selectEl('${k}')" title="${t("régler sa place et sa taille")}">${elName(k)}</button>`
+      + `<button class="x" onclick="showEl('${k}', false)" title="${t("retirer du bloc")}">×</button></span>`
+    : `<span class="el off" data-el="${k}"><button onclick="showEl('${k}', true)" title="${t("remettre dans le bloc")}">+ ${elName(k)}</button></span>`).join("")
+    + (moved ? `<button class="small ghost" onclick="resetEl()">${t("Tout remettre en place")}</button>` : "");
+  $("detach").checked = detached;
+  $("detach-note").textContent = detached ? t("Sur l'aperçu, clique sur un élément pour le choisir, fais-le glisser, pince pour changer sa taille.")
+    : t("Sur l'aperçu, le bloc se déplace d'un seul tenant (⌥ Alt en glissant : un seul élément).");
+  const on = isEl(selEl) && elShown(selEl);
+  $("el-box").classList.toggle("hidden", !on);
+  if (on) $("el-name").textContent = elName(selEl);
+  refreshCtls();
+}
+function setDetached(on) {
+  detached = on;
+  try { localStorage.setItem("detach", on ? "1" : "0"); } catch {}
+  renderElements();
+}
+function selectEl(k, scroll) {
+  selEl = selEl === k && !scroll ? null : k;
+  renderElements();
+  if (scroll) $("el-box").scrollIntoView({ block: "center", behavior: "smooth" });
+}
+function showEl(k, on) {
+  if (!isEl(k)) return;
+  if (!on && ELEMENTS.filter(([x]) => elShown(x)).length < 2) { toast(t("Garde au moins un élément dans le bloc.")); return; }
+  if (!on && selEl === k) selEl = null;
+  setLook(`--${k}-display`, on ? null : "none");
+  if (!on) toast(t("{name} retiré du bloc", { name: elName(k) }) + ` <button class="small" onclick="showEl('${k}', true); this.closest('.toast').remove()">${t("Remettre")}</button>`);
+}
+// back to its place in the block (all of them when k is left out)
+function resetEl(k) {
+  for (const [x] of ELEMENTS) if (!k || x === k) { delete P.style[`--${x}-dx`]; delete P.style[`--${x}-dy`]; }
+  changed({ look: true });
+}
+// its font, size and colours: the section of the panel that has them
+function gotoEl() { $(selEl === "ar" ? "sec-ar" : "sec-fr").scrollIntoView({ block: "start", behavior: "smooth" }); }
+
 // ---------------------------------------------------------------- number controls
 // Premiere-style: type a value, use the arrows (Shift = x10, hold to repeat)
 // or drag the label sideways. CTL[name] = {get, set, step}.
@@ -2243,6 +2344,10 @@ const CTL = {
   "blk.y": { get: () => getVar("--block-top"), set: v => setVar("--block-top", v, true), step: 1 },
   "blk.s": { get: () => getVar("--block-zoom") * 100, set: v => setVar("--block-zoom", Math.max(20, Math.min(400, v)) / 100, true), step: 1 },
   "band.y": { get: () => getVar("--band-top"), set: v => setVar("--band-top", v, true), step: 1 },
+  "el.x": { get: () => selEl ? getVar(`--${selEl}-dx`) : 0, set: v => selEl && setVar(`--${selEl}-dx`, v, true), step: 1 },
+  "el.y": { get: () => selEl ? getVar(`--${selEl}-dy`) : 0, set: v => selEl && setVar(`--${selEl}-dy`, v, true), step: 1 },
+  "el.s": { get: () => selEl ? getVar(`--${selEl}-size`) / defaultOf(`--${selEl}-size`) * 100 : 100,
+            set: v => selEl && CTL["size." + selEl].set(defaultOf(`--${selEl}-size`) * v / 100), step: 1 },
   // background: centre of the picture in the frame, scale 100 % = whole picture visible
   "clip.x": { get: () => canvasW() / 2 + (+clipNow().x || 0) * canvasW(), set: v => clipNow().x = Math.round((v - canvasW() / 2) / canvasW() * 1e5) / 1e5, step: 1 },
   "clip.y": { get: () => canvasH() / 2 + (+clipNow().y || 0) * canvasH(), set: v => clipNow().y = Math.round((v - canvasH() / 2) / canvasH() * 1e5) / 1e5, step: 1 },
@@ -2300,7 +2405,8 @@ function xformHTML(p, t = window.t) {
       <div class="nf"><span class="scrub" data-scrub="${p}.x">X</span><input type="number" step="1" data-ctl="${p}.x"><span class="unit">px</span></div>
       <div class="nf"><span class="scrub" data-scrub="${p}.y">Y</span><input type="number" step="1" data-ctl="${p}.y"><span class="unit">px</span></div>
       <div class="nf"><span class="scrub" data-scrub="${p}.s" ${p === "clip" ? `title="${t("100 % = image entière visible")}"` : ""}>${t("Échelle")}</span><input type="number" step="1" data-ctl="${p}.s"><span class="unit">%</span></div>
-      ${p !== "clip" ? `<button class="small ghost" onclick="setVar('--${p === "hdr" ? "header" : "block"}-x', 0)">${t("Centrer")}</button>` : ""}
+      ${p === "el" ? `<button class="small ghost" onclick="resetEl(selEl)">${t("Remettre à sa place")}</button>`
+        : p !== "clip" ? `<button class="small ghost" onclick="setVar('--${p === "hdr" ? "header" : "block"}-x', 0)">${t("Centrer")}</button>` : ""}
     </div>`;
 }
 function sizeHTML(k, label) {  // label: French, translated with the rest of the page
@@ -2592,8 +2698,7 @@ function renderStylePanel() {
   fontPicker("font-arabic", "--arabic", "arabic", "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ");
   const mark = (P.style["--ayah-mark"] || "none").replace(/"/g, "");
   document.querySelectorAll("#ayah-mark button").forEach(b => b.classList.toggle("on", b.dataset.mark === mark));
-  $("show-num").checked = P.style["--num-display"] !== "none";
-  $("show-tr").checked = P.style["--tr-display"] !== "none";
+  renderElements();
   renderColors();
 }
 function fontPicker(el, v, script, sample) {
@@ -2746,7 +2851,8 @@ async function deleteFont(family) {
   await api(`/api/fonts/${encodeURIComponent(family)}`, { method: "DELETE" });
   fonts = await api("/api/fonts"); loadFaces(); reloadOverlay(); renderStylePanel();
 }
-const PLACE_KEYS = ["--header-top", "--header-x", "--block-top", "--block-x", "--header-zoom", "--block-zoom", "--band-top", "--logo-x", "--logo-y"];
+const PLACE_KEYS = ["--header-top", "--header-x", "--block-top", "--block-x", "--header-zoom", "--block-zoom", "--band-top", "--logo-x", "--logo-y",
+  "--num-dx", "--num-dy", "--fr-dx", "--fr-dy", "--ar-dx", "--ar-dy", "--tr-dx", "--tr-dy"];
 function applyStyle(id) {
   const s = styles.find(x => x.id === id);
   if (!s) return;

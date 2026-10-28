@@ -38,6 +38,7 @@
     --block-side: 70px; --fr-width: 900px; --ar-width: 920px; --tr-width: 940px;
     --fr-gap: 10px; --ar-gap: 30px; --tr-gap: 60px;
     --band-top: 1500px; --band-h: 330px; --band-bg: rgba(0, 0, 0, .32);
+    /* texts left out of the block: --num-display, --fr-display, --ar-display, --tr-display: none */
     /* arrangement: read by applyLayout() */
     --layout: stack;        /* stack | cinema (Arabic first) | band (Arabic in a band at the bottom) */
     --header-mode: top;     /* top | corner (small label) | intro (cards before the recitation) */
@@ -77,15 +78,20 @@
   #block[hidden], #band[hidden], #intro[hidden] { display: none; }
   #num-line { display: var(--num-display, block); }
   #num { font: var(--num-weight, 400) var(--num-size)/1 var(--num-font, var(--text-font)); color: var(--num-color, var(--white)); --sw: 5px; }
-  #fr-box { min-height: calc(var(--fr-size) * 2.46); display: flex; align-items: center; justify-content: center; margin-top: var(--fr-gap); }
+  #fr-box { min-height: calc(var(--fr-size) * 2.46); display: var(--fr-display, flex); align-items: center; justify-content: center; margin-top: var(--fr-gap); }
   #fr { font: var(--fr-weight, 400) var(--fr-size)/1.18 var(--text-font), "Nunito", "Noto Naskh Arabic", sans-serif; color: var(--fr-color, var(--white));
         text-transform: var(--fr-case, none); font-variant-caps: var(--fr-variant, normal); letter-spacing: var(--fr-spacing, normal);
         --sw: 5px; max-width: var(--fr-width); text-wrap: balance; white-space: pre-line; }
   #fr[dir=rtl] { line-height: 1.6; }
-  #ar-box { margin-top: var(--ar-gap); min-height: calc(var(--ar-size) * 1.9); display: flex; align-items: center; justify-content: center; }
+  #ar-box { margin-top: var(--ar-gap); min-height: calc(var(--ar-size) * 1.9); display: var(--ar-display, flex); align-items: center; justify-content: center; }
   #ar { font: 400 var(--ar-size)/1.75 var(--arabic), "Amiri Quran", serif; direction: rtl; color: var(--ar-color, var(--white)); --sw: 5px; max-width: var(--ar-width); text-wrap: balance; }
   #ar .ayah { font-family: var(--ayah-font, "Amiri Quran"); white-space: nowrap; }
   #tr-line { display: var(--tr-display, block); }
+  /* each text moved on its own, from its place in the block (--fr-dx: 0px...) */
+  #num-line { translate: var(--num-dx, 0px) var(--num-dy, 0px); }
+  #fr-box { translate: var(--fr-dx, 0px) var(--fr-dy, 0px); }
+  #ar-box { translate: var(--ar-dx, 0px) var(--ar-dy, 0px); }
+  #tr-line { translate: var(--tr-dx, 0px) var(--tr-dy, 0px); }
   #tr { margin-top: var(--tr-gap); font: var(--tr-weight, 400) var(--tr-size)/1.2 var(--tr-font, var(--text-font)), "Nunito", sans-serif;
         color: var(--tr-color, var(--phonetic)); text-transform: var(--tr-case, none); letter-spacing: var(--tr-spacing, normal);
         --sw: 4px; max-width: var(--tr-width); text-wrap: balance; }
