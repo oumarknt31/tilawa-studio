@@ -53,6 +53,7 @@ class RenderOptions:
     loudnorm: bool = True  # -14 LUFS, the level YouTube, TikTok and Instagram play at
     basmala: str = ""  # YouTube styles: a reciter's basmala said before the recitation (basmala.RECITERS), "" = none
     repeat: int = 1  # horizontal (YouTube) videos: the recitation this many times in a row (to learn it by heart)
+    show_subs: bool = True  # the subtitles track's eye in the editor: off = a video without subtitles
 
 
 # "Surah X" in each translation language ({} = the surah's name)
@@ -574,7 +575,7 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
     work.mkdir(parents=True, exist_ok=True)
 
     # 1) overlays
-    shown = [b for b in blocks if b.end > t0 and b.start < t1]
+    shown = [b for b in blocks if b.end > t0 and b.start < t1] if opt.show_subs else []
     renderer = OverlayRenderer(w, h, fmt)
     try:
         intro = header_mode(style) == "intro" and opt.show_header and not still_image
@@ -590,7 +591,7 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         card_pngs = [renderer.png(work / f"intro{k}.png", style, intro=c) for k, c in enumerate(cards)]
         basmala = basmala if basmala and not still_image else None
         if basmala:
-            b_png = renderer.png(work / "basmala.png", style, block=basmala["payload"])
+            b_png = renderer.png(work / "basmala.png", style, block=basmala["payload"] if opt.show_subs else None)
         pngs = []
         for i, b in enumerate(shown):
             pngs.append(renderer.png(work / f"block{i:03d}.png", style, block=block_payload(b, lang)))

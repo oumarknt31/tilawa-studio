@@ -125,13 +125,27 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
      Les vidéos horizontales peuvent être **répétées** (10 fois par défaut, ou le nombre choisi) : la récitation
      revient encore et encore pour l'apprendre par cœur, les cartes de titre et la basmala ajoutée une seule fois, au début.
    - **Timeline** (en bas), avec les outils de Premiere et DaVinci :
+     - **Choisir** : un clic choisit un clip ou un sous-titre sans bouger la tête de lecture (double-clic : y aller ;
+       la règle en haut déplace la tête de lecture) ; ⇧ ou ⌘ + clic, ou un cadre tracé depuis un espace vide, en
+       choisit plusieurs ; ⌘A tous, Échap aucun. **Sélection vers l'avant** (A) : un élément et tout ce qui le suit
+       sur sa piste (Maj : sur toutes les pistes).
+     - **Modifier ce qui est choisi** : ⌘C copier, ⌘X couper, ⌘V coller à la tête de lecture (ce qui était dessous
+       laisse la place, comme dans Premiere), ⌘D dupliquer juste après, **Suppr** (un sous-titre laisse son temps vide ;
+       le temps d'un clip d'arrière-plan va à son voisin), ⌥ ← → une image plus tôt / plus tard (⇧ : dix). Glisser
+       plusieurs sous-titres les déplace ensemble.
+     - **Texte** (T) : trace un nouveau sous-titre sur la piste des sous-titres (ou *Nouveau* dans l'onglet
+       Sous-titres) et écris-le, ou *Remplir avec* un verset (numéroté comme la lecture le numérote), la basmala ou
+       l'isti'adha ; puis *🎧 Caler sur la récitation* trouve ce verset dans l'audio en dessous et le cale mot par mot,
+       comme l'analyse. Une vidéo peut ainsi être sous-titrée entièrement à la main quand l'analyse s'est trompée.
+     - **Boutons des pistes** : 🔒 verrouille une piste (plus rien n'y change par erreur) ; l'œil des sous-titres les
+       masque dans l'aperçu et dans la vidéo exportée. **Main** (H) : faire défiler la timeline.
      - **Sélection** (V) : glisse un clip sur un autre pour les échanger, un clip de la réserve ou un média de la
        bibliothèque sur un clip pour l'y mettre ; tire un bord pour déplacer la coupe (Maj : la suite se décale),
        un sous-titre pour le déplacer, ses bords pour changer son horaire.
      - **Lame** (B) : coupe là où tu cliques (un sous-titre : entre les mots les plus proches) ; **S** ou **⌘K** à la tête de lecture.
      - **Décaler** (Y, ou ⌥ + glisser) : le passage d'une vidéo montré dans son clip.
      - **Remplacer** (R) : un autre média de la bibliothèque, ou un nouveau fichier, à la place d'un clip (et de ses répétitions si tu veux).
-     - ⌘C / ⌘V un clip à la place d'un autre (⌥⌘V : son apparence seulement), **Suppr**, **clic droit** pour tous les outils.
+     - *Coller à la place* met un clip copié à la place d'un autre (⌥⌘V : son apparence seulement) ; **clic droit** pour tous les outils.
      - **Magnétisme** (N) : ce que tu glisses s'aimante aux versets et sous-titres, aux coupes de l'arrière-plan, au début
        et à la fin de la vidéo et à la tête de lecture, d'une piste à l'autre ; une ligne dorée et une étiquette montrent
        à quoi. Un sous-titre déplacé s'aimante par l'un ou l'autre bout. ⌘ en glissant : sans aimant.

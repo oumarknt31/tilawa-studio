@@ -67,9 +67,9 @@ def phonetic(kind: str, v: quran.Verse | None, a0: int, a1: int, style: str) -> 
 
 @dataclass
 class Block:
-    kind: str  # "verse" | "istiadha" | "basmala"
+    kind: str  # "verse" | "istiadha" | "basmala" | "text" (written by hand in the editor)
     surah: int
-    ayah: int  # 0 for istiadha/basmala
+    ayah: int  # 0 for istiadha/basmala/text
     a0: int  # align-word range inside the verse
     a1: int
     start: float  # on-screen start (s)
@@ -534,6 +534,8 @@ def verse_texts(b: Block, style: str = "simple") -> None:
 
 def set_phonetic(b: Block, style: str) -> None:
     """The phonetic line of a block (and of each of its words), in a convention."""
+    if b.kind == "text":  # written by hand: stays as it is
+        return
     tr = phonetic(b.kind, quran.verse(b.surah, b.ayah) if b.kind == "verse" else None, b.a0, b.a1, style)
     b.tr = " ".join(tr)
     if b.kind == "verse":
@@ -579,6 +581,8 @@ def merge_blocks(blocks: list[Block], i: int, style: str = "simple") -> None:
     a.a1, a.end, a.voice_end = b.a1, b.end, b.voice_end
     a.words = a.words + b.words
     a.fr = (a.fr + " " + b.fr).strip()
+    if a.kind == "text":
+        a.ar, a.tr = (a.ar + " " + b.ar).strip(), (a.tr + " " + b.tr).strip()
     a.highlight = a.highlight and b.highlight
     if a.kind == "verse":
         verse_texts(a, style)
@@ -591,6 +595,9 @@ def retranslate(blocks: list[Block], lang: str, chosen: str | None = None) -> No
     i = 0
     while i < len(blocks):
         b = blocks[i]
+        if b.kind == "text":  # written by hand: stays as it is
+            i += 1
+            continue
         if b.kind != "verse":
             v = quran.verse(1, 1)
             b.fr = quran.ISTIADHA_TRANSLATION[lang] if b.kind == "istiadha" else translation(v, lang, chosen)

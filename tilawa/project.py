@@ -448,6 +448,28 @@ def verse_candidates(p: Project, i: int, progress: Progress | None = None, limit
             "current": {"surah": cur[0], "ayah": cur[1], "number": quran.verse(*cur).number(blocks[0]["a0"]) or 1}}
 
 
+def filled(p: Project, kind: str, s: int = 0, n: int = 0) -> dict:
+    """A subtitle written by hand, filled with a verse (numbered as the project's reading numbers it),
+    the basmala or the isti'adha: its text in the project's translation and transliteration."""
+    style = p.segment.get("translit", "simple")
+    if kind in ("basmala", "istiadha"):
+        b = segment.Block(kind, 0, 0, 0, 0, 0, 0, "", "", "")
+        b.ar = quran.basmala_uthmani() if kind == "basmala" else segment.ISTIADHA_UTHMANI
+    else:
+        s, a = quran.key_of(s, n)
+        v = quran.verse(s, a)
+        # the words of verse n inside the Hafs verse (in Warsh, a verse can be part of one)
+        own = [k for k, x in enumerate(v.numbers) if x == n] or list(range(len(v.align)))
+        b = segment.Block("verse", s, a, own[0], own[-1] + 1, 0, 0, "", "", "")
+        segment.verse_texts(b, style)
+    segment.retranslate([b], p.lang, p.segment.get("translation"))
+    segment.set_phonetic(b, style)
+    out = b.to_dict()
+    out["num"], out["num_end"] = numbers(out) if kind == "verse" else (0, 0)
+    out["ends_verse"] = render.ends_verse(b)
+    return out
+
+
 def set_verse(p: Project, i: int, s: int, a: int, progress: Progress | None = None) -> None:
     """Give the recitation of block i's verse to verse s:a: that stretch is aligned again with it."""
     progress = progress or (lambda st, f: None)

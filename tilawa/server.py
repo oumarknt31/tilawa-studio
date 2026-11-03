@@ -376,6 +376,16 @@ def verse_candidates(pid: str, body: dict):
     return {"job": _job("verse", pid, lambda progress: project.verse_candidates(p, i, progress))}
 
 
+@app.post("/api/projects/{pid}/fill")
+def fill(pid: str, body: dict):
+    """The text of a verse (as the reading numbers it), the basmala or the isti'adha, for a subtitle written by hand."""
+    p = project.Project.load(_folder(pid))
+    kind = str(body.get("kind", "verse"))
+    if kind not in ("verse", "basmala", "istiadha"):
+        raise HTTPException(400)
+    return project.filled(p, kind, int(body.get("surah") or 0), int(body.get("number") or 0))
+
+
 @app.post("/api/projects/{pid}/set-verse")
 def set_verse(pid: str, body: dict):
     """Give the recitation of a subtitle to another verse: aligned again with it (a job)."""

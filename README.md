@@ -124,13 +124,26 @@ downloaded in a browser.
      Horizontal videos can be **repeated** (10 times by default, or any number): the recitation
      plays again and again to learn it by heart, the title cards and added basmala only once, at the start.
    - **Timeline** (bottom), with the tools of Premiere and DaVinci:
+     - **Choosing**: a click chooses a clip or a subtitle without moving the playhead (double-click: go there;
+       the ruler at the top moves the playhead); ⇧ or ⌘ + click, or a box drawn from an empty space, chooses
+       several; ⌘A all of them, Esc none. **Track select forward** (A): an item and everything after it on its
+       track (Shift: on every track).
+     - **Editing what is chosen**: ⌘C copy, ⌘X cut, ⌘V paste at the playhead (what was under it makes room, as in
+       Premiere), ⌘D duplicate right after, **Delete** (a subtitle leaves its time empty; a background clip's time goes
+       to its neighbour), ⌥ ← → one frame earlier / later (⇧: ten). Dragging several subtitles moves them together.
+     - **Type** (T): draw a new subtitle on the subtitles track (or *New* in the Subtitles tab) and write it there,
+       or *Fill with* a verse (as the reading numbers it), the basmala or the isti'adha; then *🎧 Fit to the
+       recitation* finds that verse in the audio under it and times it word by word, as the analysis does. So a
+       video can be subtitled entirely by hand when the analysis got it wrong.
+     - **Track buttons**: 🔒 locks a track (nothing on it can change by mistake); the subtitles' eye hides them in
+       the preview and in the exported video. **Hand** (H) scrolls the timeline.
      - **Selection** (V): drag a clip onto another to swap them, a clip of the reserve or a media of the
        library onto a clip to put it there; drag an edge to move the cut (Shift: what follows moves too),
        a subtitle to move it, its edges to change its timing.
      - **Blade** (B) cuts where you click (a subtitle: between the nearest words); **S** or **⌘K** at the playhead.
      - **Slip** (Y, or ⌥ + drag): which part of a video its clip shows.
      - **Replace** (R): another media from the library, or a new file, in place of a clip (and its repeats if you like).
-     - ⌘C / ⌘V a clip in place of another (⌥⌘V: its look only), **Delete**, **right click** for every tool.
+     - *Paste in its place* puts a copied clip in place of another (⌥⌘V: its look only); **right click** for every tool.
      - **Magnet** (N): what you drag locks onto the verses and subtitles, the background cuts, the start and
        end of the video and the playhead, across tracks; a gold line and a label show what it locked onto.
        A moved subtitle locks by either end. Hold ⌘ while dragging to move freely.
