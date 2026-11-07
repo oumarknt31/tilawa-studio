@@ -569,6 +569,12 @@
         <p class="muted small" style="margin:10px 0 0">Le son reste toujours celui de la récitation. 1 média remplit toute la vidéo ; plusieurs : un par verset, repris dans l'ordre s'il y a plus de versets que de médias.</p>
       </div>
       <div class="section">
+        <div class="sh"><h3>✨ Une image par verset</h3><button class="small ghost" onclick="openAi()">Réglages</button></div>
+        <p class="muted small" id="ai-note" style="margin:0 0 8px"></p>
+        <button class="small primary" id="ai-go" onclick="makeVerseImages()"></button>
+        <div id="ai-run" class="hidden" style="margin-top:8px"><div class="progress"><div id="ai-bar"></div></div><span id="ai-status" class="small muted"></span></div>
+      </div>
+      <div class="section">
         <div class="sh"><h3>Mes médias</h3></div>
         <div id="media-drop" class="drop" style="min-height:0;padding:14px;gap:4px"><strong style="font-size:13.5px">Dépose des photos ou des vidéos</strong>
           <span class="muted small">jpg, png, heic (iPhone), mp4, mov… ou clique</span><span id="media-status" class="small" style="color:var(--accent)"></span></div>
@@ -974,6 +980,33 @@
   <input id="replace-file" type="file" accept="image/*,video/*,.heic,.heif,.mkv,.mov,.webm" class="hidden">
 </dialog>
 
+<dialog id="ai-dlg" style="max-width:520px">
+  <h2>Images par verset (OpenAI)</h2>
+  <p class="muted small" style="margin-top:0">Crée une clé sur <b>platform.openai.com/api-keys</b> et ajoute du crédit (Billing) : c'est séparé d'un abonnement ChatGPT. La clé reste sur cet ordinateur, dans le dossier Tilawa Studio, et ne sert qu'à demander les images à OpenAI.</p>
+  <label>Clé OpenAI</label>
+  <input id="ai-key" type="password" autocomplete="off" spellcheck="false">
+  <label style="margin-top:12px">Style de toutes les images</label>
+  <textarea id="ai-style" rows="3"></textarea>
+  <p class="faint small" style="margin:6px 0 0">Ajouté à chaque consigne, pour que les images forment une série. Les règles restent toujours : pas de personnes, d'animaux, de figures religieuses ni d'écriture.
+    <a href="#" onclick="event.preventDefault(); $('ai-style').value = aiSet.default_style">Style par défaut</a></p>
+  <p class="error small" id="ai-err" style="margin:8px 0 0"></p>
+  <div class="row" style="justify-content:space-between;margin-top:16px">
+    <button class="ghost small hidden" id="ai-forget" onclick="saveAi(true)">Retirer ma clé</button><span class="grow"></span>
+    <button class="ghost" onclick="$('ai-dlg').close()">Annuler</button>
+    <button class="primary" onclick="saveAi(false)">Enregistrer</button>
+  </div>
+</dialog>
+
+<dialog id="ai-redo" style="max-width:560px">
+  <h2>Refaire l'image</h2>
+  <p class="muted small" id="ai-redo-what" style="margin-top:0"></p>
+  <textarea id="ai-prompt" rows="10" style="font-size:12.5px"></textarea>
+  <div class="row" style="justify-content:flex-end;margin-top:14px">
+    <button class="ghost" onclick="$('ai-redo').close()">Annuler</button>
+    <button class="primary" onclick="redoImageGo()">Refaire</button>
+  </div>
+</dialog>
+
 <dialog id="fmt-dialog">
   <h2>Passer en <span id="fmt-name"></span></h2>
   <p class="muted" style="margin-top:0">Les textes reprennent les places prévues pour ce format ; les couleurs, polices et arrière-plans sont gardés.</p>
@@ -1350,6 +1383,38 @@ const EN = {
   "Tout garder (début et fin)": "Keep everything (start and end)",
   "Seules tes vidéos ont un passage à choisir : une photo ou la vidéo d'origine restent en place.": "Only your videos have a part to choose: a photo or the original video stays as it is.",
   "la vidéo commence à {s}": "the video starts at {s}",
+  "et ajoute du crédit (Billing) : c'est séparé d'un abonnement ChatGPT. La clé reste sur cet ordinateur, dans le dossier Tilawa Studio, et ne sert qu'à demander les images à OpenAI.": "and add credit (Billing): it is separate from a ChatGPT subscription. The key stays on this computer, in the Tilawa Studio folder, and is only used to ask OpenAI for the pictures.",
+  "Ajouté à chaque consigne, pour que les images forment une série. Les règles restent toujours : pas de personnes, d'animaux, de figures religieuses ni d'écriture.": "Added to every prompt, so the pictures make a series. The rules always stay: no people, animals, religious figures or writing.",
+  "✨ Une image par verset": "✨ A picture per verse",
+  "Réglages": "Settings",
+  "Avec ta clé OpenAI, l'appli crée une image pour chaque verset à partir de son sens (paysages, lumière, symboles : jamais de personnes, d'animaux ni de figures) et la cale sur ce verset. Payé sur ton compte OpenAI, environ {p} $ l'image.": "With your OpenAI key, the app makes a picture for each verse from its meaning (landscapes, light, symbols: never people, animals or figures) and places it on that verse. Paid on your OpenAI account, about {p} $ a picture.",
+  "Pas encore de versets dans les sous-titres.": "No verses in the subtitles yet.",
+  "{n} versets · {m} images à créer (environ {c} $ sur ton compte OpenAI). Vérifie chacune avant de publier.": "{n} verses · {m} pictures to make (about {c} $ on your OpenAI account). Check each one before posting.",
+  "{n} versets : chacun a son image. Clic droit sur un clip pour en refaire une.": "{n} verses: each has its picture. Right click a clip to redo one.",
+  "Ajouter ma clé OpenAI": "Add my OpenAI key",
+  "Créer les {m} images": "Make the {m} pictures",
+  "Recaler sur les versets": "Place them on the verses again",
+  "Chaque verset a son image : elles sont calées sur les versets": "Each verse has its picture: they are placed on the verses",
+  "Créer {n} images avec OpenAI, environ {c} $ sur ton compte ?": "Make {n} pictures with OpenAI, about {c} $ on your account?",
+  "Créer": "Make",
+  "{n} images créées et calées sur leurs versets": "{n} pictures made and placed on their verses",
+  "Verset {v}": "Verse {v}",
+  "Verset {v} : la consigne envoyée à OpenAI. Change-la si tu veux, puis « Refaire » (environ {p} $).": "Verse {v}: the prompt sent to OpenAI. Change it if you like, then \u201cRedo\u201d (about {p} $).",
+  "clé enregistrée (colle une autre clé pour la changer)": "key saved (paste another key to change it)",
+  "Clé OpenAI retirée de cet ordinateur": "OpenAI key removed from this computer",
+  "Réglages enregistrés": "Settings saved",
+  "Vérification de la clé…": "Checking the key…",
+  "Refaire cette image (OpenAI)…": "Redo this picture (OpenAI)…",
+  "Création des images par OpenAI…": "OpenAI is making the pictures…",
+  "Images par verset (OpenAI)": "Pictures per verse (OpenAI)",
+  "Crée une clé sur": "Create a key on",
+  "Clé OpenAI": "OpenAI key",
+  "Style de toutes les images": "Style of all the pictures",
+  "Style par défaut": "Default style",
+  "Retirer ma clé": "Remove my key",
+  "Enregistrer": "Save",
+  "Refaire l'image": "Redo the picture",
+  "Refaire": "Redo",
   "Sélection vers l'avant, texte (tracer un nouveau sous-titre), main": "Track select forward, type (draw a new subtitle), hand",
   "Clic": "Click",
   "Choisir un élément sans bouger la tête de lecture (double-clic : y aller ; la règle en haut : déplacer la tête de lecture)": "Choose an item without moving the playhead (double-click: go there; the ruler at the top: move the playhead)",
@@ -1467,7 +1532,7 @@ const icon = (name, size = 16) => `<svg class="i" style="width:${size}px;height:
 const STAGES_FR = { queued: "En attente…", download: "Téléchargement de la vidéo…", preview: "Préparation de l'aperçu…",
   audio: "Lecture de l'audio…", model: "Chargement du modèle de récitation…", listening: "Écoute de la récitation…",
   identify: "Identification de la sourate et des versets…", aligning: "Synchronisation de chaque mot…", done: "Terminé",
-  overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…", loudness: "Mesure du volume…",
+  images: "Création des images par OpenAI…", overlays: "Dessin des sous-titres…", encoding: "Encodage de la vidéo…", loudness: "Mesure du volume…",
   prepare: "Préparation des vidéos en aller-retour…", install: "Installation des composants…",
   fetch_update: "Téléchargement de la mise à jour…", repeat: "Assemblage des répétitions…" };
 const STAGES = new Proxy(STAGES_FR, { get: (o, k) => o[k] && t(o[k]) });
@@ -1561,6 +1626,7 @@ overlayLoaded();
 async function init() {
   [surahs, langs, styles, fonts, settings, info, basmalas] = await Promise.all(
     ["/api/surahs", "/api/languages", "/api/styles", "/api/fonts", "/api/settings", "/api/info", "/api/basmala"].map(u => api(u)));
+  loadAi();
   document.body.classList.toggle("desktop", !!info.desktop);
   showVersion();
   setTimeout(checkUpdate, 1500);
@@ -3081,6 +3147,7 @@ function clipName(c) {
 }
 function renderBgPanel() {
   const clips = P.background.clips, onlyOrig = clips.length === 1 && clips[0].src === "original";
+  renderAi();
   $("mode-orig").classList.toggle("on", onlyOrig);
   $("mode-own").classList.toggle("on", clips.every(c => c.src !== "original"));
   $("media-list").innerHTML = P.media.map(m => `<div class="media" draggable="true" title="${t("glisse-le sur un clip de la timeline pour le remplacer")}"
@@ -3298,17 +3365,7 @@ function spreadEvenly() {
   changed({ bg: true });
 }
 // where each verse starts on screen, in order; a verse read again later (repeats, another surah) starts again
-function verseStarts() {
-  const out = [];
-  let prev = null;
-  for (const b of P.blocks) {
-    if (b.kind !== "verse") continue;
-    const key = b.surah + ":" + b.ayah;
-    if (key !== prev) out.push(b.start);
-    prev = key;
-  }
-  return out;
-}
+function verseStarts() { return verseKeys().map(k => k.at); }
 // the automatic sequence: one media per verse in their order, from the first again when there are
 // more verses than media; the media left over when there are fewer verses wait in the reserve
 function cycleOf(files) {
@@ -3343,7 +3400,7 @@ function buildOwnSequence() {
   const make = (f, i) => cloneClip(prev[i]?.src === f ? prev[i] : pool.get(f) || newClip(f));
   const { seq, spare } = cycleOf(P.media.map(m => m.file));
   bg.clips = seq.map(make); bg.spare = spare.map(f => make(f, -1));
-  bg.auto = true;
+  bg.auto = true; bg.byVerse = false;
   timeToVerses();
   selClip = Math.min(selClip, bg.clips.length - 1);
 }
@@ -3351,6 +3408,7 @@ function buildOwnSequence() {
 function followVerses() {
   const bg = P.background, before = JSON.stringify(bg);
   if (!bg.auto || bg.clips.every(c => c.src === "original")) return false;
+  if (bg.byVerse) { placeVerseImages(); return JSON.stringify(bg) !== before; }
   if (isCycle() && cycleOf(P.media.map(m => m.file)).seq.length !== bg.clips.length) buildOwnSequence();
   else timeToVerses();
   return JSON.stringify(bg) !== before;
@@ -3370,7 +3428,7 @@ async function useOriginal() {
   if (!await ask(t("Revenir à la vidéo d'origine seule ? (tes médias restent dans la bibliothèque)"))) return;
   const orig = clips.find(c => c.src === "original");
   P.background.clips = [orig ? { ...orig, motion: "none" } : newClip("original")];
-  P.background.auto = false;
+  P.background.auto = false; P.background.byVerse = false;
   selClip = 0; changed({ bg: true });
 }
 let wantOwn = false;
@@ -3421,6 +3479,110 @@ async function deleteMedia(file) {
   loadState(p);
   if (wasCycle && P.media.length) { buildOwnSequence(); scheduleSave(); }  // the others close up
   lastState = state(); refreshAll();
+}
+
+// ---------------------------------------------------------------- a picture per verse, made by OpenAI
+// With the user's own OpenAI key (kept in the Tilawa Studio folder): each verse gets a picture made
+// from its meaning, placed on that verse; a verse said again shows its picture again.
+let aiSet = { has_key: false, price: 0.04 };
+const usd = (x) => x.toLocaleString(UI === "fr" ? "fr-FR" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+async function loadAi() { try { aiSet = await api("/api/images"); renderAi(); } catch {} }
+// each verse where it starts on screen, with its key (as verseStarts)
+function verseKeys() {
+  const out = [];
+  let prev = null;
+  for (const b of P.blocks) {
+    if (b.kind !== "verse") continue;
+    const key = b.surah + ":" + b.ayah;
+    if (key !== prev) out.push({ at: b.start, key, s: b.surah, a: b.ayah });
+    prev = key;
+  }
+  return out;
+}
+// the picture of each verse: the last one made for it
+function aiByVerse() {
+  const out = new Map();
+  for (const m of P.media) if (m.ai && m.verse) out.set(m.verse.join(":"), m.file);
+  return out;
+}
+const aiMissing = () => [...new Map(verseKeys().filter(k => !aiByVerse().has(k.key)).map(k => [k.key, [k.s, k.a]])).values()];
+// the sequence: one clip per verse start, with that verse's picture (a verse without one: the one before it)
+function placeVerseImages() {
+  const ks = verseKeys(), have = aiByVerse();
+  if (!ks.length || !ks.some(k => have.has(k.key))) return false;
+  let last = null;
+  const files = ks.map(k => (last = have.get(k.key) || last));
+  const first = files.find(Boolean);
+  for (let i = 0; !files[i]; i++) files[i] = first;
+  const bg = P.background, kept = new Map([...bg.clips, ...spares()].map(c => [c.src, c]));
+  bg.clips = files.map(f => kept.has(f) ? cloneClip(kept.get(f)) : newClip(f));
+  bg.byVerse = true; bg.auto = true;
+  timeToVerses();
+  return true;
+}
+function placeAiImages() { if (placeVerseImages()) { changed({ bg: true }); renderAi(); } }
+function renderAi() {
+  if (!P) return;
+  const n = new Set(verseKeys().map(k => k.key)).size, miss = aiMissing().length, cost = usd(miss * aiSet.price);
+  $("ai-note").textContent = !aiSet.has_key
+    ? t("Avec ta clé OpenAI, l'appli crée une image pour chaque verset à partir de son sens (paysages, lumière, symboles : jamais de personnes, d'animaux ni de figures) et la cale sur ce verset. Payé sur ton compte OpenAI, environ {p} $ l'image.", { p: usd(aiSet.price) })
+    : !n ? t("Pas encore de versets dans les sous-titres.")
+    : miss ? t("{n} versets · {m} images à créer (environ {c} $ sur ton compte OpenAI). Vérifie chacune avant de publier.", { n, m: miss, c: cost })
+    : t("{n} versets : chacun a son image. Clic droit sur un clip pour en refaire une.", { n });
+  $("ai-go").textContent = !aiSet.has_key ? t("Ajouter ma clé OpenAI") : miss ? t("Créer les {m} images", { m: miss }) : t("Recaler sur les versets");
+  $("ai-go").disabled = aiSet.has_key && !n;
+}
+async function makeVerseImages(verses, prompts) {
+  if (!aiSet.has_key) return openAi();
+  if (!verses) {
+    verses = aiMissing();
+    if (!verses.length) { placeAiImages(); toast(t("Chaque verset a son image : elles sont calées sur les versets")); return; }
+    if (!await ask(t("Créer {n} images avec OpenAI, environ {c} $ sur ton compte ?", { n: verses.length, c: usd(verses.length * aiSet.price) }), { ok: "Créer" })) return;
+  }
+  await save();
+  const go = $("ai-go"), status = $("ai-status"), id = P.id;
+  go.disabled = true; $("ai-run").classList.remove("hidden");
+  try {
+    const { job } = await api(`/api/projects/${pid()}/images`, json({ verses, prompts }));
+    const r = await follow(job, status, $("ai-bar"), false, null);
+    if (!P || P.id !== id) return;
+    P.media = (await api(`/api/projects/${pid()}`)).media;  // only the new pictures: what changed meanwhile here stays
+    placeVerseImages(); changed({ bg: true });
+    if (r.made.length) toast(`${icon("check")} ${t("{n} images créées et calées sur leurs versets", { n: r.made.length })}`, "ok");
+    for (const f of r.failed) toast(`${t("Verset {v}", { v: f.verse.join(":") })} : ${esc(f.error)}`, "err");
+  } catch (e) { toast(esc(e.message), "err"); }
+  finally { status.textContent = ""; go.disabled = false; $("ai-run").classList.add("hidden"); renderAi(); }
+}
+// another picture for the verse of clip i, from its prompt (changed or not)
+let redoVerse = null;
+function redoImage(i) {
+  const m = P.media.find(x => x.file === P.background.clips[i]?.src);
+  if (!m?.ai) return;
+  redoVerse = m.verse;
+  $("ai-prompt").value = m.prompt || "";
+  $("ai-redo-what").textContent = t("Verset {v} : la consigne envoyée à OpenAI. Change-la si tu veux, puis « Refaire » (environ {p} $).", { v: m.verse.join(":"), p: usd(aiSet.price) });
+  $("ai-redo").showModal();
+}
+function redoImageGo() {
+  $("ai-redo").close();
+  makeVerseImages([redoVerse], { [redoVerse.join(":")]: $("ai-prompt").value.trim() });
+}
+function openAi() {
+  $("ai-key").value = ""; $("ai-key").placeholder = aiSet.has_key ? t("clé enregistrée (colle une autre clé pour la changer)") : "sk-…";
+  $("ai-style").value = aiSet.style || "";
+  $("ai-forget").classList.toggle("hidden", !aiSet.has_key);
+  $("ai-err").textContent = "";
+  $("ai-dlg").showModal();
+}
+async function saveAi(forget) {
+  const body = { style: $("ai-style").value };
+  if (forget) body.key = ""; else if ($("ai-key").value.trim()) body.key = $("ai-key").value.trim();
+  $("ai-err").textContent = body.key ? t("Vérification de la clé…") : "";
+  try {
+    aiSet = await api("/api/images", json(body, "PUT"));
+    $("ai-dlg").close(); renderAi();
+    toast(forget ? t("Clé OpenAI retirée de cet ordinateur") : `${icon("check")} ${t("Réglages enregistrés")}`, forget ? "" : "ok");
+  } catch (e) { $("ai-err").textContent = e.message; }
 }
 
 // ---------------------------------------------------------------- audio
@@ -4096,6 +4258,7 @@ $("tl-content").addEventListener("contextmenu", (e) => {
              [t("Couper à la tête de lecture"), "S", () => splitClip(i, head), lk || !(x && head > x.s && head < x.e)],
              null,
              [t("Remplacer…"), "R", () => openReplace(i), lk],
+             ...(P.media.find(m => m.file === P.background.clips[i].src)?.ai ? [[t("Refaire cette image (OpenAI)…"), "", () => redoImage(i), lk]] : []),
              [n > 1 ? t("Copier ({n})", { n }) : t("Copier"), "⌘C", () => copySel()],
              [t("Couper (pour coller ailleurs)"), "⌘X", cutSel, lk || one],
              [t("Coller à la tête de lecture"), "⌘V", () => pasteAt(), lk || !board],

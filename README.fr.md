@@ -78,6 +78,13 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
        neige, lave…) ; ceux ajoutés plus tard prennent leur place dans la suite. **Plus de médias que de versets** :
        un par verset, les autres attendent dans la **réserve**, au bout de la timeline.
        *Caler sur les versets* / *Répartir également* pour refaire le minutage.
+     - **✨ Une image par verset** (avec ta propre clé d'API OpenAI, séparée d'un abonnement ChatGPT ; environ
+       0,04 $ l'image, payés sur ton compte OpenAI) : l'appli demande au modèle d'images d'OpenAI (gpt-image-2,
+       qualité moyenne) une image du sens de chaque verset, d'après sa traduction anglaise, toujours en paysages,
+       lumière et symboles (jamais de personnes, d'animaux, de figures religieuses ni d'écriture), dans un style
+       que tu écris une fois. Chaque image va sur son verset ; un verset redit reprend son image ; clic droit sur
+       un clip pour refaire son image (sa consigne peut être changée). La clé reste dans le dossier Tilawa Studio.
+       Vérifie chaque image avant de publier.
      - Une vidéo plus courte que sa place est jouée en **aller-retour** (avant puis à l'envers) : boucle sans saut.
      - Pour chaque élément : position X/Y et échelle (comme dans Premiere), *Remplir l'écran* / *Image entière*,
        zoom lent, et **couleur** : exposition, contraste, hautes lumières, ombres, saturation, température, teinte.

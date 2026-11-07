@@ -516,6 +516,45 @@ def add_media(p: Project, src: Path, name: str) -> dict:
     return item
 
 
+def verse_images(folder: Path, verses: list[tuple[int, int]], key: str, style: str = "",
+                 prompts: dict[str, str] | None = None, progress: Progress | None = None, lang: str = "fr") -> dict:
+    """A background picture for each verse (s, a), made by OpenAI from its meaning, added to the
+    project's media with the verse it shows. A few at a time; a verse refused or failed is reported."""
+    import tempfile
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from . import imagegen
+
+    progress = progress or (lambda st, f: None)
+    fmt = Project.load(folder).format
+    asked = {(s, a): (prompts or {}).get(f"{s}:{a}") or imagegen.prompt(s, a, fmt, style) for s, a in verses}
+    made, failed, lock = [], [], threading.Lock()
+    progress("images", 0.0)
+
+    def one(s, a):
+        return imagegen.generate(key, asked[(s, a)], fmt)
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        jobs = {pool.submit(one, s, a): (s, a) for s, a in asked}
+        for k, fut in enumerate(as_completed(jobs)):
+            s, a = jobs[fut]
+            try:
+                data = fut.result()
+                with lock, tempfile.TemporaryDirectory() as tmp:
+                    src = Path(tmp) / "image.png"
+                    src.write_bytes(data)
+                    p = Project.load(folder)  # as it is now: the editor may have saved meanwhile
+                    item = add_media(p, src, f"{quran.surah(s)['name']} {s}:{a} (IA)")
+                    item.update({"verse": [s, a], "prompt": asked[(s, a)], "ai": True})
+                    p.save()
+                made.append({"verse": [s, a], "file": item["file"]})
+            except Exception as e:  # the others go on
+                failed.append({"verse": [s, a], "error": e.text(lang) if isinstance(e, UserError) else str(e)})
+            progress("images", (k + 1) / len(jobs))
+    return {"made": made, "failed": failed}
+
+
 def waveform(p: Project, per_second: int = 50) -> list[float]:
     """Peak level (0..1) of the audio, `per_second` values per second, for the timeline."""
     cache = p.folder / "waveform.json"

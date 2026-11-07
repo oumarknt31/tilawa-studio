@@ -26,7 +26,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import basmala, media, project, quran, render, segment
+from . import basmala, imagegen, media, project, quran, render, segment
 from .cli import HOME
 from .i18n import UI_LANGS, UserError
 from .library import Library
@@ -46,6 +46,7 @@ app.mount("/fonts", StaticFiles(directory=PKG / "fonts"), name="fonts")
 app.mount("/userfonts", StaticFiles(directory=LIB.fonts_dir), name="userfonts")
 app.mount("/assets", StaticFiles(directory=PKG / "assets"), name="assets")
 _pool = ThreadPoolExecutor(max_workers=1)
+_images = ThreadPoolExecutor(max_workers=1)  # pictures made by OpenAI: not in the way of analyses and exports
 _jobs: dict[str, dict] = {}
 _lock = threading.Lock()
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".3gp"}
@@ -78,7 +79,7 @@ async def local_only(request: Request, call_next):
 
 # ---------------------------------------------------------------- jobs
 
-def _job(kind: str, project_id: str, fn) -> str:
+def _job(kind: str, project_id: str, fn, pool: ThreadPoolExecutor | None = None) -> str:
     jid = uuid.uuid4().hex[:10]
     lang = LANG.get()
     job = {"id": jid, "kind": kind, "project": project_id, "stage": "queued", "progress": 0.0,
@@ -103,7 +104,7 @@ def _job(kind: str, project_id: str, fn) -> str:
             traceback.print_exc()
             job["status"], job["error"] = "error", (e.text(lang) if isinstance(e, UserError) else str(e)) or e.__class__.__name__
 
-    _pool.submit(copy_context().run, run)  # with the request's project reading (quran.use_reading)
+    (pool or _pool).submit(copy_context().run, run)  # with the request's project reading (quran.use_reading)
     return jid
 
 
@@ -614,6 +615,42 @@ def put_settings(body: dict):
     s = LIB.update_settings({k: v for k, v in body.items() if k in ("format", "lang", "style", "reciters", "tour", "ui", "logo_auto")})
     render.LOGO_AUTO = s.get("logo_auto", True)
     return s
+
+
+# ---------------------------------------------------------------- pictures made by OpenAI (with the user's key)
+
+@app.get("/api/images")
+def images_settings():
+    return {"has_key": bool(imagegen.load_key(HOME)), "style": LIB.settings().get("image_style") or imagegen.STYLE,
+            "default_style": imagegen.STYLE, "price": imagegen.PRICE, "model": imagegen.MODEL, "quality": imagegen.QUALITY}
+
+
+@app.put("/api/images")
+def put_images_settings(body: dict):
+    if "key" in body:
+        key = str(body["key"] or "").strip()
+        if key:
+            imagegen.check_key(key)
+        imagegen.save_key(HOME, key)
+    if "style" in body:
+        style = str(body["style"] or "").strip()[:600]
+        LIB.update_settings({"image_style": "" if style == imagegen.STYLE else style})
+    return images_settings()
+
+
+@app.post("/api/projects/{pid}/images")
+def make_images(pid: str, body: dict):
+    """A picture per verse ([[s, a], ...], Hafs keys), made by OpenAI (a job: about a minute for a few)."""
+    folder = _folder(pid)
+    key = imagegen.load_key(HOME)
+    if not key:
+        raise UserError("need_openai_key")
+    verses = [(int(s), int(a)) for s, a in body.get("verses") or []]
+    for s, a in verses:
+        quran.verse(s, a)  # validates
+    style, prompts, lang = LIB.settings().get("image_style") or "", body.get("prompts") or {}, LANG.get()
+    return {"job": _job("images", pid, lambda progress: project.verse_images(folder, verses, key, style, prompts, progress, lang),
+                        pool=_images)}
 
 
 @app.get("/api/styles")

@@ -77,6 +77,13 @@ downloaded in a browser.
        the last until the end. **Fewer items than verses**: they come back in order (lava, rain, snow, lava…);
        items added later join that order. **More items than verses**: one per verse, the others wait in the
        **reserve**, at the end of the timeline. *Match the verses* / *Spread evenly* to redo the timing.
+     - **✨ A picture per verse** (with your own OpenAI API key, separate from a ChatGPT subscription; about
+       $0.04 a picture, paid on your OpenAI account): the app asks OpenAI's image model (gpt-image-2, medium
+       quality) for a picture of each verse's meaning, from its English translation, always as landscapes,
+       light and symbols (never people, animals, religious figures or writing), in one style you write once.
+       Each picture goes on its verse; a verse said again shows its picture again; right click a clip to
+       redo its picture (its prompt can be changed). The key stays in the Tilawa Studio folder. Check every
+       picture before posting.
      - A video shorter than its slot plays **back and forth** (forward, then reversed): a loop with no jump.
      - For each item: X/Y position and scale (like in Premiere), *Fill the screen* / *Whole picture*,
        slow zoom, and **colour**: exposure, contrast, highlights, shadows, saturation, temperature, tint.
