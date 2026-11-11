@@ -749,8 +749,10 @@ def list_recitations():
 
 
 def _recitation(rid: str) -> Path:
+    if not re.fullmatch(r"[\w-]+", rid):  # (as project ids: never a path, on Windows either)
+        raise HTTPException(400, "bad id")
     d = recite.folder(HOME) / rid
-    if "/" in rid or ".." in rid or not (d / "recitation.json").exists():
+    if not (d / "recitation.json").exists():
         raise HTTPException(404)
     return d
 
