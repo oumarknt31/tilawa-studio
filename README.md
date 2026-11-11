@@ -163,6 +163,19 @@ downloaded in a browser.
 
 Shortcuts: `Space` play/pause, `←` `→` previous/next subtitle, `⌘Z` / `Ctrl+Z` undo, `?` help.
 
+### Recitation and creation streaks
+
+On the home screen, two streaks, counted on your computer's own day (midnight to midnight):
+- **Recitation streak**: *🎙️ Recite* records you with the microphone (or *Import a recording* made with
+  a phone); the verses recited are recognised by listening ("Al-Mulk 1–10"), and a day with at least one
+  verse counts. Any length: a verse, a few, a surah. Short single verses are recognised too, as long as
+  most of the verse is heard clearly. The recordings stay on your computer (`Tilawa Studio/Récitations`).
+- **Creation streak**: a day with a video exported counts.
+- **Two in one**: *🎬 Make a video* turns a recitation into a project (the verses already known); exported,
+  it counts for the creation streak too.
+
+Streaks with friends (a streak shared by two friends who both make a video the same day) are next.
+
 ### Video settings
 
 | Setting | Advice |

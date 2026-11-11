@@ -165,6 +165,20 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
 
 Raccourcis : `Espace` lecture/pause, `←` `→` sous-titre précédent/suivant, `⌘Z` / `Ctrl+Z` annuler, `?` aide.
 
+### Séries de récitation et de création
+
+Sur l'écran d'accueil, deux séries, comptées sur la journée de ton ordinateur (de minuit à minuit) :
+- **Série de récitation** : *🎙️ Réciter* t'enregistre au micro (ou *Importer un enregistrement* fait avec un
+  téléphone) ; les versets récités sont reconnus à l'écoute (« Al-Mulk 1–10 »), et une journée avec au moins un
+  verset compte. N'importe quelle longueur : un verset, quelques-uns, une sourate. Un seul verset court est
+  reconnu aussi, s'il est bien entendu en grande partie. Les enregistrements restent sur ton ordinateur
+  (`Tilawa Studio/Récitations`).
+- **Série de création** : une journée avec une vidéo exportée compte.
+- **Deux en un** : *🎬 En faire une vidéo* transforme une récitation en projet (les versets déjà connus) ;
+  exportée, elle compte aussi pour la série de création.
+
+Les séries avec des amis (une série partagée par deux amis qui font chacun une vidéo le même jour) arrivent ensuite.
+
 ### Réglages de la vidéo
 
 | Réglage | Conseil |

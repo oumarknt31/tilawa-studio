@@ -134,7 +134,7 @@ exec "$DIR/tilawa-python" -m tilawa.cli desktop "$@" >> "$HOME/{NAME}/logs/app.l
         "CFBundleShortVersionString": version.lstrip("v"), "CFBundleVersion": version.lstrip("v"),
         "LSMinimumSystemVersion": "12.0", "NSHighResolutionCapable": True,
         "LSApplicationCategoryType": "public.app-category.video", "LSArchitecturePriority": ["arm64"],
-        "NSMicrophoneUsageDescription": "Tilawa Studio does not use the microphone.",
+        "NSMicrophoneUsageDescription": "Tilawa Studio enregistre ta récitation du Coran quand tu appuies sur Réciter. / Tilawa Studio records your Quran recitation when you press Recite.",
     }
     with open(contents / "Info.plist", "wb") as f:
         plistlib.dump(plist, f)

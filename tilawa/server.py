@@ -6,6 +6,7 @@ Heavy work (analysis, rendering) runs one job at a time in a worker thread.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -26,7 +27,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import basmala, imagegen, media, project, quran, render, segment
+from . import basmala, imagegen, media, project, quran, recite, render, segment
 from .cli import HOME
 from .i18n import UI_LANGS, UserError
 from .library import Library
@@ -218,17 +219,29 @@ async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_ver
         raise UserError("need_https")
     if file and Path(file.filename or "").suffix.lower() not in VIDEO_EXTS | media.AUDIO_EXTS:
         raise UserError("bad_source", exts=", ".join(sorted(VIDEO_EXTS | media.AUDIO_EXTS)))
-    name = f"{quran.surah(surah)['name']}-{first_verse}" if surah else "recitation"
-    slug = re.sub(r"[^\w-]+", "-", f"{name}-{time.strftime('%Y%m%d-%H%M%S')}")
-    folder = PROJECTS / slug
-    folder.mkdir(parents=True, exist_ok=True)
+    folder, slug = _project_folder(surah, first_verse)
     source = url.strip()
     if file:
         dst = folder / f"upload{Path(file.filename).suffix.lower()}"
         with dst.open("wb") as f:
             shutil.copyfileobj(file.file, f, length=8 << 20)
         source = str(dst)
+    return _start_project(folder, slug, source, bool(file), surah, first_verse, last_verse, reciter, title, format, lang,
+                          style, translation, reading)
 
+
+def _project_folder(surah: int, first_verse: int) -> tuple[Path, str]:
+    name = f"{quran.surah(surah)['name']}-{first_verse}" if surah else "recitation"
+    slug = re.sub(r"[^\w-]+", "-", f"{name}-{time.strftime('%Y%m%d-%H%M%S')}")
+    folder = PROJECTS / slug
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder, slug
+
+
+def _start_project(folder: Path, slug: str, source: str, remove_source: bool, surah: int, first_verse: int,
+                   last_verse: int | None, reciter: str, title: str, format: str, lang: str, style: str,
+                   translation: str, reading: str) -> dict:
+    """A new project made from a file or a link, then its recitation analysed (a job)."""
     settings = LIB.update_settings({"format": format, "lang": lang, "style": style, "reading": reading})
     look = LIB.style(style)
     translit = settings.get("translit", "simple")
@@ -239,7 +252,7 @@ async def new_project(surah: int = Form(0), first_verse: int = Form(1), last_ver
     def work(progress):
         p = project.create(folder, source, surah, first_verse, last_verse, reciter, title, progress, format, lang, look,
                            translit, translation, reading)
-        if file:
+        if remove_source:
             Path(source).unlink(missing_ok=True)
         project.analyze(p, progress)
         return slug
@@ -447,7 +460,13 @@ def start_render(pid: str):
     p = project.Project.load(_folder(pid))
     if not p.blocks:
         raise UserError("nothing_to_render")
-    return {"job": _job("render", pid, lambda progress: project.make_video(p, VIDEOS, progress).name)}
+
+    def work(progress):
+        name = project.make_video(p, VIDEOS, progress).name
+        recite.log_export(HOME, pid, name)  # a day of the creation streak
+        return name
+
+    return {"job": _job("render", pid, work)}
 
 
 @app.delete("/api/projects/{pid}")
@@ -651,6 +670,126 @@ def make_images(pid: str, body: dict):
     style, prompts, lang = LIB.settings().get("image_style") or "", body.get("prompts") or {}, LANG.get()
     return {"job": _job("images", pid, lambda progress: project.verse_images(folder, verses, key, style, prompts, progress, lang),
                         pool=_images)}
+
+
+# ---------------------------------------------------------------- recitations and streaks
+
+_rec: dict = {}  # the recording in progress: {"id", "recorder"}
+
+
+@app.post("/api/recite/start")
+def recite_start():
+    if _rec.get("recorder"):
+        raise UserError("already_recording")
+    rid = recite.new_id()
+    _rec.update(id=rid, recorder=recite.Recorder(recite.folder(HOME) / rid / "recitation.wav"))
+    return {"id": rid}
+
+
+@app.get("/api/recite/level")
+def recite_level():
+    r = _rec.get("recorder")
+    return {"recording": bool(r), "level": r.level if r else 0.0, "seconds": r.seconds if r else 0.0}
+
+
+@app.post("/api/recite/cancel")
+def recite_cancel():
+    r, rid = _rec.pop("recorder", None), _rec.pop("id", None)
+    if r:
+        r.cancel()
+        shutil.rmtree(recite.folder(HOME) / rid, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/recite/stop")
+def recite_stop():
+    r, rid = _rec.pop("recorder", None), _rec.pop("id", None)
+    if not r:
+        raise UserError("nothing_recited")
+    try:
+        wav = r.stop()
+    except UserError:
+        shutil.rmtree(recite.folder(HOME) / rid, ignore_errors=True)
+        raise
+    return {"job": _job("recite", rid, lambda progress: _recognised(rid, wav, progress))}
+
+
+@app.post("/api/recitations")
+def import_recitation(file: UploadFile = File(...)):
+    """A recitation recorded elsewhere (a phone...): recognised like one recorded here."""
+    if Path(file.filename or "").suffix.lower() not in VIDEO_EXTS | media.AUDIO_EXTS:
+        raise UserError("bad_source", exts=", ".join(sorted(VIDEO_EXTS | media.AUDIO_EXTS)))
+    rid = recite.new_id()
+    d = recite.folder(HOME) / rid
+    d.mkdir(parents=True, exist_ok=True)
+    src = d / f"import{Path(file.filename).suffix.lower()}"
+    with src.open("wb") as f:
+        shutil.copyfileobj(file.file, f, length=8 << 20)
+
+    def work(progress):
+        wav = d / "recitation.wav"
+        subprocess.run([media.tools()[0], "-y", "-v", "error", "-i", str(src), "-vn", "-ac", "1", "-ar", str(recite.RATE), str(wav)], check=True)
+        src.unlink(missing_ok=True)
+        return _recognised(rid, wav, progress, imported=True)
+
+    return {"job": _job("recite", rid, work)}
+
+
+def _recognised(rid: str, wav: Path, progress, imported: bool = False) -> dict:
+    found = recite.recognise(wav, progress)
+    if not found["verses"]:
+        shutil.rmtree(recite.folder(HOME) / rid, ignore_errors=True)
+        raise UserError("nothing_recited")
+    return recite.save(HOME, rid, wav, found, imported)
+
+
+@app.get("/api/recitations")
+def list_recitations():
+    return recite.recitations(HOME)
+
+
+def _recitation(rid: str) -> Path:
+    d = recite.folder(HOME) / rid
+    if "/" in rid or ".." in rid or not (d / "recitation.json").exists():
+        raise HTTPException(404)
+    return d
+
+
+@app.get("/api/recitations/{rid}/audio")
+def recitation_audio(rid: str):
+    return FileResponse(_recitation(rid) / "recitation.wav", media_type="audio/wav")
+
+
+@app.delete("/api/recitations/{rid}")
+def delete_recitation(rid: str):
+    shutil.rmtree(_recitation(rid))
+    return {"ok": True}
+
+
+@app.post("/api/recitations/{rid}/project")
+def recitation_project(rid: str, body: dict):
+    """A video made from a recitation: a new project from its recording, the verses already known."""
+    d = _recitation(rid)
+    rec = json.loads((d / "recitation.json").read_text(encoding="utf-8"))
+    settings = LIB.settings()
+    surahs = {s for s, _ in rec["keys"]}
+    surah = rec["keys"][0][0] if len(surahs) == 1 else 0  # one surah: its verses are known; several: found again
+    ayahs = [a for s, a in rec["keys"]]
+    folder, slug = _project_folder(surah, min(ayahs) if surah else 1)
+    source = folder / "recitation.wav"
+    shutil.copy2(d / "recitation.wav", source)
+    lang = body.get("lang") or settings.get("lang") or "fr"
+    return _start_project(folder, slug, str(source), True, surah, min(ayahs) if surah else 1, max(ayahs) if surah else None,
+                          str(body.get("reciter") or ""), "", body.get("format") or settings.get("format") or "9:16",
+                          lang if lang in quran.LANGS else "fr", body.get("style") or settings.get("style") or "",
+                          (settings.get("translations") or {}).get(lang, ""), rec.get("reading") or "auto")
+
+
+@app.get("/api/streaks")
+def streaks():
+    recs = recite.recitations(HOME)
+    return {"recite": recite.streak({r["day"] for r in recs}) | {"total_verses": sum(r["verses"] for r in recs)},
+            "create": recite.streak(recite.export_days(HOME, VIDEOS))}
 
 
 @app.get("/api/styles")
