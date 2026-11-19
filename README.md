@@ -107,11 +107,15 @@ downloaded in a browser.
        numbered translation in capitals with its key words in bold, light transliteration), *Le Chemin des
        Pieux — YouTube*, *Classic band*, *Headline band* (translation in the middle, Arabic and transliteration
        in a translucent band at the bottom), *Golden cinema*, *Minimal*;
+     - **Cream paper** (16:9 and vertical), made for the drawings on cream paper (pictures per verse): flat
+       text without outline, teal Arabic, a book serif translation with its verse number in teal, plum
+       transliteration, a boxed title, and **a single key word in red** (put *asterisks* around a word of
+       the Arabic, too, to colour it). Dark text: for light backgrounds;
      - the **items of the block** (number, translation, Arabic, transliteration): × to take one out, whatever
        the style; on the preview the block moves as a whole, or each item on its own with *Move the items one
        by one* (or ⌥ + drag) — click to choose it, pinch to change its size;
-     - **layout** (stacked, Arabic on top, band at the bottom); **key words** of the translation in bold or
-       in colour, found automatically or chosen by putting *asterisks* around them; capitals or small caps;
+     - **layout** (stacked, Arabic on top, band at the bottom); **key words** of the translation in bold, in
+       colour or a single one, found automatically or chosen by putting *asterisks* around them; capitals or small caps;
        outline thickness (or just a soft shadow);
      - title and reciter at the top, as a small **label in a corner**, or as **intro cards** before the
        recitation (the surah, "Chapter 2 of the Noble Quran", "Recited by…"; ▶ *Preview the intro*);
@@ -266,7 +270,7 @@ Tests: `uv run python -m pytest -q`
   by `packaging/warsh_text.py`.
 - Fonts (SIL Open Font License, see `tilawa/fonts/`): Amiri Quran, Amiri, Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat,
-  Nunito, Baloo 2, Playfair Display, Lora, Cinzel.
+  Nunito, Baloo 2, Playfair Display, Source Serif 4, Lora, Cinzel.
 - Recognition model: Apache 2.0.
 
 The files in `tilawa/data/` are provided as is, with their copyright notices.

@@ -77,8 +77,11 @@ def test_title_cards_start_the_background_earlier(tmp_path):
 def test_youtube_styles():
     from tilawa import library
 
-    yt = [s for s in library.BUILTIN_STYLES if s.get("formats")]
-    assert len(yt) >= 4 and all(s["formats"] == ["16:9"] for s in yt)
+    yt = [s for s in library.BUILTIN_STYLES if s.get("formats") == ["16:9"]]
+    assert len(yt) >= 4
+    # a style made in two sizes: the 16:9 one and one for every other format, under the same name
+    other = [s for s in library.BUILTIN_STYLES if s.get("formats") and s["formats"] != ["16:9"]]
+    assert all("16:9" not in s["formats"] and any(y["name"] == s["name"] for y in yt) for s in other)
     for s in library.BUILTIN_STYLES:  # a style never moves the texts
         assert not set(s["style"]) & set(library.POSITION_KEYS)
     assert render.header_mode({"--header-mode": "intro"}) == "intro" and render.header_mode(None) == "top"

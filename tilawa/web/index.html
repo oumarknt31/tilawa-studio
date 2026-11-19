@@ -715,8 +715,9 @@
           <button data-v="none" onclick="setLook('--emph', null)">Normal</button>
           <button data-v="bold" onclick="setLook('--emph', 'bold')">En gras</button>
           <button data-v="color" onclick="setLook('--emph', 'color')">En couleurs</button>
+          <button data-v="one" onclick="setLook('--emph', 'one')">Un seul mot</button>
         </div>
-        <p class="faint small" style="margin:6px 0 0">Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde*</p>
+        <p class="faint small" style="margin:6px 0 0">Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde* (aussi dans l'arabe, pour le colorer)</p>
         <div class="row" style="margin-top:10px">
           <label class="toggle"><input type="checkbox" id="fr-upper" onchange="setLook('--fr-case', this.checked ? 'uppercase' : null)"> MAJUSCULES</label>
           <label class="toggle"><input type="checkbox" id="fr-smallcaps" onchange="setLook('--fr-variant', this.checked ? 'small-caps' : null)"> Petites capitales</label>
@@ -1255,8 +1256,9 @@ const EN = {
   "▶ Voir l'intro": "▶ Preview the intro",
   "{n} cartes avant la récitation : la vidéo commence {s} s plus tôt.": "{n} cards before the recitation: the video starts {s} s earlier.",
   "Mots importants": "Key words", "Normal": "Normal", "En gras": "Bold", "En couleurs": "In colour",
-  "Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde*":
-    "Pick them yourself by putting asterisks around them in the subtitle: *mercy*",
+  "Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde* (aussi dans l'arabe, pour le colorer)":
+    "Pick them yourself by putting asterisks around them in the subtitle: *mercy* (in the Arabic too, to colour it)",
+  "Un seul mot": "One word", "Pour ce format": "For this format", "Mot entre *astérisques*": "Word between *asterisks*", "Mot important": "Key word", "Papier crème": "Cream paper",
   "MAJUSCULES": "CAPITALS", "Petites capitales": "Small caps", "Police du numéro": "Number font",
   "Police de la phonétique": "Transliteration font", "Comme la traduction": "Same as the translation",
   "Disposition": "Layout", "Empilée": "Stacked", "Arabe en haut": "Arabic on top", "Bandeau en bas": "Band at the bottom",
@@ -1819,7 +1821,9 @@ function renderStyleSelect() {
   const ok = styles.filter(s => !s.formats || s.formats.includes(newFormat));
   const cur = $("new-style").value;
   $("new-style").innerHTML = ok.map(s => `<option value="${s.id}">${esc(t(s.name))}${s.id === settings.style ? " ★" : ""}</option>`).join("");
-  $("new-style").value = [cur, settings.style].find(id => ok.some(s => s.id === id)) || "pieux";
+  // a style made in two sizes (16:9 and the others): the one for this format
+  const fit = (id) => ok.find(s => s.id === id) || ok.find(s => s.name === styles.find(x => x.id === id)?.name);
+  $("new-style").value = [cur, settings.style].map(fit).find(Boolean)?.id || "pieux";
 }
 async function createProject() {
   if (!newSource) return;
@@ -3068,7 +3072,7 @@ function renderThemes() {
   const own = styles.filter(s => s.formats && s.formats.includes(P.format)), all = styles.filter(s => !s.formats);
   const grid = (list) => `<div class="themes">${list.map(themeCard).join("")}</div>`;
   $("themes").innerHTML = own.length
-    ? `<div class="themes-head">${t("Pour YouTube (horizontal)")}</div>${grid(own)}<div class="themes-head">${t("Tous formats")}</div>${grid(all)}`
+    ? `<div class="themes-head">${t(P.format === "16:9" ? "Pour YouTube (horizontal)" : "Pour ce format")}</div>${grid(own)}<div class="themes-head">${t("Tous formats")}</div>${grid(all)}`
     : grid(all);
 }
 const lookOf = (k, d) => String(P.style[k] ?? d).replace(/"/g, "");
@@ -3319,14 +3323,15 @@ async function changeTranslit(style) {
 const COLORS = {
   title: [["Titre", ["--title-c1", "--title-c2"], ["#f07ad6", "#86dde6"], "--title-grad"],
           ["Récitateur", ["--reciter-c1", "--reciter-c2"], ["#86dccb", "#e6a1a5"], "--reciter-grad"]],
-  ar: [["Couleur", ["--ar-color"], ["#f6f6f8"]]],
-  text: [["Traduction", ["--fr-color"], ["#f6f6f8"]], ["Numéro", ["--num-color"], ["#f6f6f8"]], ["Phonétique", ["--tr-color"], ["#f3df8f"]]],
+  ar: [["Couleur", ["--ar-color"], ["#f6f6f8"]], ["Mot entre *astérisques*", ["--ar-emph"], ["#bf4527"]]],
+  text: [["Traduction", ["--fr-color"], ["#f6f6f8"]], ["Numéro", ["--num-color"], ["#f6f6f8"]], ["Phonétique", ["--tr-color"], ["#f3df8f"]],
+         ["Mot important", ["--emph-colors"], ["#bf4527"]]],
   outline: [["", ["--outline"], ["#0b0b0d"]]],
 };
 function renderColors() {
   for (const [group, rows] of Object.entries(COLORS)) {
     $("colors-" + group).innerHTML = rows.map(([label, vars, defs], r) => `<div class="crow">${label ? `<span>${t(label)}</span>` : ""}
-      ${vars.map((v, k) => `${k ? `<span class="faint" title="${t("dégradé")}">→</span>` : ""}<input type="color" value="${P.style[v] || defs[k]}"
+      ${vars.map((v, k) => `${k ? `<span class="faint" title="${t("dégradé")}">→</span>` : ""}<input type="color" value="${(P.style[v] || defs[k]).split(" ")[0]}"
         oninput="setColor('${group}', ${r}, ${k}, this.value)" title="${t(vars.length > 1 ? (k ? "fin du dégradé" : "début du dégradé") : "couleur")}">`).join("")}
       <button class="small ghost" onclick="resetColor('${group}', ${r})" title="${t("couleur d'origine")}">↺</button></div>`).join("");
   }

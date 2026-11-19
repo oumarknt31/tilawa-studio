@@ -107,11 +107,15 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
        traduction numérotée en majuscules avec ses mots importants en gras, phonétique légère), *Le Chemin des
        Pieux — YouTube*, *Bandeau classique*, *Bandeau titre* (traduction au milieu, arabe et phonétique dans
        un bandeau translucide en bas), *Cinéma doré*, *Minimal* ;
+     - **Papier crème** (16:9 et vertical), fait pour les dessins sur papier crème (images par verset) : texte
+       plat sans contour, arabe bleu canard, traduction en serif de livre avec son numéro en bleu, phonétique
+       prune, titre dans un cadre, et **un seul mot important en rouge** (entoure aussi un mot de l'arabe
+       d'*astérisques* pour le colorer). Texte foncé : pour les fonds clairs ;
      - les **éléments du bloc** (numéro, traduction, arabe, phonétique) : × pour en retirer un, quel que soit
        le style ; sur l'aperçu, le bloc se déplace d'un seul tenant, ou chaque élément séparément avec *Déplacer
        les éléments un par un* (ou ⌥ + glisser) — clique pour le choisir, pince pour changer sa taille ;
-     - **disposition** (empilée, arabe en haut, bandeau en bas) ; **mots importants** de la traduction en gras
-       ou en couleurs, trouvés automatiquement ou choisis en les entourant d'*astérisques* ; majuscules ou
+     - **disposition** (empilée, arabe en haut, bandeau en bas) ; **mots importants** de la traduction en gras,
+       en couleurs ou un seul, trouvés automatiquement ou choisis en les entourant d'*astérisques* ; majuscules ou
        petites capitales ; épaisseur du contour (ou simple ombre douce) ;
      - titre et récitateur en haut, en petite **étiquette dans un coin**, ou en **cartes d'intro** avant la
        récitation (la sourate, « Chapitre 2 du noble Coran », « Récitée par… » ; ▶ *Voir l'intro*) ;
@@ -271,7 +275,7 @@ Tests : `uv run python -m pytest -q`
   par `packaging/warsh_text.py`.
 - Polices (SIL Open Font License, voir `tilawa/fonts/`) : Amiri Quran, Amiri, Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat, Nunito, Baloo 2,
-  Playfair Display, Lora, Cinzel.
+  Playfair Display, Source Serif 4, Lora, Cinzel.
 - Modèle de reconnaissance : Apache 2.0.
 
 Les fichiers de `tilawa/data/` sont fournis tels quels, avec leurs mentions de droits.

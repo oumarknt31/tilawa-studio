@@ -51,6 +51,24 @@ BUILTIN_STYLES = [
         "--arabic": '"Aref Ruqaa"', "--ar-size": "48px", "--ayah-mark": "circle", "--title-font": '"Cinzel"', "--text-font": '"Lora"',
         "--title-c1": "#e0c3fc", "--title-c2": "#8ec5fc", "--title-grad": _grad("#e0c3fc", "#8ec5fc"),
         "--reciter-c1": "#8ec5fc", "--reciter-c2": "#e0c3fc", "--reciter-grad": _grad("#8ec5fc", "#e0c3fc")}},
+    # for the drawings on cream paper (pictures per verse): dark flat text, one word in red, a small label;
+    # sizes measured on the user's 16:9 reference (Ya-Sin 60), smaller for the vertical and square formats
+    *({"id": sid, "name": "Papier crème", "builtin": True, "formats": fmts, "style": {
+        "--layout": "cinema", "--header-mode": "corner", "--emph": "one", "--emph-colors": "#bf4527", "--emph-weight": "600",
+        "--ar-emph": "#bf4527", "--stroke": "0", "--shadow": "none", "--outline": "#3b2a1e",
+        "--arabic": '"Amiri"', "--ar-weight": "700", "--ar-color": "#1c5961", "--text-font": '"Source Serif 4"', "--fr-weight": "500", "--fr-break": "comma",
+        "--fr-color": "#3b2a1e", "--num-color": "#1c5961", "--tr-font": '"Open Sans"', "--tr-color": "#5c3a6c",
+        "--title-font": '"Montserrat"', "--title-case": "uppercase",
+        "--title-c1": "#ffffff", "--title-c2": "#ffffff", "--title-grad": _grad("#ffffff", "#ffffff"),
+        "--reciter-c1": "#ffffff", "--reciter-c2": "#ffffff", "--reciter-grad": _grad("#ffffff", "#ffffff"),
+        "--label-bg": "#1d4f56", "--label-border": "3px solid #bf4527", "--label-radius": "3px",
+        "--intro-accent": "#bf4527", "--logo-pos": "tr", **sizes}}
+      for sid, fmts, sizes in [
+          ("papier", ["16:9"], {"--ar-size": "100px", "--fr-size": "72px", "--fr-width": "1150px", "--tr-size": "46px",
+                                "--fr-gap": "0px", "--tr-gap": "40px", "--title-size": "28px", "--reciter-size": "28px"}),
+          ("papier-vertical", ["9:16", "1:1", "4:5"], {"--ar-size": "86px", "--fr-size": "60px", "--tr-size": "38px",
+                                                       "--fr-gap": "0px", "--tr-gap": "34px", "--title-size": "30px",
+                                                       "--reciter-size": "30px"})]),
     # for YouTube (16:9), from the layouts of popular recitation channels: shown for that format only
     {"id": "cinema", "name": "Cinéma", "builtin": True, "formats": ["16:9"], "style": {
         "--layout": "cinema", "--header-mode": "corner", "--emph": "bold", "--emph-weight": "600", "--stroke": "0",

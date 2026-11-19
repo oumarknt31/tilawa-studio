@@ -44,6 +44,10 @@
    [
     "Amiri-Regular.ttf",
     "400"
+   ],
+   [
+    "Amiri-Bold.ttf",
+    "700"
    ]
   ]
  },
@@ -183,6 +187,17 @@
    [
     "PlayfairDisplay-Variable.ttf",
     "400 900"
+   ]
+  ]
+ },
+ {
+  "family": "Source Serif 4",
+  "label": "Source Serif — livre, posé",
+  "script": "latin",
+  "files": [
+   [
+    "SourceSerif4-Variable.ttf",
+    "200 900"
    ]
   ]
  },

@@ -22,7 +22,7 @@
     --text-font: var(--latin);
     --arabic: "Amiri Quran";
     --outline: #0b0b0d;
-    --stroke: 1;  /* outline thickness: 0 = none (the soft shadow stays) */
+    --stroke: 1;  /* outline thickness: 0 = none (the soft shadow stays, unless --shadow: none) */
     --title-grad: linear-gradient(90deg, #f07ad6 0%, #c79ee0 38%, #a9bfe0 62%, #86dde6 100%);
     --reciter-grad: linear-gradient(90deg, #86dccb 0%, #b4b0aa 55%, #e6a1a5 100%);
     --white: #f6f6f8;
@@ -42,7 +42,7 @@
     /* arrangement: read by applyLayout() */
     --layout: stack;        /* stack | cinema (Arabic first) | band (Arabic in a band at the bottom) */
     --header-mode: top;     /* top | corner (small label) | intro (cards before the recitation) */
-    --emph: none;           /* key words of the translation: none | bold | color */
+    --emph: none;           /* key words of the translation: none | bold | color | one (a single word, in the first colour) */
     --emph-colors: #ffffff #a8c8ff #fff0a0 #ffb4cc #ffc888 #a4ecd8;
     --emph-weight: 700;
     --intro-accent: #86dde6;
@@ -60,16 +60,18 @@
   .ol > .o {
     position: absolute; inset: 0; color: var(--outline);
     -webkit-text-stroke: calc(var(--sw, 6px) * var(--stroke)) var(--outline);
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .55));
+    filter: var(--shadow, drop-shadow(0 2px 3px rgba(0, 0, 0, .55)));
   }
   .ol > .f { position: relative; }
   .grad > .f { background: var(--g); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .em { font-weight: var(--emph-weight); }
+  #ar .em { font-weight: inherit; }  /* (Arabic fonts without bold: the colour only) */
+  .n { font-weight: var(--num-weight, inherit); font-family: var(--num-font, var(--text-font)); }  /* the verse number in front of the translation */
 
   #header { position: absolute; top: var(--header-top); left: 0; right: 0; text-align: center; transform: translateX(var(--header-x)); }
   #header > .zoom { zoom: var(--header-zoom); }
   #block > .zoom, #band > .zoom { zoom: var(--block-zoom); }
-  #title { font: 700 var(--title-size)/1.1 var(--title-font); letter-spacing: .5px; --g: var(--title-grad); --sw: 7px; white-space: nowrap; }
+  #title { font: 700 var(--title-size)/1.1 var(--title-font); letter-spacing: .5px; text-transform: var(--title-case, none); --g: var(--title-grad); --sw: 7px; white-space: nowrap; }
   #reciter { font: 700 var(--reciter-size)/1.2 var(--title-font); --g: var(--reciter-grad); --sw: 5px; }
   #reciter-line { margin-top: 30px; }
   #mic { font-size: calc(var(--reciter-size) * .88); margin-right: 10px; vertical-align: 4px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
@@ -84,7 +86,7 @@
         --sw: 5px; max-width: var(--fr-width); text-wrap: balance; white-space: pre-line; }
   #fr[dir=rtl] { line-height: 1.6; }
   #ar-box { margin-top: var(--ar-gap); min-height: calc(var(--ar-size) * 1.9); display: var(--ar-display, flex); align-items: center; justify-content: center; }
-  #ar { font: 400 var(--ar-size)/1.75 var(--arabic), "Amiri Quran", serif; direction: rtl; color: var(--ar-color, var(--white)); --sw: 5px; max-width: var(--ar-width); text-wrap: balance; }
+  #ar { font: var(--ar-weight, 400) var(--ar-size)/1.75 var(--arabic), "Amiri Quran", serif; direction: rtl; color: var(--ar-color, var(--white)); --sw: 5px; max-width: var(--ar-width); text-wrap: balance; }
   #ar .ayah { font-family: var(--ayah-font, "Amiri Quran"); white-space: nowrap; }
   #tr-line { display: var(--tr-display, block); }
   /* each text moved on its own, from its place in the block (--fr-dx: 0px...) */
@@ -118,7 +120,8 @@
   /* header as a small label in a corner */
   body[data-header=corner] #header { left: var(--block-side); right: auto; text-align: left; }
   body[data-header=corner] #header > .zoom { display: flex; align-items: center; gap: .7em; padding: 10px 22px;
-    border: 2px solid rgba(255, 255, 255, .85); border-radius: 4px; background: rgba(0, 0, 0, .18); font-size: var(--reciter-size); }
+    border: var(--label-border, 2px solid rgba(255, 255, 255, .85)); border-radius: var(--label-radius, 4px);
+    background: var(--label-bg, rgba(0, 0, 0, .18)); font-size: var(--reciter-size); }
   body[data-header=corner] #reciter-line { margin-top: 0; }
   body[data-header=corner] #reciter-line::before { content: "|"; color: rgba(255, 255, 255, .8); margin-right: .7em; font: 400 var(--reciter-size)/1 var(--title-font); }
   body[data-header=corner] #mic { display: none; }
@@ -253,8 +256,9 @@
         for (const [t, em] of parts) {
           if (em === null) { layer.append(t); continue; }
           const s = document.createElement("span");
-          s.className = "em"; s.textContent = t;
-          if (em && cls === "f") s.style.color = em;
+          s.className = em === "#num" ? "n" : "em"; s.textContent = t;
+          if (em === "#num" && cls === "f") s.style.color = css("--num-color") || "";
+          else if (em && em !== "#num" && cls === "f") s.style.color = em;
           layer.append(s);
         }
       } else layer.textContent = text || "";
@@ -299,26 +303,35 @@
     ru: "а б без бы был была были было в вам вас во вот все всех вы где да для до его ее ей если есть еще же за и из или им их к как ко когда кто ли мне мы на над не нет ни но о об он она они от по под при с со так там те то тоже ты у уж уже что чтобы эти это этот я",
   }).map(([k, v]) => [k, new Set(v.split(" "))]));
   function keyWords(text, lang, mode, plain) {
+    let out;
     if (/\*[^*\n]+\*/.test(text)) {  // chosen by hand
-      return text.split(/(\*[^*\n]+\*)/).filter(Boolean).map(s => s.startsWith("*") && s.endsWith("*") && s.length > 2 ? [s.slice(1, -1), ""] : [s.replace(/\*/g, ""), null]);
+      out = text.split(/(\*[^*\n]+\*)/).filter(Boolean).map(s => s.startsWith("*") && s.endsWith("*") && s.length > 2 ? [s.slice(1, -1), ""] : [s.replace(/\*/g, ""), null]);
+    } else {
+      const stop = STOP[lang];
+      if (mode === "none" || !stop) return null;
+      const words = [...text.matchAll(/[\p{L}\p{M}]+/gu)].filter(m => m[0].length >= 3 && !stop.has(m[0].toLowerCase()));
+      // one: the longest of them (the first if several), the word that says the most
+      const keep = mode === "one" ? words.filter(m => m === words.reduce((x, y) => y[0].length > x[0].length ? y : x, words[0])) : words;
+      out = [];
+      let last = 0;
+      for (const m of keep) {
+        out.push([text.slice(last, m.index), null], [m[0], ""]);
+        last = m.index + m[0].length;
+      }
+      out.push([text.slice(last), null]);
     }
-    const stop = STOP[lang];
-    if (mode === "none" || !stop) return null;
-    const out = [];
-    let last = 0;
-    for (const m of text.matchAll(/[\p{L}\p{M}]+/gu)) {
-      const w = m[0];
-      if (w.length < 3 || stop.has(w.toLowerCase())) continue;
-      out.push([text.slice(last, m.index), null], [w, ""]);
-      last = m.index + w.length;
-    }
-    out.push([text.slice(last), null]);
-    if (mode === "color" && !plain) {
+    if ((mode === "color" || mode === "one") && !plain) {
       const palette = css("--emph-colors").split(/[\s,]+/).filter(Boolean);
       let k = 0;
-      for (const p of out) if (p[1] === "") p[1] = palette[k++ % palette.length] || "";
+      for (const p of out) if (p[1] === "") p[1] = (mode === "one" ? palette[0] : palette[k++ % palette.length]) || "";
     }
     return out;
+  }
+  // the Arabic: words put between *asterisks* by hand, in --ar-emph (or the key words' colour)
+  function arabicWords(text) {
+    if (!/\*[^*\n]+\*/.test(text || "")) return null;
+    const mode = css("--emph"), c = css("--ar-emph") || ((mode === "color" || mode === "one") && css("--emph-colors").split(/[\s,]+/)[0]) || "";
+    return text.split(/(\*[^*\n]+\*)/).filter(Boolean).map(s => s.startsWith("*") && s.endsWith("*") && s.length > 2 ? [s.slice(1, -1), c] : [s.replace(/\*/g, ""), null]);
   }
 
   // When the translation needs two lines, break it after a sentence end close
@@ -334,7 +347,9 @@
     const max = parseFloat(getComputedStyle(fr).maxWidth) || 900;
     if (text.includes("\n") || lineWidth(text) <= max) return text;
     let best = null;
-    for (const m of text.matchAll(/[.!?;»:”"۔؟](?=\s)/g)) {
+    // (--fr-break: comma: after a comma too)
+    const ends = css("--fr-break") === "comma" ? /[.!?;»:”"۔؟,،](?=\s)/g : /[.!?;»:”"۔؟](?=\s)/g;
+    for (const m of text.matchAll(ends)) {
       const a = text.slice(0, m.index + 1).trim(), b = text.slice(m.index + 1).trim();
       const wa = lineWidth(a), wb = lineWidth(b);
       if (wa > max || wb > max) continue;
@@ -374,9 +389,15 @@
     const inline = document.body.dataset.layout === "cinema" && css("--num-display") !== "none" && b.num;
     const marked = (inline ? b.num + " " : "") + (b.fr || "");
     const text = sentenceBreak(marked.replace(/\*/g, ""));
-    setText(fr, text, "", keyWords(withBreak(marked, text), b.lang || "fr", css("--emph") || "none", b.highlight));
+    let parts = keyWords(withBreak(marked, text), b.lang || "fr", css("--emph") || "none", b.highlight);
+    if (inline && css("--num-color")) {  // the number in its own colour
+      parts = parts || [[text, null]];
+      const [t0, e0] = parts[0], n = b.num + " ";
+      if (e0 === null && t0.startsWith(n)) parts.splice(0, 1, [n, "#num"], [t0.slice(n.length), null]);
+    }
+    setText(fr, text, "", parts);
     ornamentFont();
-    setText($("ar"), b.ar, ornament(b.ayah));
+    setText($("ar"), b.ar, ornament(b.ayah), arabicWords(b.ar));
     setText($("tr"), b.tr);
     for (const id of ["fr", "ar"]) $(id).classList.toggle("grad", !!b.highlight);
   };
