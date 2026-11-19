@@ -1043,10 +1043,16 @@
   <p class="muted small" style="margin-top:0">Crée une clé sur <b>platform.openai.com/api-keys</b> et ajoute du crédit (Billing) : c'est séparé d'un abonnement ChatGPT. La clé reste sur cet ordinateur, dans le dossier Tilawa Studio, et ne sert qu'à demander les images à OpenAI.</p>
   <label>Clé OpenAI</label>
   <input id="ai-key" type="password" autocomplete="off" spellcheck="false">
+  <label style="margin-top:12px">Genre d'images</label>
+  <div class="seg-ctl" id="ai-presets">
+    <button type="button" data-preset="drawing" onclick="pickPreset('drawing')">Dessin : une seule idée</button>
+    <button type="button" data-preset="painting" onclick="pickPreset('painting')">Peinture : un paysage</button>
+  </div>
+  <p class="faint small" id="ai-preset-note" style="margin:6px 0 0"></p>
   <label style="margin-top:12px">Style de toutes les images</label>
   <textarea id="ai-style" rows="3"></textarea>
   <p class="faint small" style="margin:6px 0 0">Ajouté à chaque consigne, pour que les images forment une série. Les règles restent toujours : pas de personnes, d'animaux, de figures religieuses ni d'écriture.
-    <a href="#" onclick="event.preventDefault(); $('ai-style').value = aiSet.default_style">Style par défaut</a></p>
+    <a href="#" onclick="event.preventDefault(); $('ai-style').value = aiSet.presets[aiPreset].style">Style par défaut</a></p>
   <p class="error small" id="ai-err" style="margin:8px 0 0"></p>
   <div class="row" style="justify-content:space-between;margin-top:16px">
     <button class="ghost small hidden" id="ai-forget" onclick="saveAi(true)">Retirer ma clé</button><span class="grow"></span>
@@ -1481,7 +1487,10 @@ const EN = {
   "Ajouté à chaque consigne, pour que les images forment une série. Les règles restent toujours : pas de personnes, d'animaux, de figures religieuses ni d'écriture.": "Added to every prompt, so the pictures make a series. The rules always stay: no people, animals, religious figures or writing.",
   "✨ Une image par verset": "✨ A picture per verse",
   "Réglages": "Settings",
-  "Avec ta clé OpenAI, l'appli crée une image pour chaque verset à partir de son sens (paysages, lumière, symboles : jamais de personnes, d'animaux ni de figures) et la cale sur ce verset. Payé sur ton compte OpenAI, environ {p} $ l'image.": "With your OpenAI key, the app makes a picture for each verse from its meaning (landscapes, light, symbols: never people, animals or figures) and places it on that verse. Paid on your OpenAI account, about {p} $ a picture.",
+  "Avec ta clé OpenAI, l'appli crée une image pour chaque verset à partir de son sens (un dessin, une seule idée : jamais de personnes, d'animaux ni de figures) et la cale sur ce verset. Payé sur ton compte OpenAI, environ {p} $ l'image.": "With your OpenAI key, the app makes a picture for each verse from its meaning (a drawing, a single idea: never people, animals or figures) and places it on that verse. Paid on your OpenAI account, about {p} $ a picture.",
+  "Genre d'images": "Kind of pictures", "Dessin : une seule idée": "Drawing: a single idea", "Peinture : un paysage": "Painting: a landscape",
+  "Un dessin simple sur papier crème, une seule idée par verset, avec de la place vide pour le texte.": "A simple drawing on cream paper, a single idea per verse, with empty room for the text.",
+  "Une scène peinte (paysage, lumière, ciel), plus sombre là où le texte est écrit.": "A painted scene (landscape, light, sky), darker where the text is written.",
   "Pas encore de versets dans les sous-titres.": "No verses in the subtitles yet.",
   "{n} versets · {m} images à créer (environ {c} $ sur ton compte OpenAI). Vérifie chacune avant de publier.": "{n} verses · {m} pictures to make (about {c} $ on your OpenAI account). Check each one before posting.",
   "{n} versets : chacun a son image. Clic droit sur un clip pour en refaire une.": "{n} verses: each has its picture. Right click a clip to redo one.",
@@ -3734,7 +3743,7 @@ function renderAi() {
   if (!P) return;
   const n = new Set(verseKeys().map(k => k.key)).size, miss = aiMissing().length, cost = usd(miss * aiSet.price);
   $("ai-note").textContent = !aiSet.has_key
-    ? t("Avec ta clé OpenAI, l'appli crée une image pour chaque verset à partir de son sens (paysages, lumière, symboles : jamais de personnes, d'animaux ni de figures) et la cale sur ce verset. Payé sur ton compte OpenAI, environ {p} $ l'image.", { p: usd(aiSet.price) })
+    ? t("Avec ta clé OpenAI, l'appli crée une image pour chaque verset à partir de son sens (un dessin, une seule idée : jamais de personnes, d'animaux ni de figures) et la cale sur ce verset. Payé sur ton compte OpenAI, environ {p} $ l'image.", { p: usd(aiSet.price) })
     : !n ? t("Pas encore de versets dans les sous-titres.")
     : miss ? t("{n} versets · {m} images à créer (environ {c} $ sur ton compte OpenAI). Vérifie chacune avant de publier.", { n, m: miss, c: cost })
     : t("{n} versets : chacun a son image. Clic droit sur un clip pour en refaire une.", { n });
@@ -3752,7 +3761,7 @@ async function makeVerseImages(verses, prompts) {
   const go = $("ai-go"), status = $("ai-status"), id = P.id;
   go.disabled = true; $("ai-run").classList.remove("hidden");
   try {
-    const { job } = await api(`/api/projects/${pid()}/images`, json({ verses, prompts }));
+    const { job } = await api(`/api/projects/${pid()}/images`, json({ verses, prompts, text: textBand() }));
     const r = await follow(job, status, $("ai-bar"), false, null);
     if (!P || P.id !== id) return;
     P.media = (await api(`/api/projects/${pid()}`)).media;  // only the new pictures: what changed meanwhile here stays
@@ -3776,7 +3785,29 @@ function redoImageGo() {
   $("ai-redo").close();
   makeVerseImages([redoVerse], { [redoVerse.join(":")]: $("ai-prompt").value.trim() });
 }
+// the kind of pictures chosen in the dialog; its own style comes with it (a style written by hand stays)
+let aiPreset = "drawing";
+const PRESET_NOTE = {
+  drawing: "Un dessin simple sur papier crème, une seule idée par verset, avec de la place vide pour le texte.",
+  painting: "Une scène peinte (paysage, lumière, ciel), plus sombre là où le texte est écrit.",
+};
+function pickPreset(p) {
+  const own = Object.values(aiSet.presets || {}).map(x => x.style), cur = $("ai-style").value.trim();
+  if (!cur || own.includes(cur)) $("ai-style").value = aiSet.presets[p].style;
+  aiPreset = p;
+  for (const b of $("ai-presets").children) b.classList.toggle("on", b.dataset.preset === p);
+  $("ai-preset-note").textContent = t(PRESET_NOTE[p]);
+}
+// where the subtitles are, [top, bottom] as shares of the height, so the pictures leave them room
+function textBand() {
+  if (!overlayReady) return null;
+  const H = canvasH(), q = textBox("block") || textBox("band");
+  if (q && q.b > q.t) return [q.t / H, q.b / H];
+  const el = ow().document.getElementById("block"), top = el && parseFloat(ow().getComputedStyle(el).top);
+  return isFinite(top) ? [top / H, Math.min(1, top / H + 0.25)] : null;
+}
 function openAi() {
+  pickPreset(aiSet.preset || "drawing");
   $("ai-key").value = ""; $("ai-key").placeholder = aiSet.has_key ? t("clé enregistrée (colle une autre clé pour la changer)") : "sk-…";
   $("ai-style").value = aiSet.style || "";
   $("ai-forget").classList.toggle("hidden", !aiSet.has_key);
@@ -3784,7 +3815,7 @@ function openAi() {
   $("ai-dlg").showModal();
 }
 async function saveAi(forget) {
-  const body = { style: $("ai-style").value };
+  const body = { style: $("ai-style").value, preset: aiPreset };
   if (forget) body.key = ""; else if ($("ai-key").value.trim()) body.key = $("ai-key").value.trim();
   $("ai-err").textContent = body.key ? t("Vérification de la clé…") : "";
   try {

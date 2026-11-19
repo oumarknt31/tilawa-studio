@@ -517,7 +517,8 @@ def add_media(p: Project, src: Path, name: str) -> dict:
 
 
 def verse_images(folder: Path, verses: list[tuple[int, int]], key: str, style: str = "",
-                 prompts: dict[str, str] | None = None, progress: Progress | None = None, lang: str = "fr") -> dict:
+                 prompts: dict[str, str] | None = None, progress: Progress | None = None, lang: str = "fr",
+                 preset: str = "", text: tuple[float, float] | None = None) -> dict:
     """A background picture for each verse (s, a), made by OpenAI from its meaning, added to the
     project's media with the verse it shows. A few at a time; a verse refused or failed is reported."""
     import tempfile
@@ -528,7 +529,8 @@ def verse_images(folder: Path, verses: list[tuple[int, int]], key: str, style: s
 
     progress = progress or (lambda st, f: None)
     fmt = Project.load(folder).format
-    asked = {(s, a): (prompts or {}).get(f"{s}:{a}") or imagegen.prompt(s, a, fmt, style) for s, a in verses}
+    asked = {(s, a): (prompts or {}).get(f"{s}:{a}") or imagegen.prompt(s, a, fmt, style, preset or imagegen.PRESET, text)
+             for s, a in verses}
     made, failed, lock = [], [], threading.Lock()
     progress("images", 0.0)
 

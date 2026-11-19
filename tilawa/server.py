@@ -638,10 +638,19 @@ def put_settings(body: dict):
 
 # ---------------------------------------------------------------- pictures made by OpenAI (with the user's key)
 
+def _image_preset() -> str:
+    p = LIB.settings().get("image_preset") or imagegen.PRESET
+    return p if p in imagegen.PRESETS else imagegen.PRESET
+
+
 @app.get("/api/images")
 def images_settings():
-    return {"has_key": bool(imagegen.load_key(HOME)), "style": LIB.settings().get("image_style") or imagegen.STYLE,
-            "default_style": imagegen.STYLE, "price": imagegen.PRICE, "model": imagegen.MODEL, "quality": imagegen.QUALITY}
+    preset = _image_preset()
+    return {"has_key": bool(imagegen.load_key(HOME)), "preset": preset,
+            "presets": {k: {"style": v["style"]} for k, v in imagegen.PRESETS.items()},
+            "style": LIB.settings().get("image_style") or imagegen.PRESETS[preset]["style"],
+            "default_style": imagegen.PRESETS[preset]["style"], "price": imagegen.PRICE, "model": imagegen.MODEL,
+            "quality": imagegen.QUALITY}
 
 
 @app.put("/api/images")
@@ -651,15 +660,19 @@ def put_images_settings(body: dict):
         if key:
             imagegen.check_key(key)
         imagegen.save_key(HOME, key)
+    if body.get("preset") in imagegen.PRESETS:
+        LIB.update_settings({"image_preset": body["preset"]})
     if "style" in body:
         style = str(body["style"] or "").strip()[:600]
-        LIB.update_settings({"image_style": "" if style == imagegen.STYLE else style})
+        # a preset's own style is not kept: changing the preset then brings its style
+        LIB.update_settings({"image_style": "" if style in {v["style"] for v in imagegen.PRESETS.values()} else style})
     return images_settings()
 
 
 @app.post("/api/projects/{pid}/images")
 def make_images(pid: str, body: dict):
-    """A picture per verse ([[s, a], ...], Hafs keys), made by OpenAI (a job: about a minute for a few)."""
+    """A picture per verse ([[s, a], ...], Hafs keys), made by OpenAI (a job: about a minute for a few).
+    text: [top, bottom] of the subtitles as shares of the height, so the picture leaves them room."""
     folder = _folder(pid)
     key = imagegen.load_key(HOME)
     if not key:
@@ -667,8 +680,12 @@ def make_images(pid: str, body: dict):
     verses = [(int(s), int(a)) for s, a in body.get("verses") or []]
     for s, a in verses:
         quran.verse(s, a)  # validates
-    style, prompts, lang = LIB.settings().get("image_style") or "", body.get("prompts") or {}, LANG.get()
-    return {"job": _job("images", pid, lambda progress: project.verse_images(folder, verses, key, style, prompts, progress, lang),
+    text = body.get("text")
+    text = (min(max(float(text[0]), 0.0), 1.0), min(max(float(text[1]), 0.0), 1.0)) if isinstance(text, list) and len(text) == 2 else None
+    style, preset = LIB.settings().get("image_style") or "", _image_preset()
+    prompts, lang = body.get("prompts") or {}, LANG.get()
+    return {"job": _job("images", pid, lambda progress: project.verse_images(folder, verses, key, style, prompts, progress, lang,
+                                                                              preset=preset, text=text),
                         pool=_images)}
 
 

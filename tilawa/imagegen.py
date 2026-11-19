@@ -1,5 +1,5 @@
 """Background pictures made by OpenAI's image model, one per verse: the meaning of the verse
-shown with landscapes, light and symbols, never people, animals, religious figures or writing.
+drawn as one simple idea (or painted as a scene), never people, animals, religious figures or writing.
 
 Only for whoever puts their own OpenAI API key in the app (kept in the Tilawa Studio folder,
 never sent anywhere but to OpenAI). The images are paid on that account, per image."""
@@ -24,24 +24,61 @@ QUALITY = "medium"
 PRICE = 0.04  # US$ per medium portrait image (gpt-image-2, OpenAI's pricing, November 2026)
 SIZES = {"9:16": "1024x1536", "4:5": "1024x1536", "1:1": "1024x1024", "16:9": "1536x1024"}
 SHAPES = {"9:16": "vertical", "4:5": "vertical", "1:1": "square", "16:9": "horizontal"}
-STYLE = ("cinematic digital painting, soft golden-hour light, gentle haze, rich but muted colours, "
-         "serene and majestic atmosphere")
+# Two kinds of pictures. "drawing": one simple idea per verse, drawn on plain paper that leaves the
+# text of the verse room (chosen in November 2026 from the sample gallery); "painting": a scene.
+PRESETS = {
+    "drawing": {
+        "style": ("hand-drawn editorial illustration on warm cream paper, bold flat shapes with rough crayon and "
+                  "charcoal texture, a limited palette of black, cream and one strong brick red, simple and "
+                  "expressive symbolic objects, minimalist"),
+        "idea": ("Find ONE simple, striking visual metaphor for what this particular verse says, drawn with very few "
+                 "elements, like a thoughtful editorial illustration. Do not add symbols that are not part of this metaphor."),
+        "living": "Never show people, figures, stick figures, faces, hands, silhouettes, animals or any living being except plants.",
+        "room": "plain and empty paper",
+    },
+    "painting": {
+        "style": ("cinematic digital painting, soft golden-hour light, gentle haze, rich but muted colours, "
+                  "serene and majestic atmosphere"),
+        "idea": ("Show the meaning through nature, light, sky, water, landscapes, places or symbolic objects, "
+                 "as one calm, evocative scene."),
+        "living": "Never show people, faces, hands, silhouettes, animals or any living being.",
+        "room": "calm and darker, without detail",
+    },
+}
+PRESET = "drawing"
+STYLE = PRESETS[PRESET]["style"]
 
 
-def prompt(s: int, a: int, fmt: str = "9:16", style: str = "") -> str:
-    """What the image model is asked for a verse (s:a, its Hafs key), from its English meaning."""
+def _room(text: tuple[float, float] | None, room: str) -> str:
+    """Where the picture leaves the text of the verse room: text = (top, bottom) of the subtitles, as
+    shares of the height (None: not known, the lower part is drawn and the rest left for the text)."""
+    if not text:
+        return (f"The picture fills the lower part (about 40 percent of its height); above it the background stays "
+                f"{room}, where the text of the verse will be written.")
+    top, bottom = max(0.0, text[0] - 0.03), min(1.0, text[1] + 0.03)
+    pct = lambda x: round(100 * x)
+    if 1 - bottom >= top:
+        where = f"the lower part, below {pct(bottom)} percent of the height"
+    else:
+        where = f"the upper part, above {pct(top)} percent of the height"
+    return (f"From {pct(top)} to {pct(bottom)} percent of the height (measured from the top) the background stays "
+            f"{room}: the text of the verse is written there. Put the drawing or scene in {where}.")
+
+
+def prompt(s: int, a: int, fmt: str = "9:16", style: str = "", preset: str = PRESET,
+           text: tuple[float, float] | None = None) -> str:
+    """What the image model is asked for a verse (s:a, its Hafs key), from its English meaning; style
+    replaces the preset's own style line; text: where the subtitles are (see _room)."""
+    p = PRESETS.get(preset) or PRESETS[PRESET]
     name = quran.surah(s)["name"]
     meaning = quran.translation("en", s, a) or quran.translation("fr", s, a)
     return (f"A {SHAPES.get(fmt, 'vertical')} background picture for a video of a Quran recitation, "
             f"expressing the meaning of this verse (Surah {name}, verse {a}): \"{meaning}\"\n\n"
-            "Show the meaning through nature, light, sky, water, landscapes, places or symbolic objects, "
-            "as one calm, evocative scene.\n"
-            "Never show people, faces, hands, silhouettes, animals or any living being. Never depict God, "
-            "prophets, angels, Paradise or Hell literally: only suggest them through light and landscape.\n"
+            f"{p['idea']}\n"
+            f"{p['living']} Never depict God, prophets, angels, Paradise or Hell literally: only suggest them.\n"
             "No text, letters, calligraphy, numbers or logos anywhere in the image.\n"
-            "Keep the main subject in the centre, with calm, darker areas where subtitles will be written; "
-            "avoid busy detail.\n"
-            f"Style: {(style or STYLE).strip()}")
+            f"{_room(text, p['room'])}\n"
+            f"Style: {(style or p['style']).strip()}")
 
 
 # ---------------------------------------------------------------- the key, on this computer only

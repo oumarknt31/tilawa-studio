@@ -61,6 +61,19 @@ def test_the_prompt_says_the_meaning_and_the_limits():
     assert "Never show people" in p and "No text" in p and p.endswith("watercolour")
 
 
+def test_a_drawing_by_default_leaving_the_text_room():
+    p = imagegen.prompt(93, 1, "9:16")
+    assert "ONE simple, striking visual metaphor" in p and "cream paper" in p and "stick figures" in p
+    assert "lower part (about 40 percent" in p  # where the text is not known
+    low = imagegen.prompt(93, 1, "9:16", text=(0.6, 0.85))  # subtitles low: drawn above them
+    assert "From 57 to 88 percent" in low and "upper part, above 57 percent" in low and "plain and empty paper" in low
+    high = imagegen.prompt(93, 1, "16:9", text=(0.1, 0.4))  # subtitles high: drawn below them
+    assert "lower part, below 43 percent" in high
+    paint = imagegen.prompt(93, 1, "9:16", preset="painting", text=(0.6, 0.85))
+    assert "golden-hour" in paint and "calm and darker" in paint and "metaphor" not in paint
+    assert imagegen.prompt(93, 1, preset="unknown") == p
+
+
 def test_the_key_stays_in_the_tilawa_folder(tmp_path, openai):
     imagegen.check_key("good")
     with pytest.raises(UserError) as e:
@@ -75,11 +88,13 @@ def test_the_key_stays_in_the_tilawa_folder(tmp_path, openai):
 def test_one_picture_per_verse_added_to_the_project(tmp_path, openai):
     p = project.Project(folder=tmp_path, video="v.mp4", surah=108, first_verse=1, format="9:16")
     p.save()
-    r = project.verse_images(tmp_path, [(108, 1), (108, 2), (108, 3)], "good", "", {"108:2": "my own prompt"})
+    r = project.verse_images(tmp_path, [(108, 1), (108, 2), (108, 3)], "good", "", {"108:2": "my own prompt"},
+                             preset="painting", text=(0.6, 0.8))
     assert sorted(m["verse"] for m in r["made"]) == [[108, 1], [108, 2]]
     assert r["failed"][0]["verse"] == [108, 3] and "contenu" in r["failed"][0]["error"]
     media = project.Project.load(tmp_path).media
     assert {tuple(m["verse"]) for m in media} == {(108, 1), (108, 2)} and all(m["ai"] and m["kind"] == "image" for m in media)
     assert all((tmp_path / "media" / m["file"]).exists() for m in media)
     assert next(m for m in media if m["verse"] == [108, 2])["prompt"] == "my own prompt"
+    assert "golden-hour" in next(m for m in media if m["verse"] == [108, 1])["prompt"]
     assert {b["size"] for b in openai} == {"1024x1536"} and {b["quality"] for b in openai} == {"medium"}

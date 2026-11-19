@@ -80,9 +80,10 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
        *Caler sur les versets* / *Répartir également* pour refaire le minutage.
      - **✨ Une image par verset** (avec ta propre clé d'API OpenAI, séparée d'un abonnement ChatGPT ; environ
        0,04 $ l'image, payés sur ton compte OpenAI) : l'appli demande au modèle d'images d'OpenAI (gpt-image-2,
-       qualité moyenne) une image du sens de chaque verset, d'après sa traduction anglaise, toujours en paysages,
-       lumière et symboles (jamais de personnes, d'animaux, de figures religieuses ni d'écriture), dans un style
-       que tu écris une fois. Chaque image va sur son verset ; un verset redit reprend son image ; clic droit sur
+       qualité moyenne) une image du sens de chaque verset, d'après sa traduction anglaise : par défaut **un
+       dessin** sur papier crème qui montre une seule idée, ou **une peinture** (un paysage) ; jamais de personnes,
+       d'animaux, de figures religieuses ni d'écriture. L'image laisse vide la place des sous-titres (papier uni,
+       ou plus sombre pour une peinture), où qu'ils soient à l'écran. Son style peut être réécrit une fois pour toutes. Chaque image va sur son verset ; un verset redit reprend son image ; clic droit sur
        un clip pour refaire son image (sa consigne peut être changée). La clé reste dans le dossier Tilawa Studio.
        Vérifie chaque image avant de publier.
      - Une vidéo plus courte que sa place est jouée en **aller-retour** (avant puis à l'envers) : boucle sans saut.
