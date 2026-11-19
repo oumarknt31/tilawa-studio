@@ -64,7 +64,7 @@ BUILTIN_STYLES = [
         "--label-bg": "#1d4f56", "--label-border": "3px solid #bf4527", "--label-radius": "3px",
         "--intro-accent": "#bf4527", "--logo-pos": "tr", **sizes}}
       for sid, fmts, sizes in [
-          ("papier", ["16:9"], {"--ar-size": "100px", "--fr-size": "72px", "--fr-width": "1150px", "--tr-size": "46px",
+          ("papier", ["16:9"], {"--ar-size": "100px", "--fr-size": "72px", "--fr-width": "1400px", "--tr-size": "46px",
                                 "--fr-gap": "0px", "--tr-gap": "40px", "--title-size": "28px", "--reciter-size": "28px"}),
           ("papier-vertical", ["9:16", "1:1", "4:5"], {"--ar-size": "86px", "--fr-size": "60px", "--tr-size": "38px",
                                                        "--fr-gap": "0px", "--tr-gap": "34px", "--title-size": "30px",

@@ -128,7 +128,8 @@ def _js_runtimes() -> dict:
 
 
 def download(url: str, dest_dir: Path, progress=None) -> Path:
-    """Download the best available quality of a video URL with yt-dlp."""
+    """Download a video URL with yt-dlp, in the best quality up to 1080p (what an export can use:
+    more only takes longer, on a slow connection several times longer)."""
     import certifi
     import yt_dlp
 
@@ -136,13 +137,16 @@ def download(url: str, dest_dir: Path, progress=None) -> Path:
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     def hook(d):
-        if progress and d.get("status") == "downloading" and d.get("total_bytes"):
-            progress(d["downloaded_bytes"] / d["total_bytes"])
+        total = d.get("total_bytes") or d.get("total_bytes_estimate")  # (estimated for streams sent in pieces)
+        if progress and d.get("status") == "downloading" and total:
+            progress(min(1.0, d["downloaded_bytes"] / total))
 
     opts = {
-        # best video + best audio; prefer higher resolution, then higher fps, then bitrate
-        "format": "bv*+ba/b",
-        "format_sort": ["res", "fps", "hdr:12", "vbr", "abr"],
+        # best video + best audio; prefer the highest resolution up to 1080 (counted on the shorter side, so
+        # a vertical 1080 x 1920 is kept), then higher fps, a single file over a stream in pieces, bitrate
+        # (not YouTube's "drc" audio: the same with its loudness evened out, the recitation flattened)
+        "format": "bv*+ba[format_id!*=drc]/bv*+ba/b",
+        "format_sort": ["res:1080", "fps", "hdr:12", "proto", "vbr", "abr"],
         "merge_output_format": "mkv",  # mkv holds any codec combination without re-encoding
         # the app's own ffmpeg (yt-dlp would look on the PATH, where there is none on most computers)
         "ffmpeg_location": str(Path(tools()[0]).parent),
