@@ -596,9 +596,9 @@
       <div id="notice"></div>
       <div class="row" style="margin:0 0 10px;gap:8px;flex-wrap:wrap"><span class="small muted">Longueur</span>
         <div class="seg-ctl" id="sub-length">
-          <button data-v="short" onclick="setLength('short')" title="une ligne d'arabe, deux de traduction">Courts</button>
-          <button data-v="normal" onclick="setLength('normal')">Normaux</button>
-          <button data-v="long" onclick="setLength('long')">Longs</button>
+          <button data-v="whole" onclick="setLength('whole')" title="coupés seulement s'ils ne tiennent pas sur deux lignes">Versets entiers</button>
+          <button data-v="normal" onclick="setLength('normal')" title="coupés aussi à chaque respiration du récitateur">Normaux</button>
+          <button data-v="short" onclick="setLength('short')">Courts</button>
         </div></div>
       <div id="pick-surah" class="section hidden"></div>
       <div id="blocks" class="blocks"></div>
@@ -1267,12 +1267,13 @@ const EN = {
   "Mots importants": "Key words", "Normal": "Normal", "En gras": "Bold", "En couleurs": "In colour",
   "Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde* (aussi dans l'arabe, pour le colorer)":
     "Pick them yourself by putting asterisks around them in the subtitle: *mercy* (in the Arabic too, to colour it)",
-  "Un seul mot": "One word", "Longueur": "Length", "Courts": "Short", "Normaux": "Normal", "Longs": "Long",
-  "une ligne d'arabe, deux de traduction": "one line of Arabic, two of translation",
+  "Un seul mot": "One word", "Longueur": "Length", "Courts": "Short", "Normaux": "Normal", "Versets entiers": "Whole verses",
+  "coupés seulement s'ils ne tiennent pas sur deux lignes": "cut only if they do not fit on two lines",
+  "coupés aussi à chaque respiration du récitateur": "also cut at every breath of the reciter",
   "Recouper les sous-titres ({what}) ? Ils seront recréés (tes modifications de sous-titres seront remplacées).":
     "Cut the subtitles again ({what})? They will be made again (your subtitle changes will be replaced).",
-  "plus courts": "shorter", "longueur normale": "normal length", "plus longs": "longer",
-  "il va avec des sous-titres courts": "it goes with short subtitles", "Recouper": "Cut again", "Limite du texte · place du dessin en dessous": "Text limit · room for the drawing below", "Pour ce format": "For this format", "Mot entre *astérisques*": "Word between *asterisks*", "Mot important": "Key word", "Papier crème": "Cream paper",
+  "plus courts": "shorter", "longueur normale": "normal length", "versets entiers": "whole verses",
+  "il va avec des versets entiers sur deux lignes au plus": "it goes with whole verses on two lines at most", "Recouper": "Cut again", "Limite du texte · place du dessin en dessous": "Text limit · room for the drawing below", "Pour ce format": "For this format", "Mot entre *astérisques*": "Word between *asterisks*", "Mot important": "Key word", "Papier crème": "Cream paper",
   "MAJUSCULES": "CAPITALS", "Petites capitales": "Small caps", "Police du numéro": "Number font",
   "Police de la phonétique": "Transliteration font", "Comme la traduction": "Same as the translation",
   "Disposition": "Layout", "Empilée": "Stacked", "Arabe en haut": "Arabic on top", "Bandeau en bas": "Band at the bottom",
@@ -3292,16 +3293,16 @@ const PLACE_KEYS = ["--header-top", "--header-x", "--block-top", "--block-x", "-
   "--num-dx", "--num-dy", "--fr-dx", "--fr-dy", "--ar-dx", "--ar-dy", "--tr-dx", "--tr-dy"];
 // how long a subtitle may get before it is cut (as segment.LENGTHS on the server)
 const LENGTHS = {
-  short: { max_words: 7, max_french_chars: 65, max_part_s: 6.5 },
-  normal: { max_words: 11, max_french_chars: 115, max_part_s: 9.0 },
-  long: { max_words: 15, max_french_chars: 160, max_part_s: 12.0 },
+  whole: { max_words: 16, max_french_chars: 95, max_part_s: 60.0, min_part_words: 3, breath_cuts: false },
+  normal: { max_words: 11, max_french_chars: 115, max_part_s: 9.0, min_part_words: 2, breath_cuts: true },
+  short: { max_words: 7, max_french_chars: 65, max_part_s: 6.5, min_part_words: 2, breath_cuts: true },
 };
 const lengthOf = () => Object.keys(LENGTHS).find(k => LENGTHS[k].max_words === (P.segment?.max_words ?? 11)) || "";
 function renderLength() { segOn("sub-length", lengthOf()); }
 async function setLength(k) {
   if (k === lengthOf()) return;
   if (!await ask(t("Recouper les sous-titres ({what}) ? Ils seront recréés (tes modifications de sous-titres seront remplacées).",
-                   { what: t({ short: "plus courts", normal: "longueur normale", long: "plus longs" }[k]) }))) return renderLength();
+                   { what: t({ short: "plus courts", normal: "longueur normale", whole: "versets entiers" }[k]) }))) return renderLength();
   reanalyze({ segment: LENGTHS[k] }, true);
 }
 function applyStyle(id) {
@@ -3313,7 +3314,7 @@ function applyStyle(id) {
   P.style = { ...keep, ...s.style };
   changed({ look: true });
   if (s.length && s.length !== lengthOf()) {  // big text: offer to cut the subtitles shorter
-    toast(`${t("Style « {name} » appliqué", { name: esc(t(s.name)) })} · ${t("il va avec des sous-titres courts")}
+    toast(`${t("Style « {name} » appliqué", { name: esc(t(s.name)) })} · ${t("il va avec des versets entiers sur deux lignes au plus")}
       <button class="small" onclick="this.closest('.toast').remove(); setLength('${s.length}')">${t("Recouper")}</button>`);
   } else toast(t("Style « {name} » appliqué", { name: esc(t(s.name)) }));
 }

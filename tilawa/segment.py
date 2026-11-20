@@ -40,6 +40,7 @@ class Options:
     max_french_chars: int = 115  # ~2 lines of French
     max_part_s: float = 9.0
     min_part_words: int = 2
+    breath_cuts: bool = True  # cut at every breath of the reciter (else only where a part is too long)
     lead_s: float = 0.10  # show a block this long before the voice starts
     max_hold_s: float = 1.5  # keep a block on screen at most this long after its last word
     show_istiadha: bool = True
@@ -49,13 +50,17 @@ class Options:
     translit: str = "simple"  # how the phonetic line is written: translit.STYLES, or "tanzil"
 
 
-# how long a subtitle may get before it is cut (at a breath, a pause mark or a place the translation can
-# follow): "short" for big text (one line of Arabic, two of translation), "normal" the default
+# how subtitles are cut: "whole" keeps a verse whole unless it cannot fit on two lines of big text
+# (then cut where both parts still make sense); "normal" (the default) also cuts at every breath;
+# "short" cuts more
 LENGTHS = {
-    "short": {"max_words": 7, "max_french_chars": 65, "max_part_s": 6.5},
-    "normal": {"max_words": 11, "max_french_chars": 115, "max_part_s": 9.0},
-    "long": {"max_words": 15, "max_french_chars": 160, "max_part_s": 12.0},
+    "whole": {"max_words": 16, "max_french_chars": 95, "max_part_s": 60.0, "min_part_words": 3, "breath_cuts": False},
+    "normal": {"max_words": 11, "max_french_chars": 115, "max_part_s": 9.0, "min_part_words": 2, "breath_cuts": True},
+    "short": {"max_words": 7, "max_french_chars": 65, "max_part_s": 6.5, "min_part_words": 2, "breath_cuts": True},
 }
+MIN_FRENCH_WORDS = 3  # a part of the translation shorter than this says nothing alone
+FR_DRIFT = 20  # cost of a translation cut far from where the Arabic is cut (per whole length): a sentence end
+               # (3) is taken up to 15 % away
 
 
 def translation(v: quran.Verse, lang: str, chosen: str | None = None) -> str:
@@ -220,6 +225,26 @@ def _anchor_pattern(arabic_word: str | None, lang: str = "fr") -> tuple[re.Patte
     return None, 0.0
 
 
+# words a part should not end on: what they introduce is in the next part (French and English)
+_DANGLING = {
+    "fr": set("le la les l un une des de d du à au aux ils il elle elles lui leur leurs se s ne n nous vous en y qui que qu "
+              "dont son sa ses ce cet cette ces mon ma mes ton ta tes notre nos votre vos et ou pour par sur dans avec sans "
+              "sous vers chez entre est sont a ont tu je j me m te t on alors afin tandis parce lorsque puisque quand si "
+              "comme jamais très bien".split()),
+    "en": set("the a an of to in on at by for from with and or who which that whom whose their his her its our your "
+              "my is are was were be will shall has have he she they we you it".split()),
+}
+
+
+def _ends_dangling(fr: str, pos: int, lang: str) -> bool:
+    """Whether the words before `pos` end on a small word that leans on what follows ("ils lui |")."""
+    words = fr[:pos].split()
+    if not words or lang not in _DANGLING:
+        return False
+    w = re.split(r"['’]", words[-1].strip("«»“”\"()[],;:").lower())[-1]
+    return w in _DANGLING[lang]
+
+
 def _french_cut_points(fr: str, lang: str = "fr") -> list[tuple[int, float]]:
     """(character position, strength) of the places a sentence can be cut.
     Never inside [...] or (...) asides."""
@@ -247,7 +272,8 @@ def _french_cut_points(fr: str, lang: str = "fr") -> list[tuple[int, float]]:
             depth = max(0, depth - 1)
         elif depth:
             inside.add(i)
-    return sorted((p, s) for p, s in pts.items() if p not in inside and 0 < p < len(fr))
+    return sorted((p, s - (4.0 if _ends_dangling(fr, p, lang) else 0.0)) for p, s in pts.items()
+                  if p not in inside and 0 < p < len(fr))
 
 
 def _effective_positions(fr: str) -> list[float]:
@@ -271,7 +297,7 @@ def french_cut_cost(fr: str, fraction: float, next_arabic: str | None, lang: str
     pat, bonus = _anchor_pattern(next_arabic, lang)
     best = 1e9
     for pos, strength in _french_cut_points(fr, lang):
-        c = 30 * abs(eff[pos] / max(eff[-1], 1) - fraction) - strength
+        c = FR_DRIFT * abs(eff[pos] / max(eff[-1], 1) - fraction) - strength
         if pat and pat.match(fr, pos):
             c -= bonus
         best = min(best, c)
@@ -293,29 +319,34 @@ def split_french(fr: str, fractions: list[float], next_arabic: list[str | None] 
     eff = _effective_positions(fr)
     total = max(eff[-1], 1)
     anchors = [_anchor_pattern(w, lang) for w in (next_arabic or [None] * n)]
-    # dynamic programming over candidates (keeps cuts in order)
+    # dynamic programming over candidates (keeps cuts in order); a part of fewer than
+    # MIN_FRENCH_WORDS words costs a lot: it would say nothing on its own
     INF = 1e9
-    cost = [[INF] * len(cands) for _ in range(n)]
-    back = [[-1] * len(cands) for _ in range(n)]
+    m = len(cands)
+    words = lambda x, y: len(fr[x:y].split())
+    tiny = lambda x, y: 25.0 if words(x, y) < MIN_FRENCH_WORDS else 0.0
 
     def c(i, j):
         pos, strength = cands[j]
-        v = abs(eff[pos] / total - fractions[i]) * 30 - strength
+        v = abs(eff[pos] / total - fractions[i]) * FR_DRIFT - strength
         pat, bonus = anchors[i]
         if pat and pat.match(fr, pos):
             v -= bonus
         return v
 
-    for j in range(len(cands)):
-        cost[0][j] = c(0, j)
+    cost = [[INF] * m for _ in range(n)]
+    back = [[-1] * m for _ in range(n)]
+    for j in range(m):
+        cost[0][j] = c(0, j) + tiny(0, cands[j][0])
     for i in range(1, n):
-        best, arg = INF, -1
-        for j in range(len(cands)):
-            if j > 0 and cost[i - 1][j - 1] < best:
-                best, arg = cost[i - 1][j - 1], j - 1
-            if arg >= 0:
-                cost[i][j], back[i][j] = best + c(i, j), arg
-    j = int(np.argmin(cost[n - 1]))
+        for j in range(m):
+            for q in range(j):
+                v = cost[i - 1][q] + tiny(cands[q][0], cands[j][0])
+                if v < cost[i][j]:
+                    cost[i][j], back[i][j] = v, q
+            if back[i][j] >= 0:
+                cost[i][j] += c(i, j)
+    j = min(range(m), key=lambda j: cost[n - 1][j] + tiny(cands[j][0], len(fr)))
     cuts = []
     for i in range(n - 1, -1, -1):
         cuts.append(cands[j][0])
@@ -375,7 +406,7 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
         feats[k] = (quiet, dip, quran.WAQF_STRENGTH.get(waqf, -1) if waqf else -1)
 
     # 1) breaths
-    cuts = [k for k in range(1, n) if feats[k][0] >= opt.breath_quiet_s]
+    cuts = [k for k in range(1, n) if feats[k][0] >= opt.breath_quiet_s] if opt.breath_cuts else []
     # don't leave tiny fragments around a breath
     cuts = [k for k in cuts if k >= opt.min_part_words and n - k >= opt.min_part_words] or []
     # and always where a verse ends inside this one (Warsh counts some Hafs verses as two)
@@ -383,10 +414,12 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
     parts = _cut(occ, cuts)
 
     # 2) length
-    def too_long(ws):
+    def fr_len(ws):  # the share of the translation that goes with these words
         a0, a1 = ws[0].word.index, ws[-1].word.index + 1
-        fr_len = len(translation(v, opt.lang, opt.translation)) * _arabic_weight(v, a0, a1) / max(1.0, _arabic_weight(v, 0, len(v.align)))
-        return (len(ws) > opt.max_words or fr_len > opt.max_french_chars or ws[-1].end - ws[0].start > opt.max_part_s)
+        return len(translation(v, opt.lang, opt.translation)) * _arabic_weight(v, a0, a1) / max(1.0, _arabic_weight(v, 0, len(v.align)))
+
+    def too_long(ws):
+        return (len(ws) > opt.max_words or fr_len(ws) > opt.max_french_chars or ws[-1].end - ws[0].start > opt.max_part_s)
 
     changed = True
     while changed:
@@ -403,7 +436,11 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
                     frac = _arabic_weight(v, 0, ws[k].word.index) / max(1.0, _arabic_weight(v, 0, len(v.align)))
                     fr_fit = french_cut_cost(translation(v, opt.lang, opt.translation), frac, ws[k].word.text, opt.lang)
                     score = (2.0 * max(waqf, 0) + (1.5 if waqf >= 0 else 0) + 6 * quiet - dip / 8
-                             - 6 * balance - 0.5 * fr_fit)
+                             - 6 * balance - 1.0 * fr_fit)
+                    if min(fr_len(ws[:k]), fr_len(ws[k:])) < 18:  # a part whose translation would be a word or two
+                        score -= 12
+                    if quran.skeleton(ws[k - 1].word.text) in _AR_DANGLING:  # "مِن | قَبْلِهِمْ"
+                        score -= 8
                     if score > best:
                         best, arg = score, k
                 if arg is not None:
@@ -413,6 +450,13 @@ def _split_piece(p: _Piece, v: quran.Verse | None, loud: Loudness, opt: Options)
             out.append(ws)
         parts = out
     return parts
+
+
+# Arabic words a part should not end on (skeletons): prepositions, particles, relatives, whose
+# meaning is in the words after them ("مِن | قَبْلِهِمْ")
+_AR_DANGLING = {quran.skeleton(w) for w in (
+    "مِن فِى عَلَىٰ إِلَىٰ عَن أَن إِن مَا لَا قَدْ ٱلَّذِى ٱلَّذِينَ ٱلَّتِى هَلْ لَوْ إِذَا لَمْ لَن ثُمَّ أَوْ أَمْ بَلْ "
+    "مَن إِنَّ أَنَّ لَقَدْ وَلَقَدْ كَيْفَ حَتَّىٰ عِندَ يَوْمَ").split()}
 
 
 def _cut(seq, cuts):

@@ -87,3 +87,16 @@ def test_doubts_mark_faint_words_and_the_reason_given():
     blocks = [_verse_block(97, 1, 0, 2, words=heard), _verse_block(97, 2, 0, 2, words=faint), _verse_block(97, 3, 0, 1)]
     detect._doubts(blocks, {2: "differ"})
     assert [b.doubt for b in blocks] == ["", "faint", "differ"]
+
+
+def test_a_cut_translation_keeps_its_meaning():
+    from tilawa.segment import split_french
+
+    # never a word alone, nor a part ending on a small word that leans on the next ("est la | royauté")
+    fr = "Béni soit celui dans la main de qui est la royauté, et Il est Omnipotent."
+    assert split_french(fr, [0.55]) == ["Béni soit celui dans la main de qui est la royauté,", "et Il est Omnipotent."]
+    parts = split_french(fr, [0.45, 0.62])
+    assert all(len(p.split()) >= 3 for p in parts)
+    # a sentence end close by is taken rather than the middle of a phrase
+    fr = "Nous croyons en Lui et c'est en Lui que nous plaçons notre confiance. Vous saurez bientôt qui est dans un égarement évident»."
+    assert split_french(fr, [0.48])[0].endswith("confiance.")

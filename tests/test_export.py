@@ -138,12 +138,14 @@ def test_crossfades_after_a_cut_too_short_to_fade(tmp_path):
 
 
 def test_subtitle_lengths_are_the_same_in_the_editor():
+    import json
     import re
     from pathlib import Path
     from tilawa import library, segment
 
     page = (Path(__file__).parent.parent / "tilawa/web/index.html").read_text(encoding="utf-8")
     for k, v in segment.LENGTHS.items():
-        m = re.search(rf"{k}: {{ max_words: (\d+), max_french_chars: (\d+), max_part_s: ([\d.]+) }}", page)
-        assert m and (int(m[1]), int(m[2]), float(m[3])) == (v["max_words"], v["max_french_chars"], v["max_part_s"])
-    assert all(s.get("length", "short") in segment.LENGTHS for s in library.BUILTIN_STYLES)
+        m = re.search(rf"\n  {k}: (\{{[^}}]*\}})", page)
+        js = json.loads(re.sub(r"(\w+):", r'"\1":', m[1]))
+        assert js == v, k
+    assert all(s.get("length", "whole") in segment.LENGTHS for s in library.BUILTIN_STYLES)

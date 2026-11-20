@@ -109,12 +109,14 @@ downloaded in a browser.
        in a translucent band at the bottom), *Golden cinema*, *Minimal*;
      - **Cream paper** (16:9 and vertical), made for the drawings on cream paper (pictures per verse): flat
        text without outline, teal Arabic, a book serif translation with its verse number in teal, plum
-       transliteration, a boxed title, and **a single key word in red**; subtitles cut short (one line of Arabic, two lines of translation at most, never edge to edge); the
-       text never goes below a line at 60 %
+       transliteration, a boxed title, and **a single key word in red**; whole verses, cut only when one would not fit on two lines (each part keeping its meaning), each
+       text on two lines at most, never edge to edge; the text never goes below a line at 60 %
        of the height (62 % vertical), shown dashed on the preview: a long subtitle is made smaller, the drawing
        has the rest (put *asterisks* around a word of
        the Arabic, too, to colour it). Dark text: for light backgrounds;
-     - **subtitle length** (Subtitles tab): short, normal or long, cut again from the recitation already heard;
+     - **subtitle length** (Subtitles tab): whole verses (cut only when too long for two lines), normal (also
+       cut at every breath) or short, cut again from the recitation already heard; a part never ends on a small
+       word that leans on the next one ("of", "the", مِن, فِى…) and never leaves a word or two alone;
      - the **items of the block** (number, translation, Arabic, transliteration): × to take one out, whatever
        the style; on the preview the block moves as a whole, or each item on its own with *Move the items one
        by one* (or ⌥ + drag) — click to choose it, pinch to change its size;
