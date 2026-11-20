@@ -114,6 +114,16 @@ downloaded in a browser.
        of the height (62 % vertical), shown dashed on the preview: a long subtitle is made smaller, the drawing
        has the rest (put *asterisks* around a word of
        the Arabic, too, to colour it). Dark text: for light backgrounds;
+     - **word tracking** (Style tab, *Word tracking*): the Arabic, the transliteration and the translation can each
+       follow the recitation word by word, in any combination, each with its own effect and colour (or one effect
+       applied to all), among 36 in six families (clean, ink & paper, frames, light, trails, motion). The Arabic
+       is coloured whole word by whole word (joins and every mark kept), at the times measured for each recited
+       word; the transliteration has one word per recited word. The translation has no word-for-word alignment:
+       it is followed by meaning groups (cut at its punctuation), each starting with the Arabic word that opens it
+       ("et" for وَ, "Dis" for قُلْ...) or where its length points; write "|" in a subtitle to cut a group yourself,
+       "|4" to make it start with the 4th Arabic word. The preview follows the timeline (play, pause, scrub, speed)
+       and the export draws the same page at each frame's time, so both look the same; a tracked video takes
+       longer to export (about 1.5 s per second of tracked subtitles);
      - **subtitle length** (Subtitles tab): whole verses (cut only when too long for two lines), normal (also
        cut at every breath) or short, cut again from the recitation already heard; a part never ends on a small
        word that leans on the next one ("of", "the", مِن, فِى…) and never leaves a word or two alone;

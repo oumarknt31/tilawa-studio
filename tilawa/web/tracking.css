@@ -1,0 +1,113 @@
+/* Word tracking: the 36 effects (stable ids from the tracker prototype, effect-catalog.json), shared by
+   the overlay (preview and export) and the editor's gallery.
+
+   A tracked text (.trk.fx-<id>) is made of whole words (.w) in three stacked copies:
+     .d  decorations only (transparent text, under everything): the ::before / ::after shapes, the cursor
+     .o  the outline and shadow copy
+     .f  the fill copy: the colour effects
+   State per word, set from the timeline time (never a CSS transition: the export draws exact frames):
+     .is-active .is-done .is-near, --p (0..1 through the word), --pc (same in %), --wave (sin p pi),
+     --ox --oy (a point going round the word), --age (words since this one, for trails).
+   Sizes are in --u, about one pixel of the prototype's text, so the shapes keep their proportions at
+   the video's text sizes. --base: the text's own colour; --accent: the tracking colour. */
+
+.trk { --flow: 90deg; --u: .0435em; }
+.trk[dir=rtl], .trk.rtl { --flow: 270deg; }
+#ar.trk { --u: .03em; }
+.trk .w { position: relative; display: inline-block; white-space: nowrap; isolation: isolate;
+  --p: 0; --pc: 0%; --ox: 50%; --oy: 0%; --wave: 0; --age: 10; }
+.trk .d .w::before, .trk .d .w::after { content: ""; pointer-events: none; position: absolute; z-index: 0; opacity: 0; box-sizing: border-box; }
+.trk .d .w.is-active::before, .trk .d .w.is-active::after { opacity: 1; }
+.trk .cur { position: absolute; pointer-events: none; opacity: 0; color: var(--accent); box-sizing: border-box; display: none; }
+.trk.fx-capsule .cur, .trk.fx-glass .cur, .trk.fx-corners .cur, .trk.fx-brackets .cur, .trk.fx-frame .cur, .trk.fx-ellipse .cur { display: block; }
+
+/* ---- Clean */
+.trk.fx-ink-sweep .f .w.is-active { background: linear-gradient(var(--flow), var(--accent) 0 var(--pc), var(--base) var(--pc) 100%);
+  -webkit-background-clip: text; background-clip: text; }
+.trk.fx-ink-sweep .f .w.is-active, .trk.fx-ink-sweep .f .w.is-active * { color: transparent !important; }
+.trk.fx-marker .d .w.is-active::before { inset: 22% 0 10%; background: linear-gradient(var(--flow), color-mix(in srgb, var(--accent) 22%, transparent) var(--pc), transparent var(--pc)); border-radius: calc(3 * var(--u)); }
+.trk.fx-underline .d .w.is-active::after { bottom: 4%; inset-inline-start: 0; height: calc(2 * var(--u)); width: var(--pc); background: var(--accent); border-radius: calc(2 * var(--u)); }
+.trk.fx-spotlight :is(.o, .f) .w:not(.is-active) { opacity: .34; }
+.trk.fx-spotlight .f .w.is-active, .trk.fx-spotlight .f .w.is-active * { color: var(--accent) !important; }
+.trk.fx-weight .w.is-active { font-weight: 700; }
+.trk.fx-weight .f .w.is-active, .trk.fx-weight .f .w.is-active * { color: var(--accent) !important; }
+.trk.fx-reading-trail .f .w:is(.is-done, .is-active), .trk.fx-reading-trail .f .w:is(.is-done, .is-active) * { color: var(--accent) !important; }
+.trk.fx-reading-trail .d .w.is-active::after { bottom: 2%; inset-inline-start: 0; height: calc(3 * var(--u)); width: var(--pc); background: var(--accent); }
+
+/* ---- Ink & paper */
+.trk.fx-brush .d .w.is-active::before { inset: 25% -3% 10%; background: color-mix(in srgb, var(--accent) 24%, transparent);
+  clip-path: polygon(0 12%, 15% 0, 45% 12%, 98% 0, 100% 72%, 87% 95%, 57% 84%, 4% 100%); transform: scaleX(calc(.2 + var(--p) * .8)); transform-origin: center; }
+.trk.fx-watercolour .d .w.is-active::before { inset: 5% -10% -10%; background: radial-gradient(ellipse, color-mix(in srgb, var(--accent) 26%, transparent), color-mix(in srgb, var(--accent) 11%, transparent) 45%, transparent 70%);
+  filter: blur(calc(2 * var(--u))); transform: scale(calc(.6 + var(--p) * .4)); }
+.trk.fx-ripple .d .w.is-active::before { inset: 5% -4% 0; border: calc(1 * var(--u)) solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 50%;
+  transform: scale(calc(.4 + var(--p) * .9)); opacity: calc(1 - var(--p) * .85); }
+.trk.fx-ripple .d .w.is-active::after { inset: 15% 4% 10%; border: calc(1 * var(--u)) solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 50%;
+  transform: scale(calc(.3 + var(--p) * .8)); opacity: calc(1 - var(--p) * .65); }
+.trk.fx-pen .d .w.is-active::before { height: calc(1 * var(--u)); bottom: 6%; width: var(--pc); inset-inline-start: 0; background: var(--accent); }
+.trk.fx-pen .d .w.is-active::after { width: calc(7 * var(--u)); height: calc(7 * var(--u)); background: var(--accent); bottom: 2%; inset-inline-start: var(--pc);
+  transform: translateX(calc(-50% * var(--dir, 1))) rotate(45deg); border-radius: 0 0 calc(2 * var(--u)) 0; }
+.trk.fx-pool .d .w.is-active::before { bottom: 9%; left: 0; right: 0; height: calc(6% + var(--p) * 55%); background: color-mix(in srgb, var(--accent) 19%, transparent); border-radius: 35% 35% calc(3 * var(--u)) calc(3 * var(--u)); }
+.trk.fx-double .d .w.is-active::after { height: calc(1 * var(--u)); bottom: 4%; width: var(--pc); inset-inline-start: 0; background: var(--accent);
+  box-shadow: 0 calc(4 * var(--u)) 0 color-mix(in srgb, var(--accent) 65%, transparent); }
+
+/* ---- Frames: one cursor per text, moving from word to word (placed by the page from the time) */
+.trk.fx-capsule .cur { background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 999px; }
+.trk.fx-glass .cur { background: linear-gradient(135deg, #ffffff85, color-mix(in srgb, var(--accent) 15%, transparent)); border: calc(1 * var(--u)) solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: calc(8 * var(--u)); box-shadow: 0 calc(3 * var(--u)) calc(10 * var(--u)) color-mix(in srgb, var(--accent) 10%, transparent); }
+.trk.fx-corners .cur { --l: calc(9 * var(--u)); --h: calc(7 * var(--u)); --t: max(1px, calc(1 * var(--u)));
+  background: linear-gradient(currentColor, currentColor) top left / var(--l) var(--t) no-repeat, linear-gradient(currentColor, currentColor) top left / var(--t) var(--h) no-repeat,
+    linear-gradient(currentColor, currentColor) top right / var(--l) var(--t) no-repeat, linear-gradient(currentColor, currentColor) top right / var(--t) var(--h) no-repeat,
+    linear-gradient(currentColor, currentColor) bottom left / var(--l) var(--t) no-repeat, linear-gradient(currentColor, currentColor) bottom left / var(--t) var(--h) no-repeat,
+    linear-gradient(currentColor, currentColor) bottom right / var(--l) var(--t) no-repeat, linear-gradient(currentColor, currentColor) bottom right / var(--t) var(--h) no-repeat; }
+.trk.fx-brackets .cur { border-left: calc(2 * var(--u)) solid currentColor; border-right: calc(2 * var(--u)) solid currentColor; border-radius: 25%; }
+.trk.fx-frame .cur { border: max(1px, calc(1 * var(--u))) solid currentColor; border-radius: calc(3 * var(--u)); }
+.trk.fx-ellipse .cur { border: max(1px, calc(1 * var(--u))) solid currentColor; border-radius: 50%; transform: rotate(-3deg); }
+
+/* ---- Light */
+.trk.fx-satin .f .w.is-active { background: linear-gradient(var(--flow), var(--base) 0%, var(--accent) calc(var(--pc) - 18%), #d38c3c var(--pc), var(--accent) calc(var(--pc) + 18%), var(--base) 100%);
+  -webkit-background-clip: text; background-clip: text; }
+.trk.fx-satin .f .w.is-active, .trk.fx-satin .f .w.is-active * { color: transparent !important; }
+.trk.fx-halo .d .w.is-active::before { inset: 0 -10% -10%; background: radial-gradient(ellipse, color-mix(in srgb, var(--accent) 32%, transparent), transparent 70%);
+  filter: blur(calc(5 * var(--u))); opacity: calc(.45 + var(--wave) * .4); }
+.trk.fx-edge .d .w.is-active::after { inset: 10% 0 3%; border-bottom: calc(1 * var(--u)) solid var(--accent); border-inline-end: calc(1 * var(--u)) solid var(--accent);
+  border-radius: calc(4 * var(--u)); box-shadow: calc(2 * var(--u)) calc(3 * var(--u)) calc(9 * var(--u)) color-mix(in srgb, var(--accent) 35%, transparent); }
+.trk.fx-column .d .w.is-active::before { top: 0; bottom: 0; inset-inline-start: var(--pc); width: calc(9 * var(--u)); background: linear-gradient(0deg, transparent, color-mix(in srgb, var(--accent) 25%, transparent), transparent);
+  transform: translateX(calc(-50% * var(--dir, 1))); filter: blur(calc(1 * var(--u))); }
+.trk.fx-star .d .w.is-active::after { width: calc(12 * var(--u)); height: calc(12 * var(--u)); background: var(--accent); top: 1%; inset-inline-start: var(--pc);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); transform: translateX(calc(-50% * var(--dir, 1))) scale(calc(.7 + var(--wave) * .4)); }
+.trk.fx-orbit .d .w.is-active::after { width: calc(5 * var(--u)); height: calc(5 * var(--u)); background: var(--accent); left: var(--ox); top: var(--oy); border-radius: 50%;
+  box-shadow: 0 0 calc(6 * var(--u)) color-mix(in srgb, var(--accent) 40%, transparent); transform: translate(-50%, -50%); }
+
+/* ---- Trails */
+.trk.fx-comet .d .w.is-active::before { bottom: 4%; height: calc(3 * var(--u)); inset-inline-start: 0; width: var(--pc); background: linear-gradient(var(--flow), transparent, var(--accent)); border-radius: calc(3 * var(--u)); }
+.trk.fx-comet .d .w.is-active::after { bottom: 1%; height: calc(7 * var(--u)); width: calc(7 * var(--u)); inset-inline-start: var(--pc); background: var(--accent); border-radius: 50%;
+  box-shadow: 0 0 calc(9 * var(--u)) color-mix(in srgb, var(--accent) 60%, transparent); transform: translateX(calc(-50% * var(--dir, 1))); }
+.trk.fx-dots .d .w.is-active::after { bottom: 3%; height: calc(5 * var(--u)); width: var(--pc); inset-inline-start: 0;
+  background: radial-gradient(circle, var(--accent) calc(1.3 * var(--u)), transparent calc(1.6 * var(--u))) 0 0 / calc(7 * var(--u)) calc(5 * var(--u)) repeat-x; }
+.trk.fx-beads .d .w.is-active::before { bottom: 1%; height: calc(7 * var(--u)); left: 8%; right: 8%;
+  background: radial-gradient(circle at 16% 50%, color-mix(in srgb, var(--accent) 30%, transparent) calc(2 * var(--u)), transparent calc(2.7 * var(--u))),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 30%, transparent) calc(2 * var(--u)), transparent calc(2.7 * var(--u))),
+    radial-gradient(circle at 84% 50%, color-mix(in srgb, var(--accent) 30%, transparent) calc(2 * var(--u)), transparent calc(2.7 * var(--u))); }
+.trk.fx-beads .d .w.is-active::after { bottom: 1%; height: calc(6 * var(--u)); width: calc(6 * var(--u)); inset-inline-start: calc(16% + var(--p) * 68%); border-radius: 50%;
+  background: var(--accent); transform: translateX(calc(-50% * var(--dir, 1))); }
+.trk.fx-bookmark .d .w.is-active::after { top: -5%; inset-inline-start: calc(12% + var(--p) * 65%); width: calc(8 * var(--u)); height: calc(11 * var(--u)); background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 73%, 0 100%); }
+.trk.fx-echo .d .w:is(.is-active, .is-near)::after { opacity: 1; bottom: 3%; height: calc(2 * var(--u)); left: 0; right: 0; background: var(--accent); }
+.trk.fx-echo .d .w.is-near::after { opacity: calc(.5 / var(--age)); }
+.trk.fx-pulse .d .w.is-active::before { inset: 8% -4%; border: calc(1 * var(--u)) solid var(--accent); border-radius: calc(6 * var(--u));
+  transform: scale(calc(1 + var(--p) * .16)); opacity: calc(.7 - var(--p) * .6); }
+
+/* ---- Motion */
+.trk.fx-lift .w.is-active { transform: translateY(calc(var(--wave) * -3 * var(--u))); }
+.trk.fx-lift .d .w.is-active::after { bottom: 0; left: 15%; right: 15%; height: calc(3 * var(--u)); border-radius: 50%; background: color-mix(in srgb, var(--accent) 23%, transparent); filter: blur(calc(2 * var(--u))); }
+.trk.fx-breathe :is(.o, .f) .w.is-active { opacity: calc(.65 + var(--wave) * .35); }
+.trk.fx-breathe .f .w.is-active, .trk.fx-breathe .f .w.is-active * { color: var(--accent) !important; }
+.trk.fx-fold .d .w.is-active::before { inset: 13% -3% 7%; background: color-mix(in srgb, var(--accent) 17%, transparent); border-radius: calc(2 * var(--u)); }
+.trk.fx-fold .d .w.is-active::after { bottom: 7%; right: -3%; width: calc(11 * var(--u)); height: calc(11 * var(--u)); background: var(--accent); clip-path: polygon(100% 0, 100% 100%, 0 100%); opacity: calc(.25 + var(--p) * .75); }
+.trk.fx-ribbon .d .w.is-active::after { bottom: 5%; inset-inline-start: calc(var(--p) * 70%); height: calc(5 * var(--u)); width: 30%; background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%, 12% 50%); }
+.trk.fx-shutter .d .w.is-active::before { inset: 14% 0 7%; background: color-mix(in srgb, var(--accent) 19%, transparent); transform: scaleX(calc(.1 + var(--p) * .9)); transform-origin: center; border-radius: calc(2 * var(--u)); }
+.trk.fx-pointers .d .w.is-active::before { top: 45%; inset-inline-start: calc(-7 * var(--u)); width: calc(6 * var(--u)); height: calc(8 * var(--u)); background: var(--accent);
+  clip-path: polygon(0 0, 100% 50%, 0 100%); transform: translateX(calc(var(--wave) * 2 * var(--u))); }
+.trk.fx-pointers .d .w.is-active::after { top: 45%; inset-inline-end: calc(-7 * var(--u)); width: calc(6 * var(--u)); height: calc(8 * var(--u)); background: var(--accent);
+  clip-path: polygon(100% 0, 0 50%, 100% 100%); transform: translateX(calc(var(--wave) * -2 * var(--u))); }

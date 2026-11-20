@@ -140,6 +140,7 @@ def _folder(pid: str) -> Path:
 
 
 def _public(p: project.Project) -> dict:
+    segment.add_anchors(p.blocks, p.lang)  # (for word tracking of the translation)
     d = asdict(p)
     d["folder"] = None
     d["id"] = p.folder.name
@@ -904,6 +905,11 @@ def basmala_audio(rid: str):
     except OSError:
         raise UserError("download_failed")
     return FileResponse(f, media_type="audio/wav")
+
+
+@app.get("/tracking.css")
+def tracking_css():
+    return FileResponse(PKG / "web" / "tracking.css", media_type="text/css")
 
 
 @app.get("/overlay.html")

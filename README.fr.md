@@ -114,6 +114,16 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
        60 % de la hauteur (62 % en vertical), en pointillés sur l'aperçu : un long sous-titre est rapetissé, le dessin
        a le reste (entoure aussi un mot de l'arabe
        d'*astérisques* pour le colorer). Texte foncé : pour les fonds clairs ;
+     - **suivi des mots** (onglet Style, *Suivi des mots*) : l'arabe, la phonétique et la traduction peuvent chacun
+       suivre la récitation mot à mot, dans n'importe quelle combinaison, chacun avec son effet et sa couleur (ou un
+       effet pour tous), parmi 36 en six familles (sobres, encre et papier, cadres, lumière, traces, mouvement).
+       L'arabe se colore mot entier par mot entier (liaisons et toutes les voyelles gardées), aux temps mesurés de
+       chaque mot récité ; la phonétique a un mot par mot récité. La traduction n'a pas d'alignement mot à mot :
+       elle est suivie par groupes de sens (coupés à sa ponctuation), chacun commençant au mot arabe qui l'ouvre
+       (« et » pour وَ, « Dis » pour قُلْ…) ou à la place que sa longueur indique ; écris « | » dans un sous-titre pour
+       couper un groupe, « |4 » pour qu'il commence au 4e mot arabe. L'aperçu suit la timeline (lecture, pause,
+       glisser, vitesse) et l'export dessine la même page au temps de chaque image : les deux sont identiques ; une
+       vidéo avec suivi est plus longue à exporter (environ 1,5 s par seconde de sous-titres suivis) ;
      - **longueur des sous-titres** (onglet Sous-titres) : versets entiers (coupés seulement s'ils sont trop longs
        pour deux lignes), normaux (coupés aussi à chaque respiration) ou courts, recoupés d'après la récitation déjà
        entendue ; une partie ne finit jamais sur un petit mot qui s'appuie sur la suite (« de », « la », مِن, فِى…) et ne

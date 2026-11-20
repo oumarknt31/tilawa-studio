@@ -82,6 +82,9 @@ class Project:
         quran.use_reading(p.reading)  # the verses read from here on are in the project's reading
         if p.blocks and "translit" not in p.segment:
             p.segment["translit"] = "tanzil"  # made before the other conventions: its phonetic is Tanzil's
+        for b in p.blocks:  # (made before the displayed word of each timed word was kept)
+            segment.add_display_indexes(b)
+        segment.add_anchors(p.blocks, p.lang)
         return p
 
 

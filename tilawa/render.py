@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 import mimetypes
 import re
+import shutil
 from fractions import Fraction
 import subprocess
 import sys
@@ -86,7 +87,7 @@ def block_payload(b: Block, lang: str = "fr") -> dict:
     """What the overlay page draws for a block (same as payload() in index.html)."""
     num = quran.verse(b.surah, b.ayah).number(b.a0) if b.kind == "verse" else 0
     return {"num": f"{num}." if num else "", "fr": b.fr, "ar": b.ar, "tr": b.tr,
-            "highlight": b.highlight, "ayah": ends_verse(b),
+            "highlight": b.highlight, "ayah": ends_verse(b), "words": b.words,
             "rtl": quran.LANGS.get(lang, ("", "", "", False))[3], "lang": lang}
 
 
@@ -134,17 +135,57 @@ class OverlayRenderer:
         info = quran.surah(surah) if surah else None
         return self.page.evaluate("([t, r, s, l]) => introCards(t, r, s, l)", [title, reciter, info, lang])
 
-    def png(self, out: Path, style: dict | None, header: dict | None = None, block: dict | None = None,
-            frame: bool = False, intro: dict | None = None) -> tuple[Path, int]:
-        """Draw one layer of the overlay; returns the PNG (cropped to the band
-        that holds something, full width) and its vertical position in output pixels."""
-        set_all = "([h, b, s, f, c]) => { setStyle(s); setHeader(h); setBlock(b); setFrame(f); setIntro(c); }"
-        args = [header, block, style or {}, frame, intro]
+    def _set(self, style: dict | None, header: dict | None, block: dict | None, frame: bool, intro: dict | None,
+              t: float | None) -> None:
+        set_all = "([h, b, s, f, c, t]) => { setStyle(s); setHeader(h); setBlock(b); setFrame(f); setIntro(c); if (t !== null) setTime(t); }"
+        args = [header, block, style or {}, frame, intro, t]
         self.page.evaluate(set_all, args)
         self.page.evaluate("settle()")
         # again, now that the fonts are loaded (line breaks depend on them)
         self.page.evaluate(set_all, args)
         self.page.evaluate("settle()")
+
+    def png(self, out: Path, style: dict | None, header: dict | None = None, block: dict | None = None,
+            frame: bool = False, intro: dict | None = None, t: float | None = None) -> tuple[Path, int]:
+        """Draw one layer of the overlay; returns the PNG (cropped to the band
+        that holds something, full width) and its vertical position in output pixels.
+        t: the time in the source video (word tracking shows where the recitation is then)."""
+        self._set(style, header, block, frame, intro, t)
+        y0, h = self._band()
+        self.page.screenshot(path=str(out), omit_background=True, type="png",
+                             clip={"x": 0, "y": y0, "width": self.canvas_w, "height": h})
+        return out, round(y0 * self.scale)
+
+    def tracked(self) -> bool:
+        """Whether the subtitle last drawn has words following the recitation."""
+        return self.page.evaluate("isTracked()")
+
+    def frames(self, folder: Path, style: dict | None, block: dict, t0: float, t1: float, fps: float) -> tuple[Path, int]:
+        """A subtitle whose words follow the recitation, from t0 to t1 (source seconds): a picture each
+        time it changes, at the frames' exact times (the same page and times as the preview); returns an
+        ffmpeg concat list holding each picture for as many frames as it lasts, and its height."""
+        folder.mkdir(parents=True, exist_ok=True)
+        self._set(style, None, block, False, None, t0)
+        y0, h = self._band(margin=48)  # (room for the shapes around the words: halo, star above...)
+        n = max(1, math.ceil((t1 - t0) * fps - 1e-6))
+        keys = self.page.evaluate("([t0, n, fps]) => Array.from({length: n}, (_, j) => setTime(t0 + j / fps))", [t0, n, fps])
+        shots: list[list] = []
+        for j, key in enumerate(keys):
+            if shots and key == keys[j - 1]:
+                shots[-1][1] += 1
+                continue
+            f = folder / f"{j:06d}.png"
+            self.page.evaluate("t => setTime(t)", t0 + j / fps)
+            self.page.screenshot(path=str(f), omit_background=True, type="png",
+                                 clip={"x": 0, "y": y0, "width": self.canvas_w, "height": h})
+            shots.append([f, 1])
+        lst = folder / "frames.txt"
+        lines = [f"file '{f.name}'\nduration {k / fps:.6f}" for f, k in shots] + [f"file '{shots[-1][0].name}'"]
+        lst.write_text("\n".join(lines) + "\n")
+        return lst, round(y0 * self.scale)
+
+    def _band(self, margin: float = 24) -> tuple[int, int]:
+        """The band of the page that holds something (full width): its top and height in CSS pixels."""
         top, bottom = self.page.evaluate("""() => {
             let t = Infinity, b = -Infinity;
             for (const el of document.querySelectorAll('.o, #mic, .ink')) {
@@ -159,11 +200,9 @@ class OverlayRenderer:
             top, bottom = 0, 2
         # margin for outline + shadow, snapped so the crop starts on a whole output pixel
         q = self.grid
-        y0 = max(0, int(top - 24) // q * q)
-        y1 = min(int(css_h) // q * q, -(-int(bottom + 24) // q) * q)
-        self.page.screenshot(path=str(out), omit_background=True, type="png",
-                             clip={"x": 0, "y": y0, "width": self.canvas_w, "height": max(q, y1 - y0)})
-        return out, round(y0 * self.scale)
+        y0 = max(0, int(top - margin) // q * q)
+        y1 = min(int(css_h) // q * q, -(-int(bottom + margin) // q) * q)
+        return y0, max(q, y1 - y0)
 
     def close(self):
         self._browser.close()
@@ -592,9 +631,13 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         basmala = basmala if basmala and not still_image else None
         if basmala:
             b_png = renderer.png(work / "basmala.png", style, block=basmala["payload"] if opt.show_subs else None)
-        pngs = []
+        pngs = []  # per subtitle: a picture, or (word tracking) a list of pictures in time
         for i, b in enumerate(shown):
-            pngs.append(renderer.png(work / f"block{i:03d}.png", style, block=block_payload(b, lang)))
+            s_src, e_src = max(b.start, t0), min(b.end, t1)
+            png = renderer.png(work / f"block{i:03d}.png", style, block=block_payload(b, lang), t=s_src)
+            if renderer.tracked() and not still_image:
+                png = (*renderer.frames(work / f"block{i:03d}", style, block_payload(b, lang), s_src, e_src, info.fps), "seq")
+            pngs.append(png)
             progress("overlays", (i + 1) / max(1, len(shown)))
     finally:
         renderer.close()
@@ -657,16 +700,21 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
                      f"d={opt.fade_out:.3f}:alpha=1,trim=duration={dur:.3f},setpts=PTS+{bs:.3f}/TB[ob]")
         graph.append(f"[{last}][ob]overlay=x=0:y={b_png[1]}:format={ov}:eof_action=pass[vb]")
         last = "vb"
-    for i, (b, (png, y)) in enumerate(zip(shown, pngs)):
+    for i, (b, (png, y, *seq)) in enumerate(zip(shown, pngs)):
         s, e = max(b.start, t0) - t0 + lead, min(b.end, t1) - t0 + lead
         dur = max(e - s, 1 / info.fps)
         fi, fo = min(opt.fade_in, dur / 3), min(opt.fade_out, dur / 3)
         if still_image:
             fi = fo = 0  # a still shows the subtitle fully
-        k = inputs.add("-i", str(png))
         fade_in = f"fade=t=in:st=0:d={fi:.3f}:alpha=1," if (b.start > t0 + 0.01 or lead) and fi > 0 else ""
         fade_out = f"fade=t=out:st={dur - fo:.3f}:d={fo:.3f}:alpha=1," if fo > 0 else ""
-        graph.append(f"{still(k, dur)},{fade_in}{fade_out}trim=duration={dur:.3f},setpts=PTS+{s:.3f}/TB[o{i}]")
+        if seq:  # word tracking: its pictures, each held for its frames
+            k = inputs.add("-f", "concat", "-safe", "0", "-i", str(png))
+            src = f"[{k}:v]{to_yuv},fps={fps},setpts=N/({fps})/TB"
+        else:
+            k = inputs.add("-i", str(png))
+            src = still(k, dur)
+        graph.append(f"{src},{fade_in}{fade_out}trim=duration={dur:.3f},setpts=PTS+{s:.3f}/TB[o{i}]")
         graph.append(f"[{last}][o{i}]overlay=x=0:y={y}:format={ov}:eof_action=pass[v{i + 1}]")
         last = f"v{i + 1}"
     script = work / "graph.txt"
@@ -735,6 +783,8 @@ def render(video: Path, blocks: list[Block], title: str, reciter: str, out: Path
         if not still_image:
             final.unlink(missing_ok=True)
         raise
+    finally:  # the pictures drawn for it (word tracking: thousands)
+        shutil.rmtree(work, ignore_errors=True)
     progress("encoding", 1.0)
     return out
 

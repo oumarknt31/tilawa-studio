@@ -62,7 +62,8 @@ BUILTIN_STYLES = [
         "--title-c1": "#ffffff", "--title-c2": "#ffffff", "--title-grad": _grad("#ffffff", "#ffffff"),
         "--reciter-c1": "#ffffff", "--reciter-c2": "#ffffff", "--reciter-grad": _grad("#ffffff", "#ffffff"),
         "--label-bg": "#1d4f56", "--label-border": "3px solid #bf4527", "--label-radius": "3px",
-        "--intro-accent": "#bf4527", "--logo-pos": "tr", **sizes}}
+        "--intro-accent": "#bf4527", "--logo-pos": "tr",
+        "--track-accent": "#bf4527", "--track-tr-accent": "#5c3a6c", **sizes}}
       for sid, fmts, sizes in [
           ("papier", ["16:9"], {"--text-bottom": "60%", "--ar-size": "78px", "--fr-size": "64px", "--fr-width": "1200px", "--ar-width": "1200px", "--tr-width": "1200px", "--tr-size": "46px",
                                 "--fr-gap": "0px", "--tr-gap": "40px", "--title-size": "28px", "--reciter-size": "28px"}),

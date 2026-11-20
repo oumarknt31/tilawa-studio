@@ -536,7 +536,8 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
                     highlight=_is_tasbih(v, a0),
                     voice_start=ws[0].start, voice_end=ws[-1].end,
                     words=[{"t0": round(o.start, 3), "t1": round(o.end, 3), "w": o.word.text,
-                            "tr": tr[k] if k < len(tr) else "", "s": round(o.score, 2)} for k, o in enumerate(ws)],
+                            "tr": tr[k] if k < len(tr) else "", "s": round(o.score, 2),
+                            "di": display_index(v, a0 + k)} for k, o in enumerate(ws)],
                 ))
         else:
             ws = group[0]
@@ -552,6 +553,41 @@ def build_blocks(occ: list[WordTiming], verses: list[quran.Verse], audio: np.nda
 
     retime(blocks, duration, opt)
     return blocks
+
+
+def display_index(v: quran.Verse, k: int) -> int:
+    """The displayed (Uthmani) word that align word k is part of: يَا and بَنِي are both يَـٰبَنِىٓ."""
+    return min(v.align_to_display[k], len(v.display) - 1)
+
+
+def add_display_indexes(b: dict) -> None:
+    """Fill the displayed word of each timed word of a verse block made before they were kept
+    (word tracking colours whole displayed words with the times of the words recited in them)."""
+    ws = b.get("words") or []
+    if b.get("kind") != "verse" or not ws or all("di" in w for w in ws) or len(ws) != b["a1"] - b["a0"]:
+        return
+    try:
+        v = quran.verse(b["surah"], b["ayah"])
+    except (KeyError, ValueError):
+        return
+    for k, w in enumerate(ws):
+        w["di"] = display_index(v, b["a0"] + k)
+
+
+def add_anchors(blocks: list[dict], lang: str) -> None:
+    """For word tracking: each recited word's usual rendering at the start of a translation group, when
+    known ("an": [JS-ready pattern, strength]): وَهُوَ → "et", قُلْ → "Dis"... (the same links as where
+    the translation is cut). The translation is then tracked group by group from the Arabic word it
+    starts with, instead of in proportion only."""
+    for b in blocks:
+        for w in b.get("words") or []:
+            pat, bonus = _anchor_pattern(w.get("w"), lang)
+            if pat:  # (the words alone, without the leading spaces and quotes, which the page allows itself)
+                rest = pat.pattern[pat.pattern.index("]*(") + 3:]
+                inner = rest[:-3] + "\\b" if rest.endswith(")\\b") else rest[:-1]
+                w["an"] = [inner.replace("\\b", "(?![\\p{L}\\p{N}])"), bonus]
+            else:
+                w.pop("an", None)
 
 
 def retime(blocks: list[Block], duration: float, opt: Options | None = None) -> None:

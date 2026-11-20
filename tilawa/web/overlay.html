@@ -65,6 +65,10 @@
     filter: var(--shadow, drop-shadow(0 2px 3px rgba(0, 0, 0, .55)));
   }
   .ol > .f { position: relative; }
+  .ol > .d { display: block; position: absolute; inset: 0; color: transparent; }  /* word tracking: its shapes, under the text */
+  #ar { --base: var(--ar-color, var(--white)); --accent: var(--track-ar-accent, var(--track-accent, #f2c14e)); }
+  #fr { --base: var(--fr-color, var(--white)); --accent: var(--track-fr-accent, var(--track-accent, #f2c14e)); }
+  #tr { --base: var(--tr-color, var(--phonetic)); --accent: var(--track-tr-accent, var(--track-accent, #f2c14e)); }
   .grad > .f { background: var(--g); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .em { font-weight: var(--emph-weight); }
   #ar .em { font-weight: inherit; }  /* (Arabic fonts without bold: the colour only) */
@@ -145,6 +149,7 @@
   body[data-logo-round] #logo { width: var(--logo-size); height: var(--logo-size); object-fit: cover; border-radius: 50%; }
   body.noframe #frame { display: none; }
 </style>
+<link rel="stylesheet" href="/tracking.css">
 <style id="layout"></style>
 <style id="faces"></style>
 </head>
@@ -275,6 +280,250 @@
     }
     el.style.display = text ? "" : "none";
   }
+  // ---------------------------------------------------------------- word tracking (effects: tracking.css)
+  // The texts that follow the recitation word by word, each with its own effect: --track-ar, --track-tr,
+  // --track-fr (an effect id; none: not tracked), --track-fr-mode (groups: meaning groups, cut at the
+  // punctuation or where "|" is written in the translation | words), --track-offset (seconds).
+  // Times: the recitation's own, measured by the alignment (block.words, one per recited word, with the
+  // displayed word it belongs to). The transliteration has one word per recited word; the translation
+  // has no word-for-word alignment: its groups follow the Arabic in proportion to their length.
+  // Every look is computed from the time given to setTime (the editor's clock, or the frame being
+  // exported), never from a running animation.
+  const TRACK_FX = ["ink-sweep", "marker", "underline", "spotlight", "weight", "reading-trail",
+    "brush", "watercolour", "ripple", "pen", "pool", "double",
+    "capsule", "glass", "corners", "brackets", "frame", "ellipse",
+    "satin", "halo", "edge", "column", "star", "orbit",
+    "comet", "dots", "beads", "bookmark", "echo", "pulse",
+    "lift", "breathe", "fold", "ribbon", "shutter", "pointers"];
+  window.TRACK_FX = TRACK_FX;
+  const FRAME_FX = new Set(["capsule", "glass", "corners", "brackets", "frame", "ellipse"]);
+  const STEADY_FX = new Set(["spotlight", "weight", "edge", "echo", ...FRAME_FX]);  // the same all through a word
+  const HAS_LETTER = /[\p{L}\p{N}]/u;
+  const CONNECT = new Set("et qui que dont ou mais car pour afin dans and who which that but for in".split(" "));
+  const tracked = {};  // "ar" | "tr" | "fr" -> {el, fx, units: [{t0, t1, toks: [{spans, f0, f1}]}]}
+  const trackFx = (id) => { const v = css("--track-" + id); return TRACK_FX.includes(v) ? v : ""; };
+
+  // the text as whole words (never letters: an Arabic word keeps its joins and every mark), in the
+  // three copies; returns the words that are recited (not the verse number, nor a pause mark alone)
+  function setWords(el, text, tail, parts) {
+    el.replaceChildren();
+    const toks = [];
+    for (const [t, em] of parts || [[text || "", null]]) for (const piece of t.split(/(\s+)/)) {
+      if (!piece) continue;
+      if (/^\s+$/.test(piece)) toks.push({ space: piece });
+      else if (toks.length && !toks[toks.length - 1].space) toks[toks.length - 1].segs.push([piece, em]);
+      else toks.push({ segs: [[piece, em]] });
+    }
+    const words = [];
+    for (const cls of ["d", "o", "f"]) {
+      const layer = document.createElement("span");
+      layer.className = cls;
+      let k = 0;
+      for (const tk of toks) {
+        if (tk.space) { layer.append(tk.space); continue; }
+        const txt = tk.segs.map(s => s[0]).join(""), timed = HAS_LETTER.test(txt) && !tk.segs.every(s => s[1] === "#num");
+        const w = document.createElement("span");
+        w.className = timed ? "w" : "x";
+        for (const [t, em] of tk.segs) {
+          if (em === null) { w.append(t); continue; }
+          const s = document.createElement("span");
+          s.className = em === "#num" ? "n" : "em"; s.textContent = t;
+          if (cls === "f") s.style.color = em === "#num" ? css("--num-color") || "" : em || "";
+          w.append(s);
+        }
+        layer.append(w);
+        if (timed) { (words[k] = words[k] || { text: txt, spans: [] }).spans.push(w); k++; }
+      }
+      if (tail) {
+        const t = document.createElement("span");
+        t.className = "ayah"; t.textContent = tail;
+        layer.append(" ", t);
+      }
+      if (cls === "d") { const c = document.createElement("span"); c.className = "cur"; layer.append(c); }
+      el.append(layer);
+    }
+    el.style.display = text ? "" : "none";
+    return words;
+  }
+  // the recited words of a block, and where any share of its text falls in time (by letters recited)
+  function timeline(b) {
+    const ws = (b.words || []).filter(w => w.t1 > w.t0);
+    if (!ws.length) return null;
+    const weight = ws.map(w => Math.max(1, (w.w || "").replace(/[^\p{L}]/gu, "").length));
+    const total = weight.reduce((a, c) => a + c, 0);
+    const at = (f) => {
+      let acc = 0;
+      for (let i = 0; i < ws.length; i++) {
+        const x = weight[i] / total;
+        if (f <= acc + x + 1e-9 || i === ws.length - 1) return ws[i].t0 + (ws[i].t1 - ws[i].t0) * Math.min(1, Math.max(0, (f - acc) / x));
+        acc += x;
+      }
+    };
+    return { ws, at };
+  }
+  const span = (texts, tl) => {  // in proportion to their letters
+    const len = texts.map(t => Math.max(1, t.replace(/[^\p{L}\p{N}]/gu, "").length)), tot = len.reduce((a, c) => a + c, 0);
+    let acc = 0;
+    return len.map(l => { const a = tl.at(acc / tot); acc += l; return [a, tl.at(acc / tot)]; });
+  };
+  const single = (words, times) => words.map((w, i) => ({ t0: times[i][0], t1: times[i][1], toks: [{ spans: w.spans, f0: 0, f1: 1 }] }));
+  // Arabic: each displayed word takes the times of the words recited in it (يَـٰبَنِىٓ: يَا then بَنِي)
+  function arabicUnits(words, tl) {
+    const ws = tl.ws, n = words.length;
+    let times = null;
+    if (ws.every(w => "di" in w)) {
+      const d0 = Math.min(...ws.map(w => w.di)), out = words.map(() => null);
+      for (const w of ws) {
+        const j = w.di - d0;
+        if (j >= 0 && j < n) out[j] = out[j] ? [Math.min(out[j][0], w.t0), Math.max(out[j][1], w.t1)] : [w.t0, w.t1];
+      }
+      if (out.every(Boolean)) times = out;
+    }
+    if (!times) times = ws.length === n ? ws.map(w => [w.t0, w.t1]) : span(words.map(w => w.text), tl);
+    return single(words, times);
+  }
+  // transliteration: one word per recited word (else, if rewritten by hand, in proportion)
+  const translitUnits = (words, tl) => single(words, tl.ws.length === words.length ? tl.ws.map(w => [w.t0, w.t1]) : span(words.map(w => w.text), tl));
+  // translation: meaning groups (cut at the punctuation, or where "|" was written), or each word. A group
+  // starts with the Arabic word whose usual rendering opens it (وَهُوَ: "et Il est..."; the links of
+  // block.words[].an), else at the word boundary its place in the text points to; "|4" written by hand:
+  // the next group starts with the subtitle's 4th Arabic word.
+  function frenchUnits(words, hand, mode, tl) {
+    const texts = words.map(w => w.text), cuts = hand.cuts;
+    let groups = [];
+    if (mode === "words") groups = texts.map((_, i) => [i, i + 1]);
+    else {
+      let s = 0;
+      for (let i = 0; i < texts.length; i++) {
+        if (i === texts.length - 1 || (cuts.size ? cuts.has(i) : /[,;:.!?»”)]$/.test(texts[i]))) { groups.push([s, i + 1]); s = i + 1; }
+      }
+      if (!cuts.size) {  // a long group without punctuation: cut before a joining word near its middle
+        const split = ([a, b]) => {
+          if (b - a <= 7) return [[a, b]];
+          let best = -1;
+          for (let i = a + 2; i < b - 2; i++) if (CONNECT.has(texts[i].toLowerCase()) && (best < 0 || Math.abs(i - (a + b) / 2) < Math.abs(best - (a + b) / 2))) best = i;
+          return best < 0 ? [[a, b]] : [...split([a, best]), ...split([best, b])];
+        };
+        groups = groups.flatMap(split);
+      }
+    }
+    const cum = [0];
+    texts.forEach(t => cum.push(cum[cum.length - 1] + Math.max(1, t.length)));
+    const tot = cum[cum.length - 1], ws = tl.ws;
+    let starts;  // the Arabic word each group starts with
+    if (mode === "words" || ws.length < 2) starts = null;
+    else {
+      const wt = ws.map(w => Math.max(1, (w.w || "").replace(/[^\p{L}]/gu, "").length)), wcum = [0];
+      wt.forEach(x => wcum.push(wcum[wcum.length - 1] + x));
+      starts = [0];
+      for (let g = 1; g < groups.length; g++) {
+        const forced = hand.at.get(groups[g - 1][1] - 1);
+        const prev = starts[g - 1], left = groups.length - g;  // (keep room for the groups after this one)
+        if (forced) { starts.push(Math.min(ws.length - left, Math.max(prev + 1, forced - 1))); continue; }
+        const head = texts.slice(groups[g][0]).join(" "), cf = cum[groups[g][0]] / tot;
+        let best = null, arg = prev + 1;
+        for (let j = prev + 1; j <= ws.length - left; j++) {
+          let c = 20 * Math.abs(wcum[j] / wcum[wcum.length - 1] - cf);
+          const an = ws[j].an;
+          if (an && new RegExp("^[\\s«“\"(\\[]*(" + an[0] + ")", "iu").test(head)) c -= 3 * an[1];
+          if (best === null || c < best) { best = c; arg = j; }
+        }
+        starts.push(arg);
+      }
+      if (starts.some((j, g) => g && j <= starts[g - 1]) || starts[starts.length - 1] >= ws.length) starts = null;
+    }
+    return groups.map(([a, b], g) => ({
+      t0: starts ? ws[starts[g]].t0 : tl.at(cum[a] / tot),
+      t1: starts ? (g + 1 < groups.length ? ws[starts[g + 1]].t0 : ws[ws.length - 1].t1) : tl.at(cum[b] / tot),
+      toks: words.slice(a, b).map((w, k) => ({ spans: w.spans, f0: (cum[a + k] - cum[a]) / (cum[b] - cum[a]), f1: (cum[a + k + 1] - cum[a]) / (cum[b] - cum[a]) })),
+    }));
+  }
+  // "Ne vous ai-Je pas engagés,|4 enfants d'Adam,": the groups written by hand (word indexes ending one,
+  // and the Arabic word the next one starts with when given)
+  function handGroups(fr) {
+    const pieces = (fr || "").split(/\|(\d*)/), cuts = new Set(), at = new Map();
+    let n = 0, text = [];
+    for (let i = 0; i < pieces.length; i += 2) {
+      const p = pieces[i];
+      text.push(p.trim());
+      n += p.replace(/\*/g, "").split(/\s+/).filter(w => HAS_LETTER.test(w)).length;
+      if (i + 1 < pieces.length && n) { cuts.add(n - 1); if (pieces[i + 1]) at.set(n - 1, parseInt(pieces[i + 1])); }
+    }
+    return { text: text.filter(Boolean).join(" "), cuts, at };
+  }
+  function track(id, el, fx, units) {
+    for (const c of [...el.classList]) if (c.startsWith("fx-")) el.classList.remove(c);
+    el.classList.toggle("trk", !!fx);
+    if (!fx) { delete tracked[id]; return; }
+    el.classList.add("fx-" + fx);
+    el.classList.toggle("rtl", getComputedStyle(el).direction === "rtl");
+    tracked[id] = { el, fx, units };
+  }
+  // ease of the frame cursor going to the next word (the prototype's cubic-bezier(.2, .7, .2, 1), .23 s)
+  function ease(x) {
+    const bz = (a, b, u) => 3 * a * u * (1 - u) ** 2 + 3 * b * u * u * (1 - u) + u ** 3;
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (bz(.2, .2, m) < x) lo = m; else hi = m; }
+    return bz(.7, 1, (lo + hi) / 2);
+  }
+  const lineBox = (toks) => {  // the tokens on one line: their box in the decoration copy
+    const els = toks.map(k => k.spans[0]);
+    const top = els[0].offsetTop, row = els.filter(e => Math.abs(e.offsetTop - top) < 2);
+    const l = Math.min(...row.map(e => e.offsetLeft)), r = Math.max(...row.map(e => e.offsetLeft + e.offsetWidth));
+    return { l, t: top, w: r - l, h: row[0].offsetHeight };
+  };
+  // the look of every tracked text at time t (seconds of the source video); returns a key that changes
+  // whenever the picture does (the export draws a frame only then)
+  window.setTime = function (t) {
+    let key = "";
+    t += parseFloat(css("--track-offset")) || 0;
+    for (const id of ["ar", "tr", "fr"]) {
+      const L = tracked[id];
+      if (!L || !L.el.isConnected) continue;
+      const U = L.units;
+      let a = -1;  // the word (group) being recited, or the last begun while the next has not (a breath)
+      for (let i = 0; i < U.length; i++) if (t >= U[i].t0) a = i;
+      if (a === U.length - 1 && t >= U[a].t1) a = -2;  // all recited
+      const P = a >= 0 ? Math.min(1, Math.max(0, (t - U[a].t0) / Math.max(1e-3, U[a].t1 - U[a].t0))) : 0;
+      U.forEach((u, i) => {
+        const active = i === a, done = a === -2 || (a >= 0 && i < a), age = a >= 0 ? a - i : 99;
+        for (const tk of u.toks) {
+          const p = active ? Math.min(1, Math.max(0, (P - tk.f0) / Math.max(1e-6, tk.f1 - tk.f0))) : 0;
+          for (const s of tk.spans) {
+            s.classList.toggle("is-active", active);
+            s.classList.toggle("is-done", done);
+            s.classList.toggle("is-near", age > 0 && age < 3);
+            s.style.setProperty("--age", Math.max(1, age));
+            if (active) {
+              s.style.setProperty("--p", p.toFixed(4)); s.style.setProperty("--pc", (p * 100).toFixed(2) + "%");
+              s.style.setProperty("--wave", Math.sin(p * Math.PI).toFixed(4));
+              s.style.setProperty("--ox", (50 + 49 * Math.cos(p * Math.PI * 2)).toFixed(2) + "%");
+              s.style.setProperty("--oy", (50 + 48 * Math.sin(p * Math.PI * 2)).toFixed(2) + "%");
+            }
+          }
+        }
+      });
+      key += `${id}${a}:${STEADY_FX.has(L.fx) ? "" : P.toFixed(3)};`;
+      const cur = L.el.querySelector(".d > .cur");
+      if (cur && FRAME_FX.has(L.fx)) {
+        if (a < 0) { cur.style.opacity = 0; continue; }
+        const u = parseFloat(getComputedStyle(L.el).fontSize) * (id === "ar" ? .03 : .0435);
+        const at = (toks) => { const b = lineBox(toks); return { l: b.l - 2 * u, t: b.t + 2 * u, w: b.w + 4 * u, h: Math.max(14 * u, b.h - 4 * u) }; };
+        // (a group on two lines: the frame goes round the part on the line being recited)
+        const now = [...U[a].toks].reverse().find(k => k.f0 <= P) || U[a].toks[0];
+        const to = at(U[a].toks.filter(k => Math.abs(k.spans[0].offsetTop - now.spans[0].offsetTop) < 2));
+        const k = a > 0 ? ease(Math.min(1, (t - U[a].t0) / .23)) : 1;
+        const from = a > 0 ? at(U[a - 1].toks.slice(-1)) : to;
+        const mix = (x, y) => x + (y - x) * k;
+        const op = a === 0 ? Math.min(1, (t - U[0].t0) / .15) : 1;
+        Object.assign(cur.style, { left: mix(from.l, to.l) + "px", top: mix(from.t, to.t) + "px", width: mix(from.w, to.w) + "px",
+                                   height: mix(from.h, to.h) + "px", opacity: op });
+        if (k < .999 || op < .999) key += `c${k.toFixed(3)}/${op.toFixed(3)};`;
+      }
+    }
+    return key;
+  };
+  window.isTracked = () => Object.keys(tracked).length > 0;
   const DIGITS = "٠١٢٣٤٥٦٧٨٩";
   function ornament(n) {
     const mark = css("--ayah-mark");
@@ -385,13 +634,14 @@
   window.setBlock = function (b) {
     const el = $("block");
     el.hidden = $("band").hidden = !b;
-    if (!b) return;
+    if (!b) { for (const id in tracked) delete tracked[id]; return; }
     for (const x of [el, $("band")]) x.classList.toggle("hl", !!b.highlight);
     const fr = $("fr");
     fr.dir = b.rtl ? "rtl" : "auto";
     setText($("num"), b.num);
+    const hand = handGroups(b.fr), tl = timeline(b);  // ("|": groups of the translation, written by hand)
     const inline = document.body.dataset.layout === "cinema" && css("--num-display") !== "none" && b.num;
-    const marked = (inline ? b.num + " " : "") + (b.fr || "");
+    const marked = (inline ? b.num + " " : "") + hand.text;
     const text = sentenceBreak(marked.replace(/\*/g, ""));
     let parts = keyWords(withBreak(marked, text), b.lang || "fr", css("--emph") || "none", b.highlight);
     if (inline && css("--num-color")) {  // the number in its own colour
@@ -399,10 +649,14 @@
       const [t0, e0] = parts[0], n = b.num + " ";
       if (e0 === null && t0.startsWith(n)) parts.splice(0, 1, [n, "#num"], [t0.slice(n.length), null]);
     }
-    setText(fr, text, "", parts);
     ornamentFont();
-    setText($("ar"), b.ar, ornament(b.ayah), arabicWords(b.ar));
-    setText($("tr"), b.tr);
+    const fx = { fr: tl && trackFx("fr"), ar: tl && trackFx("ar"), tr: tl && trackFx("tr") };
+    if (fx.fr) track("fr", fr, fx.fr, frenchUnits(setWords(fr, text, "", parts), hand, css("--track-fr-mode") || "groups", tl));
+    else { setText(fr, text, "", parts); track("fr", fr, ""); }
+    if (fx.ar) track("ar", $("ar"), fx.ar, arabicUnits(setWords($("ar"), b.ar, ornament(b.ayah), arabicWords(b.ar)), tl));
+    else { setText($("ar"), b.ar, ornament(b.ayah), arabicWords(b.ar)); track("ar", $("ar"), ""); }
+    if (fx.tr) track("tr", $("tr"), fx.tr, translitUnits(setWords($("tr"), b.tr), tl));
+    else { setText($("tr"), b.tr); track("tr", $("tr"), ""); }
     for (const id of ["fr", "ar"]) $(id).classList.toggle("grad", !!b.highlight);
     fitBlock();
   };
