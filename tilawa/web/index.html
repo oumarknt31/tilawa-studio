@@ -174,6 +174,8 @@
   .guide { top: 0; bottom: 0; left: 50%; width: 1px; background: var(--pink); }
   #hit { z-index: 5; cursor: grab; touch-action: none; }
   #hit.text { cursor: move; } #hit.dragging { cursor: grabbing; }
+  #text-line { position: absolute; left: 0; right: 0; z-index: 5; display: none; pointer-events: none; border-top: 2px dashed var(--accent); }
+  #text-line span { position: absolute; right: 6px; top: 3px; font-size: 10px; color: #fff; background: rgba(0, 0, 0, .6); padding: 1px 6px; border-radius: 4px; }
   #el-sel { position: absolute; z-index: 6; display: none; pointer-events: none; border: 1.5px solid var(--accent); border-radius: 6px; }
   #el-sel button { position: absolute; right: -11px; top: -11px; width: 22px; height: 22px; padding: 0; border-radius: 50%; z-index: 6;
     pointer-events: auto; background: var(--danger); border-color: var(--danger); color: #fff; font-size: 15px; line-height: 1; }
@@ -891,6 +893,7 @@
         <svg id="filters" width="0" height="0" style="position:absolute"></svg>
         <div id="dim"></div>
         <iframe id="overlay" src="/overlay.html" title="aperçu"></iframe>
+        <div id="text-line"><span>Limite du texte · place du dessin en dessous</span></div>
         <div id="safe" class="hidden"></div>
         <div class="outline" id="outline"></div>
         <div id="el-sel"><button onclick="showEl(selEl, false)" title="retirer cet élément">×</button></div>
@@ -1258,7 +1261,7 @@ const EN = {
   "Mots importants": "Key words", "Normal": "Normal", "En gras": "Bold", "En couleurs": "In colour",
   "Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde* (aussi dans l'arabe, pour le colorer)":
     "Pick them yourself by putting asterisks around them in the subtitle: *mercy* (in the Arabic too, to colour it)",
-  "Un seul mot": "One word", "Pour ce format": "For this format", "Mot entre *astérisques*": "Word between *asterisks*", "Mot important": "Key word", "Papier crème": "Cream paper",
+  "Un seul mot": "One word", "Limite du texte · place du dessin en dessous": "Text limit · room for the drawing below", "Pour ce format": "For this format", "Mot entre *astérisques*": "Word between *asterisks*", "Mot important": "Key word", "Papier crème": "Cream paper",
   "MAJUSCULES": "CAPITALS", "Petites capitales": "Small caps", "Police du numéro": "Number font",
   "Police de la phonétique": "Transliteration font", "Comme la traduction": "Same as the translation",
   "Disposition": "Layout", "Empilée": "Stacked", "Arabe en haut": "Arabic on top", "Bandeau en bas": "Band at the bottom",
@@ -2199,6 +2202,10 @@ function draw() {
     const el = w.document.getElementById("block");
     if (el) el.style.opacity = Math.max(0, a);
   }
+  // the line the subtitles never go below (style "Papier crème"), shown while choosing the style or background
+  const line = parseFloat(P.style["--text-bottom"]), tl = $("text-line");
+  tl.style.display = line && (tab === "text" || tab === "bg") ? "block" : "none";
+  if (line) tl.style.top = line / 100 * $("stage").clientHeight + "px";
   const sel = $("el-sel");
   frameAround(sel, detached && isEl(selEl) && tab === "text" && !drag && textBox(selEl));
   // its × inside the preview, near an edge
@@ -3806,7 +3813,12 @@ function pickPreset(p) {
 // where the subtitles are, [top, bottom] as shares of the height, so the pictures leave them room
 function textBand() {
   if (!overlayReady) return null;
-  const H = canvasH(), q = textBox("block") || textBox("band");
+  const H = canvasH(), line = parseFloat(P.style["--text-bottom"]);
+  if (line) {  // the line the texts never go below: the drawing under it
+    const el = ow().document.getElementById("block"), top = el ? el.offsetTop : H * .2;
+    return [Math.min(top / H, line / 100 - .1), line / 100];
+  }
+  const q = textBox("block") || textBox("band");
   if (q && q.b > q.t) return [q.t / H, q.b / H];
   const el = ow().document.getElementById("block"), top = el && parseFloat(ow().getComputedStyle(el).top);
   return isFinite(top) ? [top / H, Math.min(1, top / H + 0.25)] : null;

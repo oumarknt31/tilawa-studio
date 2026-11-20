@@ -48,6 +48,7 @@
     --intro-accent: #86dde6;
     --logo-pos: auto;       /* auto (best corner for the format) | tl | tr | bl | br | custom (--logo-x, --logo-y) | none */
     --logo-opacity: 1; --logo-round: 0;  /* --logo-size: per format, in LAYOUTS */
+    /* --text-bottom: 60%  the subtitles never go lower (the place left to a drawing): a long one is made smaller */
   }
   html, body { margin: 0; padding: 0; background: transparent; }
   body { width: 1080px; height: 1920px; overflow: hidden; position: relative; transform-origin: 0 0; }
@@ -70,7 +71,8 @@
 
   #header { position: absolute; top: var(--header-top); left: 0; right: 0; text-align: center; transform: translateX(var(--header-x)); }
   #header > .zoom { zoom: var(--header-zoom); }
-  #block > .zoom, #band > .zoom { zoom: var(--block-zoom); }
+  #block > .zoom { zoom: calc(var(--block-zoom) * var(--fit, 1)); }  /* --fit: made smaller to stay above --text-bottom */
+  #band > .zoom { zoom: var(--block-zoom); }
   #title { font: 700 var(--title-size)/1.1 var(--title-font); letter-spacing: .5px; text-transform: var(--title-case, none); --g: var(--title-grad); --sw: 7px; white-space: nowrap; }
   #reciter { font: 700 var(--reciter-size)/1.2 var(--title-font); --g: var(--reciter-grad); --sw: 5px; }
   #reciter-line { margin-top: 30px; }
@@ -210,6 +212,7 @@
     document.body.style.width = w + "px";
     document.body.style.height = (height || h) + "px";
     applyLayout();
+    fitBlock();
   };
   const css = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim().replace(/^"|"$/g, "");
   const $ = (id) => document.getElementById(id);
@@ -400,7 +403,20 @@
     setText($("ar"), b.ar, ornament(b.ayah), arabicWords(b.ar));
     setText($("tr"), b.tr);
     for (const id of ["fr", "ar"]) $(id).classList.toggle("grad", !!b.highlight);
+    fitBlock();
   };
+  // a subtitle reaching below --text-bottom (share of the height) made smaller to end on that line
+  function fitBlock() {
+    const el = $("block"), z = el.querySelector(".zoom");
+    z.style.removeProperty("--fit");
+    const H = parseFloat(document.body.style.height) || FORMATS[format][1];
+    const line = parseFloat(css("--text-bottom")) / 100 * H - H * .015;  // (a little above it)
+    if (!line || el.hidden || document.body.dataset.layout === "band") return;
+    const top = el.offsetTop, h = el.offsetHeight;
+    if (h && top + h > line) z.style.setProperty("--fit", Math.max(0.4, (line - top) / h).toFixed(4));
+  }
+  window.fitBlock = fitBlock;
+  document.fonts.addEventListener("loadingdone", () => fitBlock());
 
   // title cards before the recitation: what they say, in the translation's language
   const INTRO = {
@@ -502,6 +518,7 @@
     for (const k of [...root]) if (k.startsWith("--") && k !== "--ayah-font" && !(k in (vars || {}))) root.removeProperty(k);
     for (const [k, v] of Object.entries(vars || {})) root.setProperty(k, v);
     applyLayout();
+    fitBlock();
   };
   window.ready = loadFonts().then(() => document.fonts.ready);
   // after a change: lay out (which starts loading the fonts in use) and wait for them
@@ -511,6 +528,7 @@
     if ($("logo").getAttribute("src") && !$("logo").complete) await new Promise(r => { $("logo").onload = $("logo").onerror = r; });
     await new Promise(r => requestAnimationFrame(() => r()));
     await document.fonts.ready;
+    fitBlock();  // with the fonts in place
     placeLogo();  // the title's final width
   };
   applyLayout();

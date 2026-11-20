@@ -109,7 +109,9 @@ font confiance, contrairement à un fichier téléchargé dans un navigateur.
        un bandeau translucide en bas), *Cinéma doré*, *Minimal* ;
      - **Papier crème** (16:9 et vertical), fait pour les dessins sur papier crème (images par verset) : texte
        plat sans contour, arabe bleu canard, traduction en serif de livre avec son numéro en bleu, phonétique
-       prune, titre dans un cadre, et **un seul mot important en rouge** (entoure aussi un mot de l'arabe
+       prune, titre dans un cadre, et **un seul mot important en rouge** ; le texte ne descend jamais sous une ligne à
+       60 % de la hauteur (62 % en vertical), en pointillés sur l'aperçu : un long sous-titre est rapetissé, le dessin
+       a le reste (entoure aussi un mot de l'arabe
        d'*astérisques* pour le colorer). Texte foncé : pour les fonds clairs ;
      - les **éléments du bloc** (numéro, traduction, arabe, phonétique) : × pour en retirer un, quel que soit
        le style ; sur l'aperçu, le bloc se déplace d'un seul tenant, ou chaque élément séparément avec *Déplacer
