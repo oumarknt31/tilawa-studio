@@ -49,6 +49,7 @@
     --logo-pos: auto;       /* auto (best corner for the format) | tl | tr | bl | br | custom (--logo-x, --logo-y) | none */
     --logo-opacity: 1; --logo-round: 0;  /* --logo-size: per format, in LAYOUTS */
     /* --text-bottom: 60%  the subtitles never go lower (the place left to a drawing): a long one is made smaller */
+    /* --max-lines: 2       the translation, Arabic and transliteration each on 2 lines at most (else a little smaller) */
   }
   html, body { margin: 0; padding: 0; background: transparent; }
   body { width: 1080px; height: 1920px; overflow: hidden; position: relative; transform-origin: 0 0; }
@@ -409,6 +410,7 @@
   function fitBlock() {
     const el = $("block"), z = el.querySelector(".zoom");
     z.style.removeProperty("--fit");
+    fitLines();
     const H = parseFloat(document.body.style.height) || FORMATS[format][1];
     const line = parseFloat(css("--text-bottom")) / 100 * H - H * .015;  // (a little above it)
     if (!line || el.hidden || document.body.dataset.layout === "band") return;
@@ -416,6 +418,17 @@
     if (h && top + h > line) z.style.setProperty("--fit", Math.max(0.4, (line - top) / h).toFixed(4));
   }
   window.fitBlock = fitBlock;
+  // each text on --max-lines lines at most: its size lowered step by step (to 70 %) until it fits
+  function fitLines() {
+    const max = parseInt(css("--max-lines"));
+    for (const id of ["fr", "ar", "tr"]) {
+      const el = $(id), f = el.querySelector(".f");
+      el.style.fontSize = "";
+      if (!max || !f || el.style.display === "none" || $("block").hidden) continue;
+      const lines = () => Math.round(f.offsetHeight / parseFloat(getComputedStyle(f).lineHeight));
+      for (let k = 0.95; k >= 0.7 && lines() > max; k -= 0.05) el.style.fontSize = `calc(var(--${id}-size) * ${k.toFixed(2)})`;
+    }
+  }
   document.fonts.addEventListener("loadingdone", () => fitBlock());
 
   // title cards before the recitation: what they say, in the translation's language

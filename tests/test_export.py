@@ -135,3 +135,15 @@ def test_crossfades_after_a_cut_too_short_to_fade(tmp_path):
     run = subprocess.run([ff, "-v", "error", *inputs.args, "-filter_complex", ";".join(graph), "-map", f"[{label}]",
                           "-f", "null", "-"], capture_output=True, text=True)
     assert run.returncode == 0, run.stderr
+
+
+def test_subtitle_lengths_are_the_same_in_the_editor():
+    import re
+    from pathlib import Path
+    from tilawa import library, segment
+
+    page = (Path(__file__).parent.parent / "tilawa/web/index.html").read_text(encoding="utf-8")
+    for k, v in segment.LENGTHS.items():
+        m = re.search(rf"{k}: {{ max_words: (\d+), max_french_chars: (\d+), max_part_s: ([\d.]+) }}", page)
+        assert m and (int(m[1]), int(m[2]), float(m[3])) == (v["max_words"], v["max_french_chars"], v["max_part_s"])
+    assert all(s.get("length", "short") in segment.LENGTHS for s in library.BUILTIN_STYLES)

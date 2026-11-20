@@ -594,6 +594,12 @@
         <button class="small" onclick="newText($('video').currentTime)" title="un sous-titre écrit à la main, à la tête de lecture (ou l'outil Texte T dans la timeline)"><svg class="i" style="width:14px"><use href="#i-plus"/></svg>Nouveau</button>
         <span id="subs-count" class="badge"></span></div>
       <div id="notice"></div>
+      <div class="row" style="margin:0 0 10px;gap:8px;flex-wrap:wrap"><span class="small muted">Longueur</span>
+        <div class="seg-ctl" id="sub-length">
+          <button data-v="short" onclick="setLength('short')" title="une ligne d'arabe, deux de traduction">Courts</button>
+          <button data-v="normal" onclick="setLength('normal')">Normaux</button>
+          <button data-v="long" onclick="setLength('long')">Longs</button>
+        </div></div>
       <div id="pick-surah" class="section hidden"></div>
       <div id="blocks" class="blocks"></div>
     </div>
@@ -1261,7 +1267,12 @@ const EN = {
   "Mots importants": "Key words", "Normal": "Normal", "En gras": "Bold", "En couleurs": "In colour",
   "Choisis-les toi-même en les entourant d'astérisques dans le sous-titre : *miséricorde* (aussi dans l'arabe, pour le colorer)":
     "Pick them yourself by putting asterisks around them in the subtitle: *mercy* (in the Arabic too, to colour it)",
-  "Un seul mot": "One word", "Limite du texte · place du dessin en dessous": "Text limit · room for the drawing below", "Pour ce format": "For this format", "Mot entre *astérisques*": "Word between *asterisks*", "Mot important": "Key word", "Papier crème": "Cream paper",
+  "Un seul mot": "One word", "Longueur": "Length", "Courts": "Short", "Normaux": "Normal", "Longs": "Long",
+  "une ligne d'arabe, deux de traduction": "one line of Arabic, two of translation",
+  "Recouper les sous-titres ({what}) ? Ils seront recréés (tes modifications de sous-titres seront remplacées).":
+    "Cut the subtitles again ({what})? They will be made again (your subtitle changes will be replaced).",
+  "plus courts": "shorter", "longueur normale": "normal length", "plus longs": "longer",
+  "il va avec des sous-titres courts": "it goes with short subtitles", "Recouper": "Cut again", "Limite du texte · place du dessin en dessous": "Text limit · room for the drawing below", "Pour ce format": "For this format", "Mot entre *astérisques*": "Word between *asterisks*", "Mot important": "Key word", "Papier crème": "Cream paper",
   "MAJUSCULES": "CAPITALS", "Petites capitales": "Small caps", "Police du numéro": "Number font",
   "Police de la phonétique": "Transliteration font", "Comme la traduction": "Same as the translation",
   "Disposition": "Layout", "Empilée": "Stacked", "Arabe en haut": "Arabic on top", "Bandeau en bas": "Band at the bottom",
@@ -2874,6 +2885,7 @@ function renderNotice() {
   renderCount();
 }
 function renderBlocks() {
+  renderLength();
   $("blocks").innerHTML = P.blocks.map((b, i) => {
     const label = b.kind === "verse" ? vlabel(b) : b.kind === "basmala" ? "Basmala" : b.kind === "text" ? t("Texte") : "Isti'adha";
     const manual = !(b.words || []).length;  // written by hand (or pasted from one)
@@ -3278,6 +3290,20 @@ async function deleteFont(family) {
 }
 const PLACE_KEYS = ["--header-top", "--header-x", "--block-top", "--block-x", "--header-zoom", "--block-zoom", "--band-top", "--logo-x", "--logo-y",
   "--num-dx", "--num-dy", "--fr-dx", "--fr-dy", "--ar-dx", "--ar-dy", "--tr-dx", "--tr-dy"];
+// how long a subtitle may get before it is cut (as segment.LENGTHS on the server)
+const LENGTHS = {
+  short: { max_words: 7, max_french_chars: 65, max_part_s: 6.5 },
+  normal: { max_words: 11, max_french_chars: 115, max_part_s: 9.0 },
+  long: { max_words: 15, max_french_chars: 160, max_part_s: 12.0 },
+};
+const lengthOf = () => Object.keys(LENGTHS).find(k => LENGTHS[k].max_words === (P.segment?.max_words ?? 11)) || "";
+function renderLength() { segOn("sub-length", lengthOf()); }
+async function setLength(k) {
+  if (k === lengthOf()) return;
+  if (!await ask(t("Recouper les sous-titres ({what}) ? Ils seront recréés (tes modifications de sous-titres seront remplacées).",
+                   { what: t({ short: "plus courts", normal: "longueur normale", long: "plus longs" }[k]) }))) return renderLength();
+  reanalyze({ segment: LENGTHS[k] }, true);
+}
 function applyStyle(id) {
   const s = styles.find(x => x.id === id);
   if (!s) return;
@@ -3286,7 +3312,10 @@ function applyStyle(id) {
   const keep = same ? Object.fromEntries(Object.entries(P.style).filter(([k]) => PLACE_KEYS.includes(k))) : {};
   P.style = { ...keep, ...s.style };
   changed({ look: true });
-  toast(t("Style « {name} » appliqué", { name: esc(t(s.name)) }));
+  if (s.length && s.length !== lengthOf()) {  // big text: offer to cut the subtitles shorter
+    toast(`${t("Style « {name} » appliqué", { name: esc(t(s.name)) })} · ${t("il va avec des sous-titres courts")}
+      <button class="small" onclick="this.closest('.toast').remove(); setLength('${s.length}')">${t("Recouper")}</button>`);
+  } else toast(t("Style « {name} » appliqué", { name: esc(t(s.name)) }));
 }
 async function saveStyle() {
   const name = await ask(t("Nom de ton style :"), { input: t("Mon style") });

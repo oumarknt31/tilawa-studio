@@ -243,7 +243,7 @@ def _start_project(folder: Path, slug: str, source: str, remove_source: bool, su
                    translation: str, reading: str) -> dict:
     """A new project made from a file or a link, then its recitation analysed (a job)."""
     settings = LIB.update_settings({"format": format, "lang": lang, "style": style, "reading": reading})
-    look = LIB.style(style)
+    look, length = LIB.style(style), LIB.style_length(style)
     translit = settings.get("translit", "simple")
     translation = translation or (settings.get("translations") or {}).get(lang, "")
     if translation:  # the one chosen in the form is remembered for this language
@@ -252,6 +252,9 @@ def _start_project(folder: Path, slug: str, source: str, remove_source: bool, su
     def work(progress):
         p = project.create(folder, source, surah, first_verse, last_verse, reciter, title, progress, format, lang, look,
                            translit, translation, reading)
+        if length in segment.LENGTHS:  # big text: subtitles cut shorter
+            p.segment.update(segment.LENGTHS[length])
+            p.save()
         if remove_source:
             Path(source).unlink(missing_ok=True)
         project.analyze(p, progress)

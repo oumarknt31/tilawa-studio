@@ -49,6 +49,15 @@ class Options:
     translit: str = "simple"  # how the phonetic line is written: translit.STYLES, or "tanzil"
 
 
+# how long a subtitle may get before it is cut (at a breath, a pause mark or a place the translation can
+# follow): "short" for big text (one line of Arabic, two of translation), "normal" the default
+LENGTHS = {
+    "short": {"max_words": 7, "max_french_chars": 65, "max_part_s": 6.5},
+    "normal": {"max_words": 11, "max_french_chars": 115, "max_part_s": 9.0},
+    "long": {"max_words": 15, "max_french_chars": 160, "max_part_s": 12.0},
+}
+
+
 def translation(v: quran.Verse, lang: str, chosen: str | None = None) -> str:
     if lang == "fr" and quran.edition("fr", chosen) == "fr.hamidullah":
         return v.french
