@@ -56,7 +56,7 @@ BUILTIN_STYLES = [
     *({"id": sid, "name": "Papier crème", "builtin": True, "formats": fmts, "length": "whole", "style": {
         "--layout": "cinema", "--header-mode": "corner", "--emph": "one", "--emph-colors": "#bf4527", "--emph-weight": "600",
         "--ar-emph": "#bf4527", "--stroke": "0", "--shadow": "none", "--outline": "#3b2a1e",
-        "--arabic": '"Amiri"', "--ar-weight": "700", "--ar-color": "#1c5961", "--text-font": '"Source Serif 4"', "--fr-weight": "500", "--fr-break": "comma", "--max-lines": "2",
+        "--arabic": '"Amiri"', "--ar-color": "#1c5961",  # (Amiri Regular; Bold for the word read in "Weight focus") "--text-font": '"Source Serif 4"', "--fr-weight": "500", "--fr-break": "comma", "--max-lines": "2",
         "--fr-color": "#3b2a1e", "--num-color": "#1c5961", "--tr-font": '"Open Sans"', "--tr-color": "#5c3a6c",
         "--title-font": '"Montserrat"', "--title-case": "uppercase",
         "--title-c1": "#ffffff", "--title-c2": "#ffffff", "--title-grad": _grad("#ffffff", "#ffffff"),

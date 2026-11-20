@@ -284,7 +284,7 @@ Tests: `uv run python -m pytest -q`
   Warsh mushaf), dump `mushafs-4` version 2026-10-26, under the Qur'anpedia.net Data License
   (https://api.quranpedia.net/dumps/LICENSE.md); `tilawa/data/quran-warsh.txt`, copied verbatim and kept current
   by `packaging/warsh_text.py`.
-- Fonts (SIL Open Font License, see `tilawa/fonts/`): Amiri Quran, Amiri, Scheherazade New,
+- Fonts (SIL Open Font License, see `tilawa/fonts/`): Amiri Quran, Amiri (Regular and Bold), Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat,
   Nunito, Baloo 2, Playfair Display, Source Serif 4, Lora, Cinzel.
 - Recognition model: Apache 2.0.

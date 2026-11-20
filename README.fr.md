@@ -290,7 +290,7 @@ Tests : `uv run python -m pytest -q`
   Complexe du roi Fahd), dump `mushafs-4` version 2026-10-26, sous la licence de données de Qur'anpedia.net
   (https://api.quranpedia.net/dumps/LICENSE.md) ; `tilawa/data/quran-warsh.txt`, copié tel quel et tenu à jour
   par `packaging/warsh_text.py`.
-- Polices (SIL Open Font License, voir `tilawa/fonts/`) : Amiri Quran, Amiri, Scheherazade New,
+- Polices (SIL Open Font License, voir `tilawa/fonts/`) : Amiri Quran, Amiri (Regular et Bold), Scheherazade New,
   Noto Naskh Arabic, Reem Kufi, Aref Ruqaa, Comic Neue, Poppins, Open Sans, Arimo, Oswald, Montserrat, Nunito, Baloo 2,
   Playfair Display, Source Serif 4, Lora, Cinzel.
 - Modèle de reconnaissance : Apache 2.0.
